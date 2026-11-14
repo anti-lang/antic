@@ -12,8 +12,9 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `sema_generic.c`, `antl_tree.c`, `sema_escape.c`, `whole.c`,
 `whole_tables.c`, `lower_place.c`, `coff.c`, `llvm_emit_call.c`,
 `build.c`, `sema_lock.c`, `lower_stmt.c`, `lower_expr.c`, `lower_desc.c`,
-`platform.c`, `parser_stmt.c`, `types.c`, `patterns.c` and `repo.c` stay
-by them. A guard stays in the code as it is. A later
+`platform.c`, `parser_stmt.c`, `types.c`, `patterns.c`, `repo.c`,
+`sema_call.c`, `sema_value.c`, `sema_uninit.c`, `registry.c`, `header.c`,
+`parser_decl.c`, `lexer.c` and `antl_read_ir.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -35,7 +36,9 @@ the source of `docs/reports/2026-11-13-coverage-phase-3e.md`, and those
 of the four files of batch 3f against the source of
 `docs/reports/2026-11-13-coverage-phase-3f.md`. Those of the four files
 of batch 3g were checked against the source of
-`docs/reports/2026-11-13-coverage-phase-3g.md`. A guard named "the report
+`docs/reports/2026-11-13-coverage-phase-3g.md`. Those of the eight files
+of batch 3h were checked against the source of
+`docs/reports/2026-11-14-coverage-phase-3h.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -472,6 +475,107 @@ The repositories of `anti build`, sorted by batch 3g of the third phase.
 | `index_dir` | A name that is no package name. | The manifest reader refuses the name of a dependency by R164, and `deps.c` the name of an index and of a lock file, as `tests/diagnostics-open.txt` says. |
 | `repo_module` | A name, a version, a module path or a digest that the rules refuse. | `deps.c` checks each of an index and of a lock file before it calls `repo_module`. |
 
+## `src/antic/sema_call.c`
+
+The calls and the members of the checker, sorted by batch 3h of the third
+phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `reached_member` | A body table outside its three kinds. | `types_body_table` gives one of the three. |
+| `refuse_abstract_call` | An abstract member that no level of the chain declares. | The member was found on the same chain. |
+| `refuse_own_member` | A member without a symbol or a type. | Both callers pass a function that the declaration pass gave a symbol and a type. |
+| `from_module_operator` | A copy of a generic `operator fn` of a library, which keeps the module of the generic. | The checker checks the levels in the tree of the generic, where the library compiles it. A client that reads a private field of a copy through `==` and `<` of a library reaches no check of a level. |
+| `sema_resolve_origin` | No class `anti.lang.Error`, which it leaves. | A `may fail` function of a module that does not import `anti.lang` is refused at its declaration, and its body is not checked. |
+| `check_handled` | A handler of the enclosing `try` outside a `try` block. | The handler takes that kind inside a `try` block alone, and the arm before the `switch` returns there. |
+| `refuse_field` | A missing field of a copy that a refused chain of copies left unfilled. | The copy past the limit of 256 levels has no name that a program can write. |
+| `unfailing_result` | The interface that `lib.instance` provides on a call that cannot fail. | `instance_at` of `anti.plugin` may fail, so the call goes through `check_handled`. |
+| `check_type_member` | A member without a symbol, and a static field that is not atomic. | The declaration pass gives every member a symbol, and the parser refuses `static` without `atomic`. |
+| `type_namespace` | `Object` that no lookup finds. | `Object.deserialize` is checked as its own call before the namespace of a type. |
+
+## `src/antic/sema_value.c`
+
+The values and the moves of the checker, sorted by batch 3h of the third
+phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `owning_field` and `owns_reason` | A class that owns memory without an `own` field, a `destruct` or a field whose value owns. | `sema_needs_teardown` holds the same rule, and only a class it answers reaches the phrase. |
+| `concurrent_in` and `declared_align` | A type that is NULL. | Every caller passes the type of a value or of a field. |
+| `field_up` | A name that no level of the chain declares. | The caller found the field on the same chain. |
+
+## `src/antic/sema_uninit.c`
+
+The check `uninitialized-read`, sorted by batch 3h of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `read_element` and `write_element` | A buffer that the walk does not follow, or a path that has ended. | `element_of` found the buffer of the place, and the walk of a block stops at the statement that ends its path. |
+| `place_element` | A place that is NULL. | Every caller passes the target of an assignment or an operand. |
+| `walk_closure` | An anonymous function without a body. | The parser gives every anonymous function a block. |
+| `walk_expr` | `x in lo..hi` without its test. | The checker writes the test of every `in` as two comparisons. |
+| `walk_assign` | An element whose buffer and index cannot be read. | `place_element` gives an element of a buffer alone, which `element_of` takes apart. |
+| `sema_check_fills` | A function without a body, and a quiet check. | The checker calls the pass for a function with a body, outside a quiet check. |
+
+## `src/rt/registry.c`
+
+The reader of `Object.deserialize`, sorted by batch 3h of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lend` | A size above `INT64_MAX`. | Every size comes from a type or from a count of elements that a text in memory holds. |
+| `read_elements` | A count of elements times their size that does not fit. | A text with that many elements does not fit in memory. |
+| `read_owned` | An `own` pointer to a class without a descriptor. | The compiler writes the descriptor of every class a field names. |
+| `read_array` | An array without an element type or a length. | The compiler writes both for every array field. |
+| `read_value` | A number that the scanner of JSON takes and the reader of a float refuses. | `anti_rt_json_valid_number` refuses every text without digits first. |
+| `read_value` | A tuple or a `?T` without its descriptor. | The compiler writes the descriptor of every tuple and `?T` a field holds. |
+| `anti_lang_Object_deserialize` | No allocator. | `Object.deserialize` takes a `*Allocator`, which is never `none`. |
+
+## `src/antic/header.c`
+
+The C header, sorted by batch 3h of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `scalar_name` | A type with no scalar name of C. | Every caller passes a scalar. |
+| `type_names_error` and `emit_tuples` | A type that is NULL. | Every caller passes the type of a field, a parameter or a result. |
+| `element_c_name` | A slice in the name of a tuple or a `?T`. | An exported signature that holds one is refused, since C cannot represent it. |
+| `vector_typedef` | A `char` lane. | A `char` lane of a simd struct is refused. |
+| `class_fields` | The table pointer among the own fields of a class. | The root holds it, and the header writes the root as `anti_Object`. |
+| `member_signature` and `class_wrapper` | A parameter without a name. | The declaration and the library file both carry the name of every parameter. |
+
+## `src/antic/parser_decl.c`
+
+The declarations of the parser, sorted by batch 3h of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `parser_member` | `internal` before a member. | The readers of a class body and of an enum body refuse `internal` before they call it. |
+| `parser_member` | No `fn` after the marks. | The callers call it where `fn`, `const` or `static` follows the marks. |
+| `parser_compatible_line` | A version that is no number. | `tests/diagnostics-open.txt` names the reason. |
+| `parser_members_of` | `inherits` and a nested type in the body. | Its one caller reads an enum body and passes no list of nested types. |
+
+## `src/antic/lexer.c`
+
+The lexer, sorted by batch 3h of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lexer_token_kind_name` | The kinds of a literal, a comment and the end. | The parser expects a symbol, a keyword or an identifier alone, and the operators of the checker are symbols. |
+| `lexer_token_kind_name` | A spelling longer than its cache entry. | No spelling is that long, by the `[provisional]` entry in `docs/decisions.md`. |
+| `lexer_token_category` | The end and an invalid token. | `--dump tokens` stops before the end, and a source with an invalid token prints no tokens. |
+
+## `src/antic/antl_read_ir.c`
+
+The checks of a later library file, which the fixes of T242 to T251
+added after batch 3b.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `check_table_read`, `check_table_write` and `check_generic_copy` | A record of the module of the file itself. | A file records what it takes from other modules alone. |
+| `copy_of_missing_generic`, `check_table_read`, `check_table_write` and `check_generic_copy` | A module that no file of the program holds. | Every import of a file is read before it. |
+| `check_table_write` and `check_generic_copy` | A class or a generic that the later file lacks. | The read of the declarations names it first, as `needs struct` and `needs generic`. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -501,5 +605,11 @@ The repositories of `anti build`, sorted by batch 3g of the third phase.
   sort.
 - The sides of a condition in `parser_stmt.c`, `types.c`, `patterns.c`
   and `repo.c` that the report of batch 3g did not sort.
+- The sides of a condition in the eight files of batch 3h that its report
+  did not sort. A class of 17 interfaces reaches the cap of 16 that
+  `ambiguous_member` names.
+- The quiet check that `sema_move_local` leaves, which no probe of batch
+  3h reached. A damaged file reaches the mark of a generic copy above 1
+  that `read_generic_copies` refuses.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
