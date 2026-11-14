@@ -1,0 +1,11 @@
+//! A constant of a class body names its type.
+
+class Counter
+{
+	const LIMIT: = 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

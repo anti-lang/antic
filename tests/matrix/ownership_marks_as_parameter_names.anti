@@ -1,0 +1,15 @@
+//! `own`, `lent`, `keep` and `concurrent` are contextual words, so a parameter
+//! may carry each as its name. The program prints the sum of the four.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn sum(own: int, lent: int, keep: int, concurrent: int) -> int
+{
+	return own + lent + keep + concurrent;
+}
+
+fn main() -> int
+{
+	printf("sum %lld\n".ptr, sum(1, 2, 3, 4));
+	return 0;
+}

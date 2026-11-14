@@ -1,0 +1,11 @@
+//! A static field of a class names its type after a colon.
+
+class Counter
+{
+	pub static atomic count int = 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

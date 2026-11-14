@@ -1,0 +1,13 @@
+//! The parameters of a function of a class body are separated by commas.
+
+class Counter
+{
+	pub fn add(self n: int)
+	{
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

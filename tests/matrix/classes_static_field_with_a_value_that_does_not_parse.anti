@@ -1,0 +1,11 @@
+//! The value of a static field of a class is an expression.
+
+class Counter
+{
+	pub static atomic count: int =;
+}
+
+fn main() -> int
+{
+	return 0;
+}

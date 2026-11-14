@@ -1,0 +1,11 @@
+//! A constant of a class body has a name.
+
+class Counter
+{
+	const = 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

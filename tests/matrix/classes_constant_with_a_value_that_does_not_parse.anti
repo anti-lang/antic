@@ -1,0 +1,11 @@
+//! The value of a constant of a class body is an expression.
+
+class Counter
+{
+	const LIMIT: int =;
+}
+
+fn main() -> int
+{
+	return 0;
+}

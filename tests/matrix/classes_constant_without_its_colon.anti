@@ -1,0 +1,11 @@
+//! A constant of a class body names its type after a colon.
+
+class Counter
+{
+	const LIMIT int = 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

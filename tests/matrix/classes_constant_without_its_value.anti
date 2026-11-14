@@ -1,0 +1,11 @@
+//! A constant of a class body gives its value after `=`.
+
+class Counter
+{
+	const LIMIT: int 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

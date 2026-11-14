@@ -1,0 +1,11 @@
+//! A static field of a class names its type.
+
+class Counter
+{
+	pub static atomic count: = 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}
