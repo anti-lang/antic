@@ -1,0 +1,30 @@
+//! C1 follows a buffer of `alloc(T, n)` while its local holds it. `=` gives the
+//! local a pointer that is no fresh buffer, so a read of an element that the
+//! first buffer lacked passes. The program prints both elements.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pick(k: int) -> int
+{
+	let q = alloc(int, 2) else {
+		return -1;
+	};
+	q[0] = k;
+	q[1] = k + 1;
+	let p = alloc(int, 2) else {
+		free(q);
+		return -1;
+	};
+	p[0] = 0;
+	free(p);
+	p = q;
+	let w = p[0] * 10 + p[1];
+	free(q);
+	return w;
+}
+
+fn main() -> int
+{
+	printf("pick %lld\n".ptr, pick(2));
+	return 0;
+}

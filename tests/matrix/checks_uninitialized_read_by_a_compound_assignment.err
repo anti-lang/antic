@@ -1,0 +1,1 @@
+checks_uninitialized_read_by_a_compound_assignment.anti:10:2: error: element 1 of `p` is read before every path from `alloc` on line 6 wrote it [uninitialized-read]

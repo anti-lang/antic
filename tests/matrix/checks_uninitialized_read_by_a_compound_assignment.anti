@@ -1,0 +1,19 @@
+//! C1 at a compound assignment: `p[1] += 2` reads element 1 of `alloc(T, n)`
+//! before it writes it, and no path wrote it.
+
+fn pick(k: int) -> int
+{
+	let p = alloc(int, 4) else {
+		return -1;
+	};
+	p[0] = k;
+	p[1] += 2;
+	let w = p[0];
+	free(p);
+	return w;
+}
+
+fn main() -> int
+{
+	return pick(2);
+}
