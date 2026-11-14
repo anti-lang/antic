@@ -317,8 +317,9 @@ elseif(CASE STREQUAL "simd")
     expect_output("${dir}/simd${EXE}" "${SOURCES}/simd.expected")
 elseif(CASE STREQUAL "forms")
     # The forms of a header that no other library holds: a constant of
-    # bool, a text with a control character, a vector type per kind of
-    # lane, a union, a tuple with pointers and an array, and a parameter
+    # bool, a text with a control character and one with a quote, a
+    # backslash and a byte outside ASCII, a vector type per kind of lane,
+    # a union, a tuple with pointers and an array, and a parameter
     # that is a function with its context. The header compiles as C++17
     # as well.
     library(forms static "${dir}")

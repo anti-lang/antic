@@ -27,6 +27,13 @@ typedef int8x16_t I8x16;
 typedef __m128i I8x16;
 #endif
 
+/** Sixteen lanes of one byte, unsigned. */
+#if defined(__aarch64__) || defined(_M_ARM64)
+typedef uint8x16_t U8x16;
+#else
+typedef __m128i U8x16;
+#endif
+
 /** Eight lanes of sixteen bits, signed. */
 #if defined(__aarch64__) || defined(_M_ARM64)
 typedef int16x8_t I16x8;
@@ -39,6 +46,13 @@ typedef __m128i I16x8;
 typedef uint16x8_t U16x8;
 #else
 typedef __m128i U16x8;
+#endif
+
+/** Eight lanes of a half float. */
+#if defined(__aarch64__) || defined(_M_ARM64)
+typedef uint16x8_t F16x8;
+#else
+typedef __m128i F16x8;
 #endif
 
 /** Four lanes of thirty-two bits, unsigned. */
@@ -88,6 +102,8 @@ struct anti_tuple_ptr_int_optr_int_a2_int {
 #define DISABLED false
 /** A text with a bell and a tab in it. */
 static const char BELL[] = "ring\007tab\011here";
+/** A text with a quote, a backslash and a letter outside ASCII in it. */
+static const char QUOTED[] = "say \"caf\303\251\" at C:\\";
 
 /** A pointer, a pointer that may be none and an array in one tuple. */
 struct anti_tuple_ptr_int_optr_int_a2_int parts(int64_t * /* non-null */ p, int64_t *q);
