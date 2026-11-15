@@ -1,0 +1,11 @@
+//! `close(c)` cannot fail, so a handler on it is refused.
+
+fn main() -> int
+{
+	let c = chan int(1);
+	close(c) catch {
+		return 1;
+	};
+	delete(c);
+	return 0;
+}

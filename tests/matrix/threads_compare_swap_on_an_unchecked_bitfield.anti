@@ -1,0 +1,17 @@
+//! `compare_swap` on a field that `unchecked` marks takes one word, and a
+//! bitfield is a part of one.
+
+concurrent class Node
+	unchecked(unguarded-field, "a lock-free list")
+{
+	pub flag: u8 : 3,
+	pub rest: u8 : 5,
+}
+
+fn main() -> int
+{
+	let n = alloc Node { flag: 0, rest: 0 };
+	let ok = n.flag.compare_swap(0, 1);
+	delete(n);
+	return ok as int;
+}

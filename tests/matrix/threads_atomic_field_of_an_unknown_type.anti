@@ -1,0 +1,12 @@
+//! An atomic field of a type that does not exist gets the message of the type
+//! alone.
+
+class Holder
+{
+	pub atomic n: Nope = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

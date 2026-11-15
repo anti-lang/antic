@@ -1,0 +1,98 @@
+//! `simd.any` and `simd.all` of the mask of a simd struct above the vector cap
+//! of 256 bytes. The mask has a byte per lane, 512 of them, so each fold is a
+//! loop over the bytes. A mask with one lane set gives `any` alone, and a mask
+//! with every lane set gives both.
+
+import anti.simd;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct U8x512
+	allow(above-vector-cap, "the loops over the lanes are the subject")
+{
+	l0: u8, l1: u8, l2: u8, l3: u8, l4: u8, l5: u8, l6: u8, l7: u8,
+	l8: u8, l9: u8, l10: u8, l11: u8, l12: u8, l13: u8, l14: u8, l15: u8,
+	l16: u8, l17: u8, l18: u8, l19: u8, l20: u8, l21: u8, l22: u8, l23: u8,
+	l24: u8, l25: u8, l26: u8, l27: u8, l28: u8, l29: u8, l30: u8, l31: u8,
+	l32: u8, l33: u8, l34: u8, l35: u8, l36: u8, l37: u8, l38: u8, l39: u8,
+	l40: u8, l41: u8, l42: u8, l43: u8, l44: u8, l45: u8, l46: u8, l47: u8,
+	l48: u8, l49: u8, l50: u8, l51: u8, l52: u8, l53: u8, l54: u8, l55: u8,
+	l56: u8, l57: u8, l58: u8, l59: u8, l60: u8, l61: u8, l62: u8, l63: u8,
+	l64: u8, l65: u8, l66: u8, l67: u8, l68: u8, l69: u8, l70: u8, l71: u8,
+	l72: u8, l73: u8, l74: u8, l75: u8, l76: u8, l77: u8, l78: u8, l79: u8,
+	l80: u8, l81: u8, l82: u8, l83: u8, l84: u8, l85: u8, l86: u8, l87: u8,
+	l88: u8, l89: u8, l90: u8, l91: u8, l92: u8, l93: u8, l94: u8, l95: u8,
+	l96: u8, l97: u8, l98: u8, l99: u8, l100: u8, l101: u8, l102: u8, l103: u8,
+	l104: u8, l105: u8, l106: u8, l107: u8, l108: u8, l109: u8, l110: u8, l111: u8,
+	l112: u8, l113: u8, l114: u8, l115: u8, l116: u8, l117: u8, l118: u8, l119: u8,
+	l120: u8, l121: u8, l122: u8, l123: u8, l124: u8, l125: u8, l126: u8, l127: u8,
+	l128: u8, l129: u8, l130: u8, l131: u8, l132: u8, l133: u8, l134: u8, l135: u8,
+	l136: u8, l137: u8, l138: u8, l139: u8, l140: u8, l141: u8, l142: u8, l143: u8,
+	l144: u8, l145: u8, l146: u8, l147: u8, l148: u8, l149: u8, l150: u8, l151: u8,
+	l152: u8, l153: u8, l154: u8, l155: u8, l156: u8, l157: u8, l158: u8, l159: u8,
+	l160: u8, l161: u8, l162: u8, l163: u8, l164: u8, l165: u8, l166: u8, l167: u8,
+	l168: u8, l169: u8, l170: u8, l171: u8, l172: u8, l173: u8, l174: u8, l175: u8,
+	l176: u8, l177: u8, l178: u8, l179: u8, l180: u8, l181: u8, l182: u8, l183: u8,
+	l184: u8, l185: u8, l186: u8, l187: u8, l188: u8, l189: u8, l190: u8, l191: u8,
+	l192: u8, l193: u8, l194: u8, l195: u8, l196: u8, l197: u8, l198: u8, l199: u8,
+	l200: u8, l201: u8, l202: u8, l203: u8, l204: u8, l205: u8, l206: u8, l207: u8,
+	l208: u8, l209: u8, l210: u8, l211: u8, l212: u8, l213: u8, l214: u8, l215: u8,
+	l216: u8, l217: u8, l218: u8, l219: u8, l220: u8, l221: u8, l222: u8, l223: u8,
+	l224: u8, l225: u8, l226: u8, l227: u8, l228: u8, l229: u8, l230: u8, l231: u8,
+	l232: u8, l233: u8, l234: u8, l235: u8, l236: u8, l237: u8, l238: u8, l239: u8,
+	l240: u8, l241: u8, l242: u8, l243: u8, l244: u8, l245: u8, l246: u8, l247: u8,
+	l248: u8, l249: u8, l250: u8, l251: u8, l252: u8, l253: u8, l254: u8, l255: u8,
+	l256: u8, l257: u8, l258: u8, l259: u8, l260: u8, l261: u8, l262: u8, l263: u8,
+	l264: u8, l265: u8, l266: u8, l267: u8, l268: u8, l269: u8, l270: u8, l271: u8,
+	l272: u8, l273: u8, l274: u8, l275: u8, l276: u8, l277: u8, l278: u8, l279: u8,
+	l280: u8, l281: u8, l282: u8, l283: u8, l284: u8, l285: u8, l286: u8, l287: u8,
+	l288: u8, l289: u8, l290: u8, l291: u8, l292: u8, l293: u8, l294: u8, l295: u8,
+	l296: u8, l297: u8, l298: u8, l299: u8, l300: u8, l301: u8, l302: u8, l303: u8,
+	l304: u8, l305: u8, l306: u8, l307: u8, l308: u8, l309: u8, l310: u8, l311: u8,
+	l312: u8, l313: u8, l314: u8, l315: u8, l316: u8, l317: u8, l318: u8, l319: u8,
+	l320: u8, l321: u8, l322: u8, l323: u8, l324: u8, l325: u8, l326: u8, l327: u8,
+	l328: u8, l329: u8, l330: u8, l331: u8, l332: u8, l333: u8, l334: u8, l335: u8,
+	l336: u8, l337: u8, l338: u8, l339: u8, l340: u8, l341: u8, l342: u8, l343: u8,
+	l344: u8, l345: u8, l346: u8, l347: u8, l348: u8, l349: u8, l350: u8, l351: u8,
+	l352: u8, l353: u8, l354: u8, l355: u8, l356: u8, l357: u8, l358: u8, l359: u8,
+	l360: u8, l361: u8, l362: u8, l363: u8, l364: u8, l365: u8, l366: u8, l367: u8,
+	l368: u8, l369: u8, l370: u8, l371: u8, l372: u8, l373: u8, l374: u8, l375: u8,
+	l376: u8, l377: u8, l378: u8, l379: u8, l380: u8, l381: u8, l382: u8, l383: u8,
+	l384: u8, l385: u8, l386: u8, l387: u8, l388: u8, l389: u8, l390: u8, l391: u8,
+	l392: u8, l393: u8, l394: u8, l395: u8, l396: u8, l397: u8, l398: u8, l399: u8,
+	l400: u8, l401: u8, l402: u8, l403: u8, l404: u8, l405: u8, l406: u8, l407: u8,
+	l408: u8, l409: u8, l410: u8, l411: u8, l412: u8, l413: u8, l414: u8, l415: u8,
+	l416: u8, l417: u8, l418: u8, l419: u8, l420: u8, l421: u8, l422: u8, l423: u8,
+	l424: u8, l425: u8, l426: u8, l427: u8, l428: u8, l429: u8, l430: u8, l431: u8,
+	l432: u8, l433: u8, l434: u8, l435: u8, l436: u8, l437: u8, l438: u8, l439: u8,
+	l440: u8, l441: u8, l442: u8, l443: u8, l444: u8, l445: u8, l446: u8, l447: u8,
+	l448: u8, l449: u8, l450: u8, l451: u8, l452: u8, l453: u8, l454: u8, l455: u8,
+	l456: u8, l457: u8, l458: u8, l459: u8, l460: u8, l461: u8, l462: u8, l463: u8,
+	l464: u8, l465: u8, l466: u8, l467: u8, l468: u8, l469: u8, l470: u8, l471: u8,
+	l472: u8, l473: u8, l474: u8, l475: u8, l476: u8, l477: u8, l478: u8, l479: u8,
+	l480: u8, l481: u8, l482: u8, l483: u8, l484: u8, l485: u8, l486: u8, l487: u8,
+	l488: u8, l489: u8, l490: u8, l491: u8, l492: u8, l493: u8, l494: u8, l495: u8,
+	l496: u8, l497: u8, l498: u8, l499: u8, l500: u8, l501: u8, l502: u8, l503: u8,
+	l504: u8, l505: u8, l506: u8, l507: u8, l508: u8, l509: u8, l510: u8, l511: u8,
+}
+
+fn opaque(v: u8) -> u8
+{
+	return v;
+}
+
+fn main() -> int
+{
+	let a = U8x512.splat(opaque(3));
+	let b = U8x512.splat(opaque(3));
+	b.l200 = 4;
+	let one = a < b;
+	let every = a <= b;
+	let none_set = a > b;
+	printf("one %d %d\n".ptr, simd.any(one) as c_int, simd.all(one) as c_int);
+	printf("every %d %d\n".ptr, simd.any(every) as c_int,
+		simd.all(every) as c_int);
+	printf("none %d %d\n".ptr, simd.any(none_set) as c_int,
+		simd.all(none_set) as c_int);
+	return 0;
+}

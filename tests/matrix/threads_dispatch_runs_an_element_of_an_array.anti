@@ -1,0 +1,22 @@
+//! `dispatch` runs a worker named after the arrow, and an element of an array
+//! of functions names none.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let fs = [add];
+	let j = dispatch t -> fs[0](2);
+	let r = join(j);
+	delete(t);
+	return r;
+}

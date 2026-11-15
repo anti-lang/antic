@@ -1,0 +1,1 @@
+threads_compare_swap_on_an_unchecked_bitfield.anti:14:11: error: `compare_swap` on a field that `unchecked` marks takes one word, an integer, a `bool` or a pointer, found `u8`

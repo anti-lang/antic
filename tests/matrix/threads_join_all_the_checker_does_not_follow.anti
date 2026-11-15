@@ -1,0 +1,43 @@
+//! A `join_all` that the checker does not follow: a slice whose low bound is
+//! read at run time and a slice of an element of an array. Each job is joined
+//! once, so the program runs. One function per form.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn zero(count: int) -> int
+{
+	return count - count;
+}
+
+fn low_of_the_run(t: *Task)
+{
+	let jobs = [dispatch t -> add(1), dispatch t -> add(2)];
+	join_all(jobs[zero(2)..2]);
+	printf("low of the run\n".ptr);
+}
+
+fn element_of_an_array(t: *Task)
+{
+	let sets = [[dispatch t -> add(3), dispatch t -> add(4)]];
+	join_all(sets[0][0..2]);
+	printf("element\n".ptr);
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 10 };
+	low_of_the_run(t);
+	element_of_an_array(t);
+	delete(t);
+	return 0;
+}

@@ -1,0 +1,21 @@
+//! `dispatch` runs a `worker fn`, and a local that holds an integer is none.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let n = 3;
+	let j = dispatch t -> n(2);
+	let r = join(j);
+	delete(t);
+	return r;
+}
