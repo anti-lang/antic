@@ -1044,8 +1044,6 @@ void sema_compile_copies(struct checker *c);
    of a method reaches. */
 bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
                     struct type **result);
-/* Whether e is `x.hash()` in the form that sema_hash_call gives. */
-bool sema_is_hash_call(const struct expr *e);
 /* Whether the checked call e is the default hash of a value whose parts
    reach no function of the program and no function of the runtime that
    has effects, so that the call has none. */

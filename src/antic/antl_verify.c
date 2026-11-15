@@ -6,6 +6,7 @@
 
 #include "antl_io.h"
 #include "ir.h"
+#include "sema.h"
 #include "types.h"
 
 /* DESIGN: the verifier of library files. The reader takes each record of
@@ -67,9 +68,9 @@ enum { MARK_NEW, MARK_BUSY, MARK_DONE, MARK_CASE };
 
 /* Where an expression stands. Every expression has a type, and a name
    its symbol, but for three places. The callee of a call may lack a
-   type, since lowering reads its symbol. The target `c[i]` of an
-   assignment on a value of a type parameter has none, since the copy
-   pass builds the call of `set_index` anew. The base of a field that is
+   type where callee_read says lowering reads it without one. The
+   target `c[i]` of an assignment on a value of a type parameter has
+   none, since the copy pass builds the call of `set_index` anew. The base of a field that is
    a value of an enum, a function, a static atomic field or a constant
    names a type, a name or a field of a module, and needs neither, since
    lowering reads the number or the symbol of the field and never the
@@ -335,6 +336,21 @@ static bool bindings_set(const struct binding *list, size_t count)
     return true;
 }
 
+/* Whether lowering reads the callee of the call e as it stands. A
+   callee without a type is a name, whose symbol lowering reads, or the
+   callee of `x.hash()`, which lowering writes as the default hash or the
+   copy pass reads again over the argument of a type parameter. Lowering
+   evaluates every other callee and reads its type, by T263 of
+   docs/audit/tests-findings.md. */
+static bool callee_read(const struct expr *e)
+{
+    const struct expr *callee = e->as.call.callee;
+
+    return callee->type != NULL || callee->kind == EXPR_NAME ||
+           (callee->kind == EXPR_FIELD && callee->as.field.base != NULL &&
+            sema_is_hash_call(e));
+}
+
 /* The rules of one expression apart from what it holds. */
 static void check_expr(struct verify *v, const struct expr *e)
 {
@@ -359,6 +375,7 @@ static void check_expr(struct verify *v, const struct expr *e)
         need(v, e->as.call.callee != NULL &&
                     all_set(e->as.call.args, e->as.call.arg_count) &&
                     all_set(e->as.call.hash_calls, e->as.call.hash_count));
+        need(v, e->as.call.callee == NULL || callee_read(e));
         need(v, e->as.call.copy_count == 0 ||
                     e->as.call.copy_count == copy_params(e->as.call.callee));
         break;

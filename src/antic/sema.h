@@ -342,6 +342,11 @@ bool sema_value_view(const struct expr *e);
    an element of a base that is a view or lies in one, `*` of a view, or
    an `as`. A NULL e is no view. */
 bool sema_place_view(const struct expr *e);
+/* Whether e is `x.hash()` in the form that sema_hash_call gives: the
+   default hash, or the hook of a value of a type parameter, which the
+   copy pass reads again. The verifier of library files asks it of a
+   callee without a type. */
+bool sema_is_hash_call(const struct expr *e);
 /* Whether fn has a body: here, in the runtime, or in the module whose
    library file declared it. */
 bool sema_has_body(const struct item *fn);
