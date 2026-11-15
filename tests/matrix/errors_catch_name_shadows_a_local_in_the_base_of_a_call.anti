@@ -1,0 +1,39 @@
+//! The name a `catch` binds in the base of a call of a function of a class
+//! shadows a local, and the warning stands once. The checker reads that base
+//! once more while it asks whether the call is an atomic one, quietly.
+
+import anti.lang;
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn twice(self) -> int
+	{
+		return self.n * 2;
+	}
+}
+
+struct Pair
+{
+	c: *Counter,
+	k: int,
+}
+
+fn make(c: *Counter) -> Pair may fail
+{
+	if c.n < 0 {
+		fail "negative";
+	}
+	return Pair { c: c, k: 1 };
+}
+
+fn main() -> int
+{
+	let e = alloc Counter { n: 5 };
+	let got = (make(e) catch e {
+		return 1;
+	}).c.twice();
+	delete(e);
+	return got - 10;
+}

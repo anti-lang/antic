@@ -1,0 +1,1 @@
+errors_catch_name_shadows_a_local_in_the_base_of_a_call.anti:34:27: error: `e` shadows the outer `e` [shadowed-catch]

@@ -1,4 +1,4 @@
-module_doc "The nodes the checker writes into the tree, which the dump of the parsed\ntree cannot hold: the read and the write of an atomic field, `p?.x`,\n`to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a\ncall whose error the `catch` of its block takes, and the bound names of a\n`switch` on a variant and of a `select`, and the descriptor of the interface\nthat `instance` of a library takes."
+module_doc "The nodes the checker writes into the tree, which the dump of the parsed\ntree cannot hold: the read and the write of an atomic field, `p?.x`,\n`to_slice` of an iterator, the built-ins of a simd struct, `mul_high`, a\ncall whose error the `catch` of its block takes, and the bound names of a\n`switch` on a variant and of a `select`, the descriptor of the interface\nthat `instance` of a library takes and `take` of an `own` field."
 import anti.lang
 import anti.plugin
 struct_decl Vec4
@@ -266,6 +266,26 @@ class_decl Tagged          Tagged
     block
       return_stmt
         int_lit 1          int
+class_decl Holder          Holder
+  field item
+    type ?*
+      type Node
+    pub
+    own
+    default
+      none                 ?*Node
+function taken             fn(*Holder) -> ?*Node
+  param h                  *Holder
+    type *
+      type Holder
+  result
+    type ?*
+      type Node
+  block
+    return_stmt
+      take                 ?*Node
+        field item         ?*Node
+          ident h          *Holder
 function provided          fn(*Library) -> int
   param lib                *Library
     type *

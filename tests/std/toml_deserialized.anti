@@ -1,0 +1,22 @@
+//! `Object.deserialize` makes a `toml.Document` that holds no read document,
+//! since its handle is a pointer that `serialize` writes as `null`. Such a
+//! document holds no key, so `has` gives `false` and `text_of` its fallback.
+
+import anti.io;
+import anti.mem;
+import anti.toml;
+
+fn main() -> int
+{
+	let back = Object.deserialize("{\"type\":\"anti.toml.Document\"}",
+		mem.LibcAllocator.get());
+	let d = back as *toml.Document;
+	if d.has("name") {
+		io.println("has");
+	} else {
+		io.println("none");
+	}
+	io.println(d.text_of("name", "fallback"));
+	delete(d);
+	return 0;
+}

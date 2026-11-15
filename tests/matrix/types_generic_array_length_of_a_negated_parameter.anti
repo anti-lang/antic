@@ -1,0 +1,20 @@
+//! The length of an array parameter of a generic function negates its constant
+//! parameter twice, `[-(-N)]int`. That is a length of the parameters alone, so
+//! a signature takes it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn total<N: int>(a: [-(-N)]int) -> int
+{
+	let s = 0;
+	for x in a {
+		s += x;
+	}
+	return s;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, total<3>([1, 2, 3]) as c_int);
+	return 0;
+}
