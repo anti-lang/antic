@@ -528,6 +528,40 @@ anti_message(cache_unknown
     ARGS build ${tools}
     ERR "anti: the environment does not say where the cache of the user is"
         "${no_version}")
+# The file of the digests of the archives of the runtime is a cache of the
+# user, cache.c. A build whose environment names no cache, and one whose
+# cache is a file, digest the archives again and build the program.
+anti_message(digests_without_a_cache STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    ENV --unset=HOME --unset=XDG_CACHE_HOME --unset=LOCALAPPDATA
+    ARGS build ${tools})
+anti_message(digests_not_written STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+          cache "A file where the cache of the user belongs.\n"
+    ENV "XDG_CACHE_HOME=${PROJECT}/cache" "LOCALAPPDATA=${PROJECT}/cache"
+    ARGS build ${tools})
+# A line of the file of another form is passed over: one too short, one
+# without the space before the digest or after it, one whose digest is no
+# hex, and a last line without its newline.
+string(REPEAT "0" 64 zero_digest)
+string(REPEAT "0" 63 short_digest)
+function(write_digests_of_another_form)
+    file(WRITE "${USER_CACHE}/archive-digests.txt"
+         "short\n1 2 3 4x${zero_digest}${zero_digest}/one\n1 2 3 4 ${zero_digest}x/two\n1 2 3 4 ${short_digest}g /three\n1 2 3 4 ${zero_digest} /last")
+endfunction()
+anti_message(digests_of_another_form STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP write_digests_of_another_form
+    ARGS build ${tools})
+# The file is written beside its place first, and a directory that stands
+# there leaves the file of the digests as it was.
+function(make_digests_temporary)
+    file(MAKE_DIRECTORY "${USER_CACHE}/archive-digests.txt.new")
+endfunction()
+anti_message(digests_temporary_is_a_directory STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP make_digests_temporary
+    ARGS build ${tools})
 # R164 of "Rules of 2026-10-13" in docs/decisions.md: the manifest reader
 # refuses a dependency whose name is no package name, by a repository and
 # by a path alike.

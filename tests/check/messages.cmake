@@ -93,6 +93,18 @@ anti_message(format_last_newline_missing
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/short.anti:7:1: error: the line is not the one `anti fmt` writes")
 
+# A file of the length `anti fmt` writes with other bytes, here a list of
+# direct imports that `anti fmt` sorts.
+anti_message(format_same_length
+    FILES anti.toml "${check_manifest}"
+          src/com/example/sorted.anti "//! A module.\n\nimport anti.text.{equal, Builder};\n\n/// Whether the text of the builder is the one given.\npub fn same(b: *Builder, s: str) -> bool\n{\n\treturn equal(b.text(), s);\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file, 1 finding"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/sorted.anti:3:1: error: the line is not the one `anti fmt` writes")
+
 # The fence of a block. A space after the tag `anti` belongs to no tag,
 # so the block compiles. A fence that no second one closes holds no block,
 # and by R179 of "Rules of 2026-10-13" in docs/decisions.md it gives a doc
@@ -126,6 +138,27 @@ anti_message(module_fence_never_closed
         "anti check: formatting: 1 file"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/open.anti:1:1: warning: the doc comment of the module holds a fence that nothing closes [doc-markup]")
+
+# A fence may stand after spaces, and its block compiles. A fence of
+# another language, `text` or no tag, holds no block.
+anti_message(block_fence_indented
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/indented.anti "//! A module.\n\n/// One.\n///\n///  ```anti\n/// let n = indented.one();\n///  ```\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 1 block"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
+anti_message(block_of_another_language
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/other.anti "//! A module.\n\n/// One.\n///\n/// ```text\n/// not a program\n/// ```\n///\n/// ```\n/// nor this one\n/// ```\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
 
 # Fault injection: each case makes one call of the system fail in
 # anti_faults, through the variable ANTI_FAULT of src/rt/fault.h. The
