@@ -1,0 +1,29 @@
+//! An `own` field of `self` that moves into an `own` parameter of a function of
+//! another object is moved, and a read of it after the call is refused. The
+//! message names the object and the function.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own node: ?*Node = none,
+
+	pub fn adopt(self, own p: ?*Node)
+	{
+		self.node = p;
+	}
+
+	pub fn hand(self, other: *Holder)
+	{
+		other.adopt(self.node);
+		let kept = self.node;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

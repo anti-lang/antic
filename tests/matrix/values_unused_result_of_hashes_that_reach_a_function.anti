@@ -1,0 +1,49 @@
+//! A dropped result of the default hash of a value gets no warning
+//! `unused-result` when a part of the value hashes through a function: a class
+//! value as a field of a struct, as a case of a variant and as an element of a
+//! tuple, whose `hash` a class below may replace, and a `Regex` as a field,
+//! whose hash is a function of the runtime. The program prints one line per
+//! form.
+
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+struct Holder
+{
+	plain: Plain,
+	n: int,
+}
+
+struct Matcher
+{
+	pattern: Regex,
+}
+
+variant Choice
+{
+	Held { plain: Plain },
+	Empty,
+}
+
+fn main() -> int
+{
+	let h = Holder { plain: Plain { n: 1 }, n: 2 };
+	h.hash();
+	printf("class value in a struct\n".ptr);
+	let c = Choice.Held { plain: Plain { n: 3 } };
+	c.hash();
+	printf("class value in a variant\n".ptr);
+	let t = (Plain { n: 4 }, 5);
+	t.hash();
+	printf("class value in a tuple\n".ptr);
+	let m = Matcher { pattern: re"a+" };
+	m.hash();
+	printf("pattern in a struct\n".ptr);
+	return 0;
+}

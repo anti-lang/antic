@@ -1,0 +1,20 @@
+//! The default hash of a `?*T` is its address, which has no effects. A call of
+//! it whose result nothing takes gets the warning `unused-result`.
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+fn key(p: ?*Point) -> int
+{
+	p.hash();
+	return 0;
+}
+
+fn main() -> int
+{
+	let p = Point { x: 3, y: 4 };
+	return key(&p);
+}

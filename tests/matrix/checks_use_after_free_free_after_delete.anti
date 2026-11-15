@@ -1,0 +1,16 @@
+//! E2 at `free(p)`: `free` gives back the memory that `destroy` left, and a
+//! `delete` left no memory of the program's there, so `free` after it is
+//! refused.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 3 };
+	delete(p);
+	free(p);
+	return 0;
+}
