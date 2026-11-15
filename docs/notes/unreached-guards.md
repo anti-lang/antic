@@ -14,7 +14,9 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `build.c`, `sema_lock.c`, `lower_stmt.c`, `lower_expr.c`, `lower_desc.c`,
 `platform.c`, `parser_stmt.c`, `types.c`, `patterns.c`, `repo.c`,
 `sema_call.c`, `sema_value.c`, `sema_uninit.c`, `registry.c`, `header.c`,
-`parser_decl.c`, `lexer.c` and `antl_read_ir.c` stay by them. A guard stays in the code as it is. A later
+`parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
+`sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c` and
+`sema_safety.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -38,7 +40,9 @@ of the four files of batch 3f against the source of
 of batch 3g were checked against the source of
 `docs/reports/2026-11-13-coverage-phase-3g.md`. Those of the eight files
 of batch 3h were checked against the source of
-`docs/reports/2026-11-14-coverage-phase-3h.md`. A guard named "the report
+`docs/reports/2026-11-14-coverage-phase-3h.md`, and those of the six
+files of batch 3i against the source of
+`docs/reports/2026-11-15-coverage-phase-3i.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -576,6 +580,70 @@ added after batch 3b.
 | `copy_of_missing_generic`, `check_table_read`, `check_table_write` and `check_generic_copy` | A module that no file of the program holds. | Every import of a file is read before it. |
 | `check_table_write` and `check_generic_copy` | A class or a generic that the later file lacks. | The read of the declarations names it first, as `needs struct` and `needs generic`. |
 
+## `src/antic/sema_free.c`
+
+The check `use-after-free`, sorted by batch 3i of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `value_of` | An expression that is NULL. | Every caller passes an operand, a target or a part of a literal that the parser wrote. |
+| `walk_closure` | An anonymous function without a body. | The parser gives every anonymous function a block. |
+| `walk_expr` | `x in lo..hi` without its test. | The checker writes the test of every `in` as two comparisons. |
+| `sema_check_frees` | A function without a body, and a quiet check. | The checker calls the pass for a function with a body, outside a quiet check. |
+
+## `src/antic/sema_hash.c`
+
+The default hash and the default `==`, sorted by batch 3i of the third
+phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `nested_call` | A call of `hash` on a part that the checker refuses. | `add_call` asks for it on a part whose hook has the one form, `operator fn hash(x: T) -> u64`, or on a part with the default. |
+| `sema_hash_without_effects` | A receiver without a type. | The checker gave the receiver of the call its type before the statement asks. |
+| `sema_default_eq` | A type that the same question answered without `==`. | Each walk returns at the first part without `==`, so no question asks a type again after it answered no. |
+
+## `src/antic/pattern.c`
+
+The reader of a pattern literal, sorted by batch 3i of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `pattern_group_count` and `pattern_group_number` | A pattern that PCRE2 refuses. | The checker asks for the groups of a literal that compiled. |
+| `class_char` and `parse_escape` | A `\` at the end of a class or of the pattern. | PCRE2 refuses both before the reader runs, as `values_pattern_that_ends_with_a_backslash` holds. |
+| `parse_class` | A range that ends with an escape of a set. | PCRE2 refuses it before the reader runs, as `values_pattern_range_that_ends_with_a_class` holds. |
+
+## `src/antic/optimize.c`
+
+The optimizer of the IR, sorted by batch 3i of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `fold_float` and `fold_conversion` | An operation that the switch has no arm for. | Their callers pass the operations of the arms alone. |
+| `mark_reachable` | A function without blocks. | Lowering gives every function with a body its entry block. |
+| `mark_reachable`, `merge_blocks` and `drop_overflow_checks` | A block without instructions. | Lowering ends every block with a jump, a branch, a `ret` or `unreachable`. |
+| `same_operand` | Two globals, two functions or two blocks. | The callers compare the offsets of slots, which are numbers and temporaries. |
+| `split_slot` | A load or a store at an offset that no field of the slot has. | The fields come from the offsets of the same loads and stores. |
+
+## `src/anti/bindwrite.c`
+
+The writer of a binding, sorted by batch 3i of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `declare` | A parameter of an array type in the shim. | clang gives every array parameter as the pointer C passes, and a description in the format of rlparser has no shim. |
+| `enum_named` | An enum type that the module does not hold. | The reader binds every enum that a type names. |
+| `settable_record` | A field without a name. | The reader names every anonymous member, as `anon0`. |
+
+## `src/antic/sema_safety.c`
+
+The checks of thread-safe classes, sorted by batch 3i of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `sema_note_guarded_pointer` | A local without a symbol. | Both callers pass the symbol of a local or a parameter that the checker declared. |
+| `sema_check_reach` | A field without a home, and the hidden lock. | Every field of a type has the type as its home, and no program names the lock of a synchronized class. |
+| `written_field` | A base without a type, and a field that a base class declares and `types_find_field` does not find. | The checker typed the base and found the field of every place it typed, so the first look finds it. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -608,6 +676,13 @@ added after batch 3b.
 - The sides of a condition in the eight files of batch 3h that its report
   did not sort. A class of 17 interfaces reaches the cap of 16 that
   `ambiguous_member` names.
+- The sides of a condition in the eight files of batch 3i that its report
+  did not sort. One of them is a field of a concurrent class of a
+  library that another module writes under `unchecked`.
+- The lines after the `switch` of each operation of `src/rt/atomic.c`,
+  which every arm leaves through `return`. The `return` after the
+  `switch` of `first_of` and `least` in `pattern.c`, which covers every
+  kind of node.
 - The quiet check that `sema_move_local` leaves, which no probe of batch
   3h reached. A damaged file reaches the mark of a generic copy above 1
   that `read_generic_copies` refuses.
