@@ -701,6 +701,63 @@ The checks of atomics and threads, sorted by batch 3j of the third phase.
 | `atomic_place` | A name of a static field that is not marked atomic itself. | The symbol of a `static atomic` item is atomic, so the first test answers. |
 | `definite_joins` | A call through `?.`. | The call stands inside the node that `?.` writes, which the walk does not enter. |
 
+## `src/antic/lower_owning.c`
+
+The teardown, the copy and the clear of owning values, sorted by batch 3k
+of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_destroy_owned`, `lower_clear_owned` | A kind of type the switch does not name. | Every caller asks `sema_needs_teardown` first, which answers `true` for the kinds the switch names alone. |
+| `lower_clear_owned` | A function value without `own` in a part that a clear reaches. | The clear of a struct, a tuple, an array or a variant enters a part that needs a teardown alone, and a function needs one when it is an `own fn`. |
+| `lower_take` | A `take` whose field is no place. | The checker refuses `take` of anything but a field of a place, so `lower_place` takes every field it gives. |
+| `lower_unbuild` | The end of a block before a field or the base is torn down. | Each teardown of a field continues the block it was given, and no field of a class ends a path. |
+
+## `src/antic/sema.c`
+
+The entry points of the checker, sorted by batch 3k of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `builtin_of_token` | A token that names no built-in type. | The parser hands a token here only after it read one of the built-in types. |
+| `resolve_type_inner` | A constant where a type stands, `TYPEX_CONST`. | The parser and the check of a generic argument refuse a constant where a type stands, so no such node reaches the resolution of a type. |
+| `function_type_of` | A function with `self` whose owner has no type yet. | The functions of a class body get their types after the class itself is declared. |
+
+## `src/rt/toml.c`
+
+The reader of the TOML subset, sorted by batch 3k of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `next_pair`, `grow_names` | A room whose double does not fit a `size_t`. | A document of that many pairs does not fit in memory before. |
+| `read_header` | A name of a `[[table]]` and its number that do not fit the buffer of the table. | `read_header` refuses a name within 24 bytes of the size of the buffer, and the number takes 21 at most. |
+| `anti_rt_toml_shape` | A document that is `NULL`. | `anti` calls it with a document it read, and `anti.toml` does not call it. |
+
+## `src/antic/ast_dump.c`
+
+The dumps of the trees, sorted by batch 3k of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `dump_module` | `abstract`, `concrete` and `self` on a function at module level. | The parser refuses each of them outside a class body, and the dump of a class body writes its members through `dump_members`. |
+
+## `src/anti/main.c`
+
+The commands of `anti`, sorted by batch 3k of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `license_project`, `build_for_tests` | A host that is no target of Anti. | Every host that runs `anti` is one of the six targets. |
+| `test_command` | A project whose `src/` holds no module, met by `anti test` without a file. | The read of the manifest refuses such a project before, with `holds no .anti file, so this project has no module`. |
+
+## `src/antic/driver_search.c`
+
+The search of the library files, sorted by batch 3k of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `link_names`, `driver_load_libraries` | A library file whose header does not read. | The driver reads the header of every library file of the command line before, and refuses such a file there. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -752,3 +809,6 @@ The checks of atomics and threads, sorted by batch 3j of the third phase.
   `anti_rt_arm64_level`, which a Mac of this generation never gives.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
+- The sides of a condition in `lower_owning.c`, `sema.c`, `toml.c`,
+  `ast_dump.c`, `main.c` of `anti` and `driver_search.c` that the report
+  of batch 3k did not sort.
