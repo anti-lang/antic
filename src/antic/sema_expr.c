@@ -663,6 +663,29 @@ static bool require_owned(struct checker *c, struct expr *e,
     return false;
 }
 
+/* Whether t is an `own fn`, with or without `none`. */
+static bool owned_fn(const struct type *t)
+{
+    return t != NULL && t->kind == TYPE_FN && t->owned;
+}
+
+/* DESIGN: the element of a tuple or an array literal without a context
+   takes the type of its value, so an `own fn` value makes the literal an
+   owner of its snapshot. The element then takes the value as every `own
+   fn` place does, by `require_owned`: a `keep own` parameter moves, and
+   an existing value is refused, by T260 of docs/audit/tests-findings.md.
+   An element whose context gives its type takes it through
+   `sema_require`, which runs the same rule. Returns whether the value
+   e of type got is taken. */
+static bool take_owned_part(struct checker *c, struct expr *e,
+                            struct type *got)
+{
+    if (sema_is_error(got) || !owned_fn(got)) {
+        return true;
+    }
+    return require_owned(c, e, got);
+}
+
 /* Refuse a function that is not `concurrent` at a `concurrent`
    parameter. The message names the variable a closure changes. */
 static void refuse_not_concurrent(struct checker *c, const struct expr *e)
@@ -2666,6 +2689,7 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             struct type *it = sema_check_kept(c, item, element, true);
             if (element == NULL) {
                 element = it;
+                ok = take_owned_part(c, item, it) && ok;
             } else {
                 ok = sema_require(c, item, it, element) && ok;
             }
@@ -2723,6 +2747,8 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             if (element != NULL) {
                 ok = sema_require(c, item, elements[i], element) && ok;
                 elements[i] = element;
+            } else {
+                ok = take_owned_part(c, item, elements[i]) && ok;
             }
             if (sema_literal_moves(item)) {
                 sema_refuse_lock_copy(c, item, elements[i]);
@@ -2751,6 +2777,10 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
             sema_error_at(c, e->as.array_repeat.value->pos, "`%s` %s, and "
                           "the repeat form copies one value into every "
                           "element", sema_tn(t), sema_owns_phrase(t));
+        } else if (owned_fn(t)) {
+            sema_error_at(c, e->as.array_repeat.value->pos, "`%s` owns its "
+                          "snapshot, and the repeat form copies one value "
+                          "into every element", sema_tn(t));
         }
         /* The value takes the element type of its context, as each
            value of `[a, b]` does: a T where a `?T` is expected, or a
