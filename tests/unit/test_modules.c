@@ -3563,6 +3563,34 @@ static void init_past_slice(struct damaged *s)
     tree_let(s, "sl")->as.slice_lit.fields[0].name = no_field;
 }
 
+/* T263: the callee of `thelper(sum)` replaced by a callee without a
+   type that no symbol names, a copy of the literal `TPoint { x: n, y: 1 }`
+   and a copy of the field `pt.x`. Lowering evaluates such a callee, and
+   reads its type. */
+static struct expr *helper_call(struct damaged *s)
+{
+    return tree_let(s, "helped")->as.binary.left;
+}
+
+static void callee_literal_without_type(struct damaged *s)
+{
+    struct expr *lit = arena_alloc(s->arena, sizeof *lit);
+
+    *lit = *tree_let(s, "pt");
+    lit->type = NULL;
+    helper_call(s)->as.call.callee = lit;
+}
+
+static void callee_field_without_type(struct damaged *s)
+{
+    struct expr *field = arena_alloc(s->arena, sizeof *field);
+
+    *field = *tree_let(s, "px");
+    field->type = NULL;
+    field->symbol = NULL;
+    helper_call(s)->as.call.callee = field;
+}
+
 /* A copy of the symbol that e names, which the file then writes as an
    extern of its own. */
 static struct symbol *own_symbol(struct damaged *s, struct expr *e)
@@ -3910,7 +3938,8 @@ static void damaged_trees(void)
         extern_fn_not_fn,        extern_const_without_value,
         line_negative,           field_past_struct,
         init_past_struct,        init_past_case,
-        variant_without_case,    init_past_slice};
+        variant_without_case,    init_past_slice,
+        callee_literal_without_type, callee_field_without_type};
     size_t i;
 
     tree_file(NULL, true);
