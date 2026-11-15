@@ -319,19 +319,24 @@ void antl_visit_type(struct writer *w, const struct type *t)
             }
         }
         return;
-    /* The value a hook of a parameter gives follows the parameter, and a
-       parameter follows the interfaces of its constraints. */
+    /* The value a hook of a parameter gives follows the parameter.
+
+       DESIGN: a parameter comes before the interfaces of its
+       constraints, since such an interface may name the parameter, `T:
+       Before<T>`, whose copy then names T. A parameter that followed them
+       had no place in the table, by T261 of docs/audit/tests-findings.md.
+       The reader binds the interfaces once the table is whole. */
     case TYPE_PARAM:
         if (t->hook_owner != NULL) {
             antl_visit_type(w, t->hook_owner);
-        }
-        for (i = 0; i < t->iface_count; i++) {
-            antl_visit_type(w, t->ifaces[i]);
         }
         if (find_type(w, t, &index)) {
             return;
         }
         add_type(w, t);
+        for (i = 0; i < t->iface_count; i++) {
+            antl_visit_type(w, t->ifaces[i]);
+        }
         if (t->walked != NULL) {
             antl_visit_type(w, t->walked);
         }

@@ -294,9 +294,21 @@ static struct constraint_ref *read_constraint_refs(struct reader *r,
     return refs;
 }
 
+/* The interfaces of the constraints of a type parameter of the table,
+   by their indices, which bind_param puts in place once the table is
+   whole. */
+struct param_refs {
+    struct type *t;
+    uint32_t count;
+    uint32_t *ifaces;
+};
+
 /* A type parameter of the table, entry at, as put_param_type of
-   antl_write.c wrote it. */
-static struct type *read_param_type(struct reader *r, uint32_t at)
+   antl_write.c wrote it. The interfaces of its constraints may follow
+   it, so their indices go to params. */
+static struct type *read_param_type(struct reader *r, uint32_t at,
+                                    struct param_refs *params,
+                                    uint32_t *param_count)
 {
     struct name name = antl_get_name(r);
     uint8_t role = antl_get_u8(r);
@@ -348,16 +360,39 @@ static struct type *read_param_type(struct reader *r, uint32_t at)
     }
     n = antl_get_count(r, 4);
     t->ifaces = antl_allocate(r, n, sizeof *t->ifaces);
+    params[*param_count].t = t;
+    params[*param_count].count = n;
+    params[*param_count].ifaces = antl_allocate(r, n, sizeof (uint32_t));
     for (i = 0; i < n && !r->failed; i++) {
-        struct type *iface = antl_type_ref(r, at);
-        if (r->failed || iface->kind != TYPE_CLASS || !iface->has_abstract) {
-            antl_damaged(r);
-            return NULL;
-        }
-        t->ifaces[i] = iface;
+        params[*param_count].ifaces[i] = antl_get_u32(r);
     }
-    t->iface_count = r->failed ? 0 : n;
+    t->iface_count = 0;
+    if (r->failed) {
+        return NULL;
+    }
+    (*param_count)++;
     return t;
+}
+
+/* Put the interfaces of the constraints of the parameter p in place,
+   now that the table of count entries is whole. Each is an abstract
+   class. */
+static void bind_param(struct reader *r, const struct param_refs *p,
+                       uint32_t count)
+{
+    uint32_t i;
+
+    for (i = 0; i < p->count; i++) {
+        struct type *iface =
+            p->ifaces[i] < count ? r->table[p->ifaces[i]] : NULL;
+        if (iface == NULL || iface->kind != TYPE_CLASS ||
+            !iface->has_abstract) {
+            antl_damaged(r);
+            return;
+        }
+        p->t->ifaces[i] = iface;
+    }
+    p->t->iface_count = p->count;
 }
 
 /* The parameters of the generic t, which follow its body. */
@@ -903,7 +938,9 @@ static struct type *read_enum(struct reader *r, uint32_t at)
 /* The entry at of the table, whose kind is read. */
 static struct type *read_type(struct reader *r, uint32_t at,
                               struct field_refs *structs,
-                              uint32_t *struct_count)
+                              uint32_t *struct_count,
+                              struct param_refs *params,
+                              uint32_t *param_count)
 {
     uint8_t kind = antl_get_u8(r);
 
@@ -925,7 +962,7 @@ static struct type *read_type(struct reader *r, uint32_t at,
     case TYPE_VARIANT:
         return read_struct(r, at, kind, structs, struct_count);
     case TYPE_PARAM:
-        return read_param_type(r, at);
+        return read_param_type(r, at, params, param_count);
     case TYPE_ENUM:
         return read_enum(r, at);
     /* The tree of a generic carries the type of `none` before a
@@ -1097,7 +1134,10 @@ void antl_read_types(struct reader *r)
     uint32_t count = antl_get_count(r, 1);
     struct field_refs *structs =
         alloc_zeroed((size_t)count + 1, sizeof *structs);
+    struct param_refs *params =
+        alloc_zeroed((size_t)count + 1, sizeof *params);
     uint32_t struct_count = 0;
+    uint32_t param_count = 0;
     uint32_t i;
 
     r->table = antl_allocate(r, count, sizeof *r->table);
@@ -1105,7 +1145,8 @@ void antl_read_types(struct reader *r)
        refuses one the program writes. Each entry is built over earlier
        ones, so no entry gets deeper than the limit and one. */
     for (i = 0; i < count && !r->failed; i++) {
-        struct type *t = read_type(r, i, structs, &struct_count);
+        struct type *t =
+            read_type(r, i, structs, &struct_count, params, &param_count);
         if (t == NULL || t->depth > TYPES_NEST_MAX) {
             antl_damaged(r);
         }
@@ -1114,6 +1155,9 @@ void antl_read_types(struct reader *r)
     r->table_count = r->failed ? 0 : count;
     for (i = 0; i < struct_count && !r->failed; i++) {
         bind_struct(r, &structs[i], count);
+    }
+    for (i = 0; i < param_count && !r->failed; i++) {
+        bind_param(r, &params[i], count);
     }
     /* A copy has the functions of its generic, whose types name the
        parameters. The checker puts the arguments in at each use. */
@@ -1139,6 +1183,7 @@ void antl_read_types(struct reader *r)
         check_nesting(r, count);
     }
     free(structs);
+    free(params);
 }
 
 /* A constant of type t. Aggregates hold one value per element or field,
