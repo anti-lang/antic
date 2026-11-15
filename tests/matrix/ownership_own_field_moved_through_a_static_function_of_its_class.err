@@ -1,0 +1,1 @@
+ownership_own_field_moved_through_a_static_function_of_its_class.anti:24:14: error: `self.node` was moved into `drop` on line 23 [use-after-free]

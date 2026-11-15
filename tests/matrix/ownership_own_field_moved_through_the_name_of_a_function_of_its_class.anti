@@ -1,0 +1,30 @@
+//! An `own` field of `self` that moves into an `own` parameter of a function of
+//! a class, called through its name as `T.f(object, field)`, is moved as it is
+//! through `object.f(field)`, and a read of it after the call is refused. The
+//! message names the function, as for a local moved in this form.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own node: ?*Node = none,
+
+	pub fn adopt(self, own p: ?*Node)
+	{
+		self.node = p;
+	}
+
+	pub fn hand(self, other: *Holder)
+	{
+		Holder.adopt(other, self.node);
+		let kept = self.node;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

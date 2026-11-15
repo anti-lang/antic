@@ -1,0 +1,31 @@
+//! An `own` field of `self` that moves into an `own` parameter of a static
+//! function, called as `T.f`, is moved as it is through a function of the
+//! module, and a read of it after the call is refused.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own node: ?*Node = none,
+
+	pub fn drop(own p: ?*Node)
+	{
+		if p != none {
+			delete(p);
+		}
+	}
+
+	pub fn give(self)
+	{
+		Holder.drop(self.node);
+		let kept = self.node;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

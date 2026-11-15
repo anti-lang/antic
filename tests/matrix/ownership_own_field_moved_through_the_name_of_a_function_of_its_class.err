@@ -1,0 +1,1 @@
+ownership_own_field_moved_through_the_name_of_a_function_of_its_class.anti:23:14: error: `self.node` was moved into `adopt` on line 22 [use-after-free]
