@@ -474,10 +474,24 @@ static struct expr *class_operator(struct checker *c, struct type *t,
         return NULL;
     }
     ok = it != NULL && call->as.call.copy_count == it->type_param_count;
-    for (i = 0; ok && i < call->as.call.copy_count; i++) {
-        ok = call->as.call.copy_args[i] == NULL ||
-             sema_meets_param(c, call->as.call.copy_args[i],
-                              it->type_params[i].type);
+    if (ok) {
+        struct type **params = types_alloc_array(
+            c->arena, it->type_param_count + 1, sizeof *params);
+        struct generic_map map;
+        for (i = 0; i < it->type_param_count; i++) {
+            params[i] = it->type_params[i].type;
+        }
+        memset(&map, 0, sizeof map);
+        map.types = c->types;
+        map.params = params;
+        map.args = call->as.call.copy_args;
+        map.values = call->as.call.copy_values;
+        map.count = it->type_param_count;
+        for (i = 0; ok && i < call->as.call.copy_count; i++) {
+            ok = call->as.call.copy_args[i] == NULL ||
+                 sema_meets_param(c, call->as.call.copy_args[i],
+                                  it->type_params[i].type, &map);
+        }
     }
     for (i = 0; ok && i < count; i++) {
         ok = sig->params[i]->kind == TYPE_POINTER || !sema_holds_mutex(t);

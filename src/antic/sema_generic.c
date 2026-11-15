@@ -771,11 +771,26 @@ bool sema_float_param(const struct type *t)
            (t->hooks & TYPE_PARAM_FLOAT) != 0;
 }
 
+static struct type *subst(struct checker *c, struct type *t,
+                          const struct generic_map *map);
+
+/* DESIGN: an interface of a constraint may name the parameters of its
+   generic, `C: Iterable<E>` or `T: Before<T>`. The argument meets it with
+   the arguments of the use in their place, as every other part of the
+   copy has them, by T262 of docs/audit/tests-findings.md. map holds the
+   arguments of the use, or is NULL where the generic names none. */
+static struct type *constraint_iface(struct checker *c, const struct type *p,
+                                     size_t i, const struct generic_map *map)
+{
+    return map != NULL ? subst(c, p->ifaces[i], map) : p->ifaces[i];
+}
+
 /* Check the argument t of the parameter p of the generic named by
-   generic at pos, and report the first hook or interface it lacks. */
+   generic at pos, and report the first hook or interface it lacks. map
+   holds the arguments of the use, as constraint_iface reads it. */
 static void check_meets(struct checker *c, struct type *t,
                         const struct type *p, const struct name *generic,
-                        struct pos pos)
+                        struct pos pos, const struct generic_map *map)
 {
     size_t i;
 
@@ -800,9 +815,10 @@ static void check_meets(struct checker *c, struct type *t,
         }
     }
     for (i = 0; i < p->iface_count; i++) {
-        if (!meets_iface(c, t, p->ifaces[i])) {
+        struct type *iface = constraint_iface(c, p, i, map);
+        if (!meets_iface(c, t, iface)) {
             sema_error_at(c, pos, "`%s` has no `%s`, which `%.*s` needs for "
-                          "`%.*s`", sema_tn(t), sema_tn(p->ifaces[i]),
+                          "`%.*s`", sema_tn(t), sema_tn(iface),
                           (int)generic->length, generic->text,
                           (int)p->name.length, p->name.text);
             return;
@@ -815,12 +831,13 @@ static void check_meets(struct checker *c, struct type *t,
    constraints once they do, since an `operator fn` gives a hook. Every
    check after that runs where the use stands. */
 static void meets(struct checker *c, struct type *t, const struct type *p,
-                  const struct name *generic, struct pos pos)
+                  const struct name *generic, struct pos pos,
+                  const struct generic_map *map)
 {
     struct pending_check *pc;
 
     if (c->pending_done) {
-        check_meets(c, t, p, generic, pos);
+        check_meets(c, t, p, generic, pos, map);
         return;
     }
     c->pending = alloc_grow(c->pending, &c->pending_capacity,
@@ -830,9 +847,11 @@ static void meets(struct checker *c, struct type *t, const struct type *p,
     pc->param = p;
     pc->generic = *generic;
     pc->pos = pos;
+    pc->map = *map;
 }
 
-bool sema_meets_param(struct checker *c, struct type *t, const struct type *p)
+bool sema_meets_param(struct checker *c, struct type *t, const struct type *p,
+                      const struct generic_map *map)
 {
     size_t i;
 
@@ -845,7 +864,7 @@ bool sema_meets_param(struct checker *c, struct type *t, const struct type *p)
         }
     }
     for (i = 0; i < p->iface_count; i++) {
-        if (!meets_iface(c, t, p->ifaces[i])) {
+        if (!meets_iface(c, t, constraint_iface(c, p, i, map))) {
             return false;
         }
     }
@@ -859,7 +878,8 @@ void sema_run_pending(struct checker *c)
     c->pending_done = true;
     for (i = 0; i < c->pending_count; i++) {
         check_meets(c, c->pending[i].type, c->pending[i].param,
-                    &c->pending[i].generic, c->pending[i].pos);
+                    &c->pending[i].generic, c->pending[i].pos,
+                    &c->pending[i].map);
     }
     free(c->pending);
     c->pending = NULL;
@@ -1594,12 +1614,27 @@ static struct type *make_copy(struct checker *c, struct type *generic,
                               struct type **args,
                               const struct symbolic **values, struct pos pos)
 {
+    struct generic_map map;
+    size_t count = generic->type_param_count;
     size_t i;
 
-    for (i = 0; i < generic->type_param_count; i++) {
+    /* The arguments go into memory of the checker, since a check that
+       waits for the types of the module reads them after the caller's
+       arrays are gone. */
+    memset(&map, 0, sizeof map);
+    map.types = c->types;
+    map.params = generic->type_params;
+    map.count = count;
+    map.args = types_alloc_array(c->arena, count + 1, sizeof *map.args);
+    map.values = types_alloc_array(c->arena, count + 1, sizeof *map.values);
+    for (i = 0; i < count; i++) {
+        map.args[i] = args[i];
+        map.values[i] = values != NULL ? values[i] : NULL;
+    }
+    for (i = 0; i < count; i++) {
         if (args[i] != NULL) {
             meets(c, args[i], generic->type_params[i], generic_name(generic),
-                  pos);
+                  pos, &map);
         }
     }
     return copy_named(c, generic, args, values);
@@ -2143,7 +2178,7 @@ static void meets_all(struct checker *c, const struct generic_map *map,
     for (i = 0; i < map->count; i++) {
         if (map->args[i] != NULL) {
             check_meets(c, map->args[i], map->params[i],
-                        i < outer_count ? outer : name, pos);
+                        i < outer_count ? outer : name, pos, map);
         }
     }
 }

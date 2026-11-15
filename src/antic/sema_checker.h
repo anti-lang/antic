@@ -270,11 +270,24 @@ struct checker {
 
 /* A copy of a generic whose arguments are checked against the
    constraints of type parameter param once every function has its type. */
+/* The parameters of a generic and what stands in their place, a type or
+   a constant, and the generic type whose copy it is. */
+struct generic_map {
+    struct types *types;
+    const struct type *from;
+    struct type *to;
+    struct type *const *params;
+    struct type **args;
+    const struct symbolic **values;
+    size_t count;
+};
+
 struct pending_check {
     struct type *type;
     const struct type *param;
     struct name generic;
     struct pos pos;
+    struct generic_map map;         /* the arguments of the use */
 };
 
 /* What a call gives the inference of a generic. It holds the type
@@ -940,17 +953,6 @@ struct type *sema_alias_type(struct checker *c, struct symbol *sym);
 void sema_run_pending(struct checker *c);
 bool sema_has_params(const struct type *t);
 bool sema_names_param(const struct type *t, const struct type *param);
-/* The parameters of a generic and what stands in their place, a type or
-   a constant, and the generic type whose copy it is. */
-struct generic_map {
-    struct types *types;
-    const struct type *from;
-    struct type *to;
-    struct type *const *params;
-    struct type **args;
-    const struct symbolic **values;
-    size_t count;
-};
 /* t with the arguments of map in place of its parameters. */
 struct type *sema_subst(struct checker *c, struct type *t,
                         const struct generic_map *map);
@@ -981,8 +983,9 @@ struct type *sema_member_type(struct checker *c, struct type *fn,
 struct type *sema_member_type_in(struct checker *c, struct type *fn,
                                  const struct item *owner, struct type *s);
 /* Whether t meets the constraints of the type parameter p, reporting
-   nothing. */
-bool sema_meets_param(struct checker *c, struct type *t, const struct type *p);
+   nothing. map holds the arguments of the use, or is NULL. */
+bool sema_meets_param(struct checker *c, struct type *t, const struct type *p,
+                      const struct generic_map *map);
 
 /* Whether t is a type parameter that `Float` constrains, an `f32` or an
    `f64` in every copy. */
