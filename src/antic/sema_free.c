@@ -570,8 +570,14 @@ static void walk_handler(struct free_walk *w, const struct handler *h)
 static void walk_call(struct free_walk *w, const struct expr *e)
 {
     const struct expr *callee = e->as.call.callee;
+    /* DESIGN: `T.f(args)` keeps its callee as a field whose symbol is
+       the function, and its arguments stand at the parameters of the
+       function as those of a name do, by T259 of
+       docs/audit/tests-findings.md. */
     const struct symbol *fn =
-        callee->kind == EXPR_NAME ? callee->symbol : NULL;
+        callee->kind == EXPR_NAME || callee->kind == EXPR_FIELD
+            ? callee->symbol
+            : NULL;
     size_t i;
 
     walk_expr(w, callee);
@@ -580,11 +586,15 @@ static void walk_call(struct free_walk *w, const struct expr *e)
         struct value v;
         walk_expr(w, arg);
         /* An `own` field of `self` moves into an `own` parameter, which
-           the checker does not mark. */
+           the checker does not mark. A call on an object names the
+           object, which the checker wrote as the first argument, and
+           `T.f(object, field)` names the function alone, as the checker
+           does for a local. */
         if (fn != NULL && fn->owned != NULL && i < fn->owned_count &&
             fn->owned[i] && arg->kind == EXPR_FIELD && value_of(w, arg, &v)) {
             struct name by = bare_name(fn);
-            if (fn->item != NULL && fn->item->has_self && i > 0) {
+            if (callee->kind == EXPR_NAME && fn->item != NULL &&
+                fn->item->has_self && i > 0) {
                 struct name into = sema_place_name(e->as.call.args[0]);
                 kill(w, &v, DIED_MOVED, arg->pos, &into, &by);
             } else {
