@@ -1,0 +1,14 @@
+//! An `own` field of function type in a tuple literal would give its snapshot
+//! two owners, the object and the tuple, so it is refused as `=` refuses it.
+
+class Box
+{
+	pub own g: ?fn(int) = none,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	let t = (b.g, 1);
+	return t.1 - 1;
+}

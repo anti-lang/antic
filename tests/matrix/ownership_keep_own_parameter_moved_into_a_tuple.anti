@@ -1,0 +1,18 @@
+//! A `keep own` parameter in a tuple literal moves into the tuple, as it moves
+//! into an `own` field of a class literal. The tuple then frees the snapshot
+//! and the parameter passes over it, so it is freed once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn hand(keep own f: fn(int))
+{
+	let t = (f, 1);
+	t.0(t.1);
+}
+
+fn main() -> int
+{
+	let k = 3;
+	hand(snapshot fn(x: int) { printf("%d\n".ptr, (x + k) as c_int); });
+	return 0;
+}

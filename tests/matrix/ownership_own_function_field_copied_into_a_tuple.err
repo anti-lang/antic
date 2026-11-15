@@ -1,0 +1,1 @@
+ownership_own_function_field_copied_into_a_tuple.anti:12:11: error: an `own fn` value is not copied by `=`, use `dup`

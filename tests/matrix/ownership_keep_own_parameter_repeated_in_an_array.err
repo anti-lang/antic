@@ -1,0 +1,1 @@
+ownership_keep_own_parameter_repeated_in_an_array.anti:6:11: error: `own fn(int)` owns its snapshot, and the repeat form copies one value into every element

@@ -1,0 +1,14 @@
+//! A `keep own` parameter that moved into a tuple literal is not named after
+//! the move, as after a move into an `own` field.
+
+fn hand(keep own f: fn(int))
+{
+	let t = (f, 1);
+	t.0(t.1);
+	f(2);
+}
+
+fn main() -> int
+{
+	return 0;
+}

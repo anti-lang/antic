@@ -1,0 +1,1 @@
+ownership_keep_own_parameter_named_after_a_move_into_a_tuple.anti:8:2: error: `f` has moved into an owner on line 6 and is not named after it

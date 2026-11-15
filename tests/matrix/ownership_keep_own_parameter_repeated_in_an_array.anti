@@ -1,0 +1,13 @@
+//! The repeat form copies one value into every element, so a `keep own`
+//! parameter there would give its snapshot one owner per element.
+
+fn hand(keep own f: fn(int))
+{
+	let a = [f; 2];
+	a[1](1);
+}
+
+fn main() -> int
+{
+	return 0;
+}
