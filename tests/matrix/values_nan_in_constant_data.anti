@@ -1,0 +1,29 @@
+//! One NaN on every target in the data of a constant, by Q1 of "Answers of
+//! 2026-11-06, fourth set". The back end writes the bytes of a constant array
+//! and of a constant struct, and a NaN there takes the canonical bits whichever
+//! NaN folded, its negation included. Each line holds the bits of the elements
+//! or the fields, read through a view.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const NAN: f64 = 0.0 / 0.0;
+const TABLE: [3]f64 = [NAN, -NAN, 1.0];
+
+struct Pair
+{
+	single: f32,
+	double: f64,
+}
+
+const PAIR: Pair = Pair { single: (0.0 / 0.0) as f32, double: -NAN };
+
+fn main() -> int
+{
+	let t = TABLE;
+	let p = PAIR;
+	printf("array %016llx %016llx %016llx\n".ptr, *(&t[0] as *u64),
+		*(&t[1] as *u64), *(&t[2] as *u64));
+	printf("struct %08x %016llx\n".ptr, *(&p.single as *u32),
+		*(&p.double as *u64));
+	return 0;
+}

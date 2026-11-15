@@ -1,0 +1,18 @@
+//! A constant struct whose bitfield takes all 64 bits of its unit. The back end
+//! writes the bits of the constant with a mask of the whole unit.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Wide
+{
+	all: u64 : 64,
+}
+
+const WIDE: Wide = Wide { all: 0xfedcba9876543210 };
+
+fn main() -> int
+{
+	let w = WIDE;
+	printf("%016llx\n".ptr, w.all);
+	return 0;
+}

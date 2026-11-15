@@ -5465,6 +5465,8 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "layout_size|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_size.s,layout_size.anti"
         "layout_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_shift.s,layout_shift.anti"
         "layout_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_divide.s,layout_divide.anti"
+        "layout_divide_argument|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_divide_argument.s,layout_divide_argument.anti"
+        "layout_divide_operand|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_divide_operand.s,layout_divide_operand.anti"
         "layout_constant_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_constant_divide.s,layout_constant_divide.anti"
         "generic_length_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_divide.s,generic_length_divide.anti"
         "generic_length_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_shift.s,generic_length_shift.anti"

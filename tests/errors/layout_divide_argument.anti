@@ -1,0 +1,13 @@
+//! A size expression that divides by zero on one target stands as an argument
+//! of a call. The back end refuses it for that target.
+const K: int = 8 / (size_of(c_long) - 8);
+
+fn pass(a: int, b: int) -> int
+{
+	return a + b;
+}
+
+fn main() -> int
+{
+	return pass(1, K);
+}

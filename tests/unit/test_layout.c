@@ -414,6 +414,54 @@ static void unit_past_aggregate(void)
     arena_free(&arena);
 }
 
+/* The first failure of a layout is its message. The struct is laid out
+   before its array, whose length is 0 on the target, and its align(2)
+   then stands below the alignment 4 of its first field, a second failure
+   that adds nothing to the message. */
+static void second_failure(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_field fields[2];
+    uint32_t s;
+    uint32_t length;
+    uint32_t array;
+
+    ir_module_init(&m, &arena, "main");
+    fields[0] = field("a", IR_I32);
+    fields[1] = field("b", IR_I32);
+    s = ir_struct_add(&m, IR_AGG_STRUCT, "main.Low", fields, 2, false, 2);
+    length = ir_sym_op(&m, IR_SUB, IR_I64,
+                       ir_sym_size_of(&m, ir_scalar(IR_CLONG)),
+                       ir_sym_int(&m, IR_I64, 8));
+    array = ir_array_add(&m, "[size_of(c_long) - 8]i32", ir_scalar(IR_I32),
+                         length, "size_of(c_long) - 8");
+    m.aggs[s]->fields[1].type = ir_aggregate(array);
+    refused(&m, TARGET_WINDOWS_X86_64,
+            "the array length `size_of(c_long) - 8` is -4 on windows-x86_64, "
+            "and an array length is at least 1");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
+/* A size expression folds integer operations alone. A library file can
+   carry another one, here a float addition, which is refused by name. */
+static void not_binary(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    uint32_t length;
+
+    ir_module_init(&m, &arena, "main");
+    length = ir_sym_op(&m, IR_FADD, IR_I64, ir_sym_int(&m, IR_I64, 2),
+                       ir_sym_int(&m, IR_I64, 3));
+    ir_array_add(&m, "[2 + 3]i32", ir_scalar(IR_I32), length, "2 + 3");
+    refused(&m, TARGET_MACOS_ARM64,
+            "a size expression uses `fadd`, which does not fold");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* A size in bits that needs more than 64 bits is refused. It used to
    wrap, and a type of 2^61 + 1 elements of 8 bytes had the size 8. */
 static void size_overflows(void)
@@ -536,6 +584,8 @@ void test_layout(void)
     least_by_minus_one();
     shift_out_of_range();
     unit_past_aggregate();
+    second_failure();
+    not_binary();
     size_overflows();
     zero_width();
     bitfields();
