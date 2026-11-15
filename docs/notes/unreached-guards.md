@@ -15,8 +15,9 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `platform.c`, `parser_stmt.c`, `types.c`, `patterns.c`, `repo.c`,
 `sema_call.c`, `sema_value.c`, `sema_uninit.c`, `registry.c`, `header.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
-`sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c` and
-`sema_safety.c` stay by them. A guard stays in the code as it is. A later
+`sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
+`sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
+`cache.c` and `sema_thread.c` stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -42,7 +43,9 @@ of batch 3g were checked against the source of
 of batch 3h were checked against the source of
 `docs/reports/2026-11-14-coverage-phase-3h.md`, and those of the six
 files of batch 3i against the source of
-`docs/reports/2026-11-15-coverage-phase-3i.md`. A guard named "the report
+`docs/reports/2026-11-15-coverage-phase-3i.md`. Those of the six files
+of batch 3j were checked against the source of
+`docs/reports/2026-11-15-coverage-phase-3j.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -644,6 +647,60 @@ The checks of thread-safe classes, sorted by batch 3i of the third phase.
 | `sema_check_reach` | A field without a home, and the hidden lock. | Every field of a type has the type as its home, and no program names the lock of a synchronized class. |
 | `written_field` | A base without a type, and a field that a base class declares and `types_find_field` does not find. | The checker typed the base and found the field of every place it typed, so the first look finds it. |
 
+## `src/antic/layout.c`
+
+The layouts of the back end, sorted by batch 3j of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `compute` | A struct whose layout depends on itself. | The checker refuses a struct that holds itself, and the reader of a library file refuses an aggregate that names itself, in `map_agg_at`. |
+
+## `src/antic/lower_simd.c`
+
+The operations of simd structs, sorted by batch 3j of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lane_at` | A lane after the first in a loop over the lanes. | A loop takes one lane per turn, so every caller asks for lane 0 in it. |
+
+## `src/antic/lower_hash.c`
+
+The default hash, sorted by batch 3j of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `hash_at` | A part that is a lock. | `hash_fields` and `hash_member` pass over a lock field, and no other part holds a lock. |
+| `hash_member` | A member that holds no data or a bitfield, after the `switch`. | Both return before the `switch`. |
+
+## `src/anti/check.c`
+
+The command `anti check`, sorted by batch 3j of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `base_options` | A host that is no target. | The six hosts that run `anti` are the six targets. |
+| `front_end_class` | A file that fails the front end of another target alone. | The checker holds no size, and it refuses a constant that does not fit a type on every target, so the front end gives one answer on all six. |
+| `unit_blocks` | A source whose outline fails. | The front-end class read the same source first, and the run ends at its failure. |
+| `format_class` | A file that does not lex. | The same: the front-end class reports it, and the formatting class does not run. |
+
+## `src/anti/cache.c`
+
+The keys of `anti build` and `anti test`, sorted by batch 3j of the third
+phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `archive_digest` | An archive whose identity cannot be read. | `target_archives` listed the archive on the line before, and the faults of the seam are held while the key is made. |
+
+## `src/antic/sema_thread.c`
+
+The checks of atomics and threads, sorted by batch 3j of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `atomic_place` | A name of a static field that is not marked atomic itself. | The symbol of a `static atomic` item is atomic, so the first test answers. |
+| `definite_joins` | A call through `?.`. | The call stands inside the node that `?.` writes, which the walk does not enter. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -686,5 +743,12 @@ The checks of thread-safe classes, sorted by batch 3i of the third phase.
 - The quiet check that `sema_move_local` leaves, which no probe of batch
   3h reached. A damaged file reaches the mark of a generic copy above 1
   that `read_generic_copies` refuses.
+- The sides of a condition in the files of batch 3j that its report did
+  not sort. Among them are the third operand of an instruction in
+  `layout_resolve`, the clear of an `own fn` in `lower_clear_owned` and
+  the key of a run without a runtime archive in `cache_runtime`.
+- The loop of `ready` in `src/rt/fault.c`, which a second thread enters
+  while the first reads the variable. The levels below `armv8.5` of
+  `anti_rt_arm64_level`, which a Mac of this generation never gives.
 - A `}` after a `return` and the other regions that belong to the
   measurement.
