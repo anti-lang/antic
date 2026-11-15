@@ -1,7 +1,8 @@
 /* Integer bounds of the runtime: the growth of a block, the places of a
    text builder, atomic subtraction at the minimum of each width, the
-   masks and the compare-and-swap of each width and the precision a text
-   of the failure routine prints with. */
+   masks and the compare-and-swap of each width, the load, the store, the
+   swap and the addition of each width and the precision a text of the
+   failure routine prints with. */
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -115,6 +116,46 @@ static void atomic_masks(void)
           i64 == 9);
 }
 
+/* The load, the store, the swap and the addition of each width read and
+   write the bytes of the width alone: the byte after a value stays as it
+   was, and a value wider than the width keeps its low bytes. A
+   compare-and-swap of two bytes and of four swaps on the expected value
+   alone. */
+static void atomic_widths(void)
+{
+    int8_t i8[2] = {5, 0x55};
+    int16_t i16[2] = {5, 0x5555};
+    int32_t i32[2] = {5, 0x55555555};
+    int64_t i64 = 5;
+
+    CHECK(anti_rt_atomic_load(i8, 1) == 5);
+    CHECK(anti_rt_atomic_load(i16, 2) == 5);
+    CHECK(anti_rt_atomic_load(i32, 4) == 5);
+    CHECK(anti_rt_atomic_load(&i64, 8) == 5);
+    anti_rt_atomic_store(i8, 1, 0x107);
+    anti_rt_atomic_store(i16, 2, 0x10007);
+    anti_rt_atomic_store(i32, 4, 0x100000007);
+    anti_rt_atomic_store(&i64, 8, 7);
+    CHECK(i8[0] == 7 && i8[1] == 0x55);
+    CHECK(i16[0] == 7 && i16[1] == 0x5555);
+    CHECK(i32[0] == 7 && i32[1] == 0x55555555);
+    CHECK(i64 == 7);
+    CHECK(anti_rt_atomic_swap(i8, 1, 9) == 7 && i8[0] == 9);
+    CHECK(anti_rt_atomic_swap(i16, 2, 9) == 7 && i16[0] == 9);
+    CHECK(anti_rt_atomic_swap(i32, 4, 9) == 7 && i32[0] == 9);
+    CHECK(anti_rt_atomic_swap(&i64, 8, 9) == 7 && i64 == 9);
+    CHECK(anti_rt_atomic_add(i8, 1, INT8_MAX) == 9);
+    CHECK(i8[0] == (int8_t)(INT8_MIN + 8) && i8[1] == 0x55);
+    CHECK(anti_rt_atomic_add(i16, 2, 3) == 9 && i16[0] == 12);
+    CHECK(anti_rt_atomic_add(i32, 4, 3) == 9 && i32[0] == 12);
+    CHECK(anti_rt_atomic_add(&i64, 8, 3) == 9 && i64 == 12);
+    CHECK(anti_rt_atomic_compare_swap(i16, 2, 11, 4) == 0 && i16[0] == 12);
+    CHECK(anti_rt_atomic_compare_swap(i16, 2, 12, 4) == 1 && i16[0] == 4);
+    CHECK(anti_rt_atomic_compare_swap(i32, 4, 11, 4) == 0 && i32[0] == 12);
+    CHECK(anti_rt_atomic_compare_swap(i32, 4, 12, 4) == 1 && i32[0] == 4);
+    CHECK(i16[1] == 0x5555 && i32[1] == 0x55555555);
+}
+
 /* The precision of `%.*s` for a text of an Anti length: the length, or
    INT_MAX for one that no int holds, which once kept the low 32 bits
    alone. */
@@ -135,5 +176,6 @@ void test_rt_bounds(void)
     builder_bounds();
     atomic_sub_minimum();
     atomic_masks();
+    atomic_widths();
     print_width();
 }

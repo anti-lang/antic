@@ -579,7 +579,7 @@ Each holds one case per message of a command, which
 | `tests/unit/test_plugin_table.c` | The loader of the runtime against a damaged plugin table and a damaged index. |
 | `tests/unit/test_project.c` | `anti new` and the sources of a project, of `src/anti/project.c`. |
 | `tests/unit/test_regex.c` | The rewriter of a byte pattern of `src/rt/regex.c` on every prefix of one pattern, and a group named by a text that holds a NUL. |
-| `tests/unit/test_rt_bounds.c` | The growth of a block, the size of a text builder and atomic subtraction at the minimum of each width. |
+| `tests/unit/test_rt_bounds.c` | The growth of a block, the size of a text builder and each atomic operation of the runtime at each width. |
 | `tests/unit/test_rt_oom.c` | A program that runs the text builder, the copy of an object and the copy of an owned buffer out of memory, for `run_rt_oom.cmake`. |
 | `tests/unit/test_sema.c` | What the checker accepts, refuses and warns of. |
 | `tests/unit/test_sha256.c` | The SHA-256 of `src/rt/digest.c` over inputs given in pieces, and the digest of a file. |

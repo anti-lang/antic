@@ -677,6 +677,24 @@ static void declarations(void)
     end(&x);
 }
 
+/* A C name that is no LLVM identifier stands in quotes: one that starts
+   with a digit, and one that holds a byte LLVM does not take bare, which
+   is written as a backslash and its two hexadecimal digits. No Anti item
+   has such a name, since a C name is an identifier of the source. */
+static void quoted_names(void)
+{
+    struct fixture x;
+
+    begin(&x);
+    returns(&x, "f", IR_VOID, ir_int_op(IR_VOID, 0));
+    ir_extern_add(&x.m, "9lives", IR_VOID, false);
+    ir_extern_add(&x.m, "a b\"c\\\x7f\x01", IR_VOID, false);
+    CHECK(run(&x, TARGET_LINUX_X86_64));
+    CHECK(holds(&x, "declare void @\"9lives\"() #1\n"));
+    CHECK(holds(&x, "declare void @\"a b\\22c\\5C\\7F\\01\"() #1\n"));
+    end(&x);
+}
+
 /* A function main.f(a: from, b: from) -> to whose body is op a, b, or op
    a alone when unary is set. The loads of the two parameters are %v0 and
    %v1, and the operation starts at %v2, or at %v1 when it is unary. */
@@ -2724,6 +2742,7 @@ void test_llvm_emit(void)
     tune_cpu();
     linkage();
     declarations();
+    quoted_names();
     arithmetic();
     shifts();
     division();
