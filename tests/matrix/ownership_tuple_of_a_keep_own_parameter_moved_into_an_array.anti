@@ -1,0 +1,19 @@
+//! A tuple that holds a `keep own` parameter owns its snapshot, and moves into
+//! an array literal. The move clears the snapshot of the tuple, so the array
+//! frees it once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn hand(keep own f: fn(int))
+{
+	let t = (f, 1);
+	let a = [t];
+	a[0].0(a[0].1);
+}
+
+fn main() -> int
+{
+	let k = 3;
+	hand(snapshot fn(x: int) { printf("%d\n".ptr, (x + k) as c_int); });
+	return 0;
+}
