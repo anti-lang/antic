@@ -1,0 +1,26 @@
+//! A constraint whose argument is another parameter of the generic, `C:
+//! collection.Iterable<E>`, takes the argument of that parameter in its place,
+//! so `List<int>` meets it for `E = int`.
+
+import anti.collection;
+import anti.collection.list;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn total<E: add, C: collection.Iterable<E>>(c: *C, own zero: E) -> E
+{
+	let sum = zero;
+	for x in c {
+		sum = sum + x;
+	}
+	return sum;
+}
+
+fn main() -> int
+{
+	let l = list.List<int>.new();
+	l.push(4);
+	l.push(5);
+	printf("%d\n".ptr, total<int, list.List<int>>(&l, 0) as c_int);
+	return 0;
+}

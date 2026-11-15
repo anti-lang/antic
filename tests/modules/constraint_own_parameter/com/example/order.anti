@@ -1,0 +1,15 @@
+//! A generic whose constraint names its own parameter, `T: Before<T>`, in a
+//! library file.
+
+pub abstract class Before<U>
+{
+	pub abstract fn before(self, o: *U) -> bool;
+}
+
+pub fn first<T: Before<T>>(a: *T, b: *T) -> *T
+{
+	if a.before(b) {
+		return a;
+	}
+	return b;
+}

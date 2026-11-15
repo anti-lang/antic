@@ -1,0 +1,27 @@
+//! A program that calls a generic of a library whose constraint names its own
+//! parameter, `T: Before<T>`, with a class that implements `Before<Num>`.
+
+import com.example.order;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Num
+{
+	implements by: order.Before<Num>,
+	pub v: int = 0,
+
+	concrete fn before(self, o: *Num) -> bool
+	{
+		return self.v < o.v;
+	}
+}
+
+fn main() -> int
+{
+	let a = alloc Num { v: 7 };
+	let b = alloc Num { v: 3 };
+	printf("%d\n".ptr, order.first<Num>(a, b).v as c_int);
+	delete(a);
+	delete(b);
+	return 0;
+}

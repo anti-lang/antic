@@ -3774,6 +3774,15 @@ antic_modules_test(generic_constant
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_constant")
 
+# A generic of a library whose constraint names its own parameter, `T:
+# Before<T>`, which a class of the program meets. T261 of
+# docs/audit/tests-findings.md: the library file of such a generic.
+antic_modules_test(constraint_own_parameter
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/constraint_own_parameter"
+    LIBRARIES order
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/constraint_own_parameter")
+
 # Direct imports. A program and a library name the items of another
 # library without its module name, and reach the module by its name as
 # well. A generic among them has its copy made in the program.

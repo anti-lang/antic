@@ -1,0 +1,39 @@
+//! A constraint whose argument is its own parameter, `T: Before<T>`, takes the
+//! argument of the parameter in its place, so a class that implements
+//! `Before<Num>` meets it for `T = Num`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Before<U>
+{
+	abstract fn before(self, o: *U) -> bool;
+}
+
+fn first<T: Before<T>>(a: *T, b: *T) -> *T
+{
+	if a.before(b) {
+		return a;
+	}
+	return b;
+}
+
+class Num
+{
+	implements order: Before<Num>,
+	pub v: int = 0,
+
+	concrete fn before(self, o: *Num) -> bool
+	{
+		return self.v < o.v;
+	}
+}
+
+fn main() -> int
+{
+	let a = alloc Num { v: 7 };
+	let b = alloc Num { v: 3 };
+	printf("%d\n".ptr, first<Num>(a, b).v as c_int);
+	delete(a);
+	delete(b);
+	return 0;
+}
