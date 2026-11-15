@@ -17,3 +17,5 @@ pub extern fn t_unsigned(p: c_uint);
 pub extern fn t_const_after(p: Mode);
 
 pub extern fn t_no_params(p: ?fn() -> c_int);
+
+pub extern fn t_function(p: ?fn(c_int) -> c_int);

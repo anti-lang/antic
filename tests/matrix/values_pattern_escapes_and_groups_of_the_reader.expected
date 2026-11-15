@@ -1,0 +1,11 @@
+exit 0
+any_but_newline 1
+any_but_newline_at_a_newline 0
+line_break 1
+cluster 1
+class_not_property 1
+class_not_property_at_a_letter 0
+relative_reference 1
+no_auto_capture 1
+empty_group 1
+repeat_of_an_empty_group 1

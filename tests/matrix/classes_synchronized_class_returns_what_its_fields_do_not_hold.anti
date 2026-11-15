@@ -1,0 +1,37 @@
+//! A public function of a synchronized class gives out no pointer into its
+//! fields. It may return the result of a function of the module that takes no
+//! argument, and the `.ptr` of a slice that its caller gave, which points into
+//! no field of the object. The program prints what each gives.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn fresh() -> int
+{
+	return 4;
+}
+
+synchronized class Counter
+{
+	n: int = 0,
+
+	pub fn base(self) -> int
+	{
+		return fresh();
+	}
+
+	pub fn first(self, s: []int) -> ?*int
+	{
+		return s.ptr;
+	}
+}
+
+fn main() -> int
+{
+	let c = Counter { };
+	let values = [7, 8, 9];
+	printf("base %d\n".ptr, c.base() as c_int);
+	if let p = c.first(values[0..3]) {
+		printf("first %d\n".ptr, *p as c_int);
+	}
+	return 0;
+}

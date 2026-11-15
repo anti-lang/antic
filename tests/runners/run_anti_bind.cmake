@@ -449,7 +449,9 @@ elseif(CASE MATCHES "^api_(parts|callbacks|literals|types|words|aliases|docs)$")
     # holds the forms of a struct literal that a define may have. api_types
     # holds one function per spelling of a C type: the words of an integer
     # in the orders no other description has, a qualifier after a name, an
-    # empty parameter list and nine spellings that do not parse. api_aliases
+    # empty parameter list, a function as a parameter, which C takes as a
+    # pointer, and nine spellings that do not parse. Its struct holds a
+    # function as a field, which the binding leaves out. api_aliases
     # holds an alias without its type, a pointer alias whose type does not
     # parse, a name no part declares, a struct and an enum named by their
     # tags, a length in hexadecimal, a callback that takes an array and two

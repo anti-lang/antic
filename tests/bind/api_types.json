@@ -4,6 +4,7 @@
                {"name": "t_unsigned", "returnType": "void", "params": [{"name": "p", "type": "unsigned"}]},
                {"name": "t_const_after", "returnType": "void", "params": [{"name": "p", "type": "Mode const"}]},
                {"name": "t_no_params", "returnType": "void", "params": [{"name": "p", "type": "int (*)()"}]},
+               {"name": "t_function", "returnType": "void", "params": [{"name": "p", "type": "int (int)"}]},
                {"name": "t_dot", "returnType": "void", "params": [{"name": "p", "type": "int ."}]},
                {"name": "t_long_word", "returnType": "void", "params": [{"name": "p", "type": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]},
                {"name": "t_enum_unknown", "returnType": "void", "params": [{"name": "p", "type": "enum Other"}]},
@@ -13,4 +14,5 @@
                {"name": "t_open_array", "returnType": "void", "params": [{"name": "p", "type": "int [3"}]},
                {"name": "t_open_group", "returnType": "void", "params": [{"name": "p", "type": "void (*"}]},
                {"name": "t_word_in_group", "returnType": "void", "params": [{"name": "p", "type": "void (* int)(int)"}]}],
+ "structs": [{"name": "TFunctionField", "fields": [{"name": "f", "type": "int (int)"}, {"name": "n", "type": "int"}]}],
  "enums": [{"name": "Mode", "values": [{"name": "MODE_A", "value": 0}]}]}

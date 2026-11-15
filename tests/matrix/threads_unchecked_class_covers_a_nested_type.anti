@@ -1,0 +1,33 @@
+//! `unchecked(unguarded-field)` last in the header of a concurrent class covers
+//! the fields of a type nested in it, which are checked as the fields of the
+//! class are. A function of the class writes a field of a local of the nested
+//! struct. The program prints what each call gives.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+concurrent class Tally unchecked(unguarded-field, "one thread writes the counts")
+{
+	struct Count
+	{
+		n: int,
+	}
+
+	count: Count = Count { n: 0 },
+
+	pub fn bump(self) -> int
+	{
+		let k = Count { n: self.count.n };
+		k.n += 1;
+		self.count = k;
+		return self.count.n;
+	}
+}
+
+fn main() -> int
+{
+	let t = alloc Tally { };
+	printf("bump %d\n".ptr, t.bump() as c_int);
+	printf("bump %d\n".ptr, t.bump() as c_int);
+	delete(t);
+	return 0;
+}

@@ -1,0 +1,30 @@
+//! Escapes and groups of a pattern literal that the reader of the check
+//! `exponential-pattern` takes apart: `\N`, `\R`, `\X`, `\P{L}` in a class, a
+//! relative reference, `(?n)`, an empty group and a repeat of one. Each is
+//! matched against a text it takes, and two against a text they refuse. A line
+//! of the output names the form and says whether the text matched.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	show("any_but_newline", "a\tb".matches(re"^a\Nb$") != none);
+	show("any_but_newline_at_a_newline", "a\nb".matches(re"^a\Nb$") != none);
+	show("line_break", "a\r\nb".matches(re"^a\Rb$") != none);
+	show("cluster", "aéb".matches(re"^a\Xb$") != none);
+	show("class_not_property", "7".matches(re"^[\P{L}]$") != none);
+	show("class_not_property_at_a_letter", "k".matches(re"^[\P{L}]$") != none);
+	show("relative_reference", "aa".matches(re"^(a)\g-1$") != none);
+	show("no_auto_capture", "ab".matches(re"^(?n)(a)b$") != none);
+	show("empty_group", "ab".matches(re"^a()b$") != none);
+	show("repeat_of_an_empty_group", "ab".matches(re"^a(?:)*b$") != none);
+	return 0;
+}
