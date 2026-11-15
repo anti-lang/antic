@@ -2557,6 +2557,7 @@ foreach(case
         "environment|report||--anti.inspect|inspect.file.pattern||0"
         "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
         "environment_long|report||--anti.inspect|empty.pattern|missing.pattern|70"
+        "environment_empty|report||--anti.inspect|inspect.build.pattern||0"
         "environment_utf8|report||--anti.inspect|inspect.file.pattern||0"
         "arguments|report||--anti.threads=2,one,--anti.backtrace,two|arguments.pattern||0"
         "exit_status|status||4294967299|empty.pattern||3"
@@ -3121,6 +3122,9 @@ endif()
 # variable the runtime reads.
 set_tests_properties(conf_environment conf_environment_option PROPERTIES
     ENVIRONMENT "ANTI_CONF=${CONF}/basic.toml")
+
+# An empty ANTI_CONF names no file, as an unset one names none.
+set_tests_properties(conf_environment_empty PROPERTIES ENVIRONMENT "ANTI_CONF=")
 
 # A value past 1023 bytes, and a path outside ASCII, reach the runtime
 # whole on every system. The long one names a file that is not there, and
@@ -8009,6 +8013,8 @@ if(ANTIC_FAULTS)
             "count_zero|open:0:EIO|an entry counts from 1"
             "count_long|open:1234567890:EIO|an entry counts from 1"
             "count_text|open:1x:EIO|an entry counts from 1"
+            "count_empty|open::EIO|an entry counts from 1"
+            "count_below_digits|open:1-:EIO|an entry counts from 1"
             "no_error|open:1:ENOPE|an entry names no error of fault\\.c")
         string(REPLACE "|" ";" parts "${case}")
         list(GET parts 0 name)
@@ -8019,6 +8025,11 @@ if(ANTIC_FAULTS)
                     $<TARGET_FILE:antic_faults> nowhere.anti
             PATTERN "^ANTI_FAULT=${value}: ${reason}")
     endforeach()
+    # An empty variable names no fault, so antic_faults runs as antic.
+    add_expect_test(faults_variable_empty STATUS 1
+        COMMAND "${CMAKE_COMMAND}" -E env "ANTI_FAULT="
+                $<TARGET_FILE:antic_faults> --front-end nowhere.anti
+        PATTERN "^antic: cannot open nowhere\\.anti")
     # Nine entries, one more than the variable holds. A command line holds
     # no `,`, so the value stands in the environment of the test.
     add_expect_test(faults_variable_nine_entries STATUS 125
