@@ -1,0 +1,2 @@
+generics_simd_struct_of_refused_lanes_in_a_compared_struct.anti:7:23: error: a lane of a `simd struct` is an integer of a fixed width, a float or `bool`, not `char`
+generics_simd_struct_of_refused_lanes_in_a_compared_struct.anti:16:9: error: `==` is not defined on `Word`, whose field `letters` has no `eq`

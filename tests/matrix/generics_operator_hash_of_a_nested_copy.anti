@@ -1,0 +1,28 @@
+//! A module-level `operator fn hash` of `Box<Box<T>>` is the hash of every copy
+//! of `Box` that nests one, and no other. `Box<int>` keeps the default hash,
+//! since the operator's first parameter does not take it, and `Box<Box<int>>`
+//! takes the operator.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub v: T,
+}
+
+operator fn hash<T>(a: Box<Box<T>>) -> u64
+{
+	return 7;
+}
+
+fn main() -> int
+{
+	let flat = Box<int> { v: 1 };
+	let nested = Box<Box<int>> { v: Box<int> { v: 2 } };
+	printf("flat takes the operator: %d\n".ptr, (flat.hash() == 7) as c_int);
+	printf("nested takes the operator: %d\n".ptr,
+		(nested.hash() == 7) as c_int);
+	printf("flat keeps the default: %d\n".ptr,
+		(flat.hash() == Box<int> { v: 1 }.hash()) as c_int);
+	return 0;
+}

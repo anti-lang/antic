@@ -1,0 +1,22 @@
+//! A struct compares with `==` when every field has `eq`, and a simd struct
+//! meets no `eq`, whatever its lanes. A field of a simd struct whose lanes its
+//! declaration refuses gives the refusal of the lanes and the refusal of `==`,
+//! one message for each mistake, as a simd struct of `f32` lanes gives the
+//! second alone.
+
+simd struct Letters { a: char, b: char }
+
+struct Word
+{
+	letters: Letters,
+}
+
+fn same(x: Word, y: Word) -> bool
+{
+	return x == y;
+}
+
+fn main() -> int
+{
+	return 0;
+}

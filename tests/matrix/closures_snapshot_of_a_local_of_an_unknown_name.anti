@@ -1,0 +1,11 @@
+//! A `snapshot fn` that captures a local whose value names nothing gives the
+//! one message of the unknown name, and none for the capture.
+
+fn main() -> int
+{
+	let x = nowhere;
+	let f = snapshot fn() -> int {
+		return x;
+	};
+	return f();
+}

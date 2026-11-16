@@ -1,0 +1,4 @@
+exit 0
+flat takes the operator: 0
+nested takes the operator: 1
+flat keeps the default: 1

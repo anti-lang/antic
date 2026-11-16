@@ -1,0 +1,10 @@
+//! An anonymous function that may fail needs `Error` of `anti.lang`, which the
+//! module imports, as a function type that may fail does.
+
+fn main() -> int
+{
+	let f = fn() -> int may fail {
+		return 1;
+	};
+	return 0;
+}

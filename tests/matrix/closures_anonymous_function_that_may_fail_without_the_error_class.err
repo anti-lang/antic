@@ -1,0 +1,1 @@
+closures_anonymous_function_that_may_fail_without_the_error_class.anti:6:10: error: `may fail` gives `?*anti.lang.Error`, so the module imports `anti.lang`
