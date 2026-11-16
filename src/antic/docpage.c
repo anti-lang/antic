@@ -452,9 +452,41 @@ static void enum_values(struct doc_entry *item, const struct type *t)
     }
 }
 
-/* The fields and the functions of a body. all takes every one of them,
-   which dev docs and `--private` ask for, and user docs take the `pub`
-   ones alone. */
+/* DESIGN: the constants and the static fields of a body follow its
+   functions among the members, each as its declaration writes it, and a
+   constant with its value as a constant of a module shows it. A library
+   file carries those another module may name with their doc text after
+   the functions, so the page of a library file is the page of its
+   source. They were left out, by T264 of docs/audit/tests-findings.md. */
+static void body_values(struct doc_entry *item, const struct type *t,
+                        bool all)
+{
+    size_t i;
+
+    for (i = 0; i < t->member_count; i++) {
+        const struct item *m = t->members[i];
+        struct doc_entry *one;
+        if (m->kind != ITEM_CONST || m->symbol == NULL ||
+            m->symbol->type == NULL || (!all && m->vis != VIS_PUB)) {
+            continue;
+        }
+        one = entry_add(&item->members, &item->member_count,
+                        &item->member_capacity);
+        text_append_bytes(&one->name, m->name.text, m->name.length);
+        text_appendf(&one->signature, "%s%s %.*s: ", visibility_word(m->vis),
+                     m->is_static ? "static atomic" : "const",
+                     (int)m->name.length, m->name.text);
+        doc_type_name(&one->signature, m->symbol->type);
+        if (!m->is_static) {
+            const_value(&one->signature, m->symbol->value);
+        }
+        doc_copy(&one->doc, &m->doc);
+    }
+}
+
+/* The fields, the functions, the constants and the static fields of a
+   body. all takes every one of them, which dev docs and `--private` ask
+   for, and user docs take the `pub` ones alone. */
 static void body_entries(struct doc_entry *item, const struct type *t, bool all)
 {
     struct name *names;
@@ -545,6 +577,7 @@ static void body_entries(struct doc_entry *item, const struct type *t, bool all)
         free(names);
         doc_copy(&one->doc, &m->doc);
     }
+    body_values(item, t, all);
 }
 
 /* `constraint Name = a + b`, whose set its type holds with the
