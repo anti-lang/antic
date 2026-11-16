@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l and 3m stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m and 3n stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -49,7 +49,9 @@ of batch 3j were checked against the source of
 files of batch 3l against the source of
 `docs/reports/2026-11-16-coverage-phase-3l.md`. Those of the seven
 files of batch 3m were checked against the source of
-`docs/reports/2026-11-16-coverage-phase-3m.md`. A guard named "the report
+`docs/reports/2026-11-16-coverage-phase-3m.md`, and those of the files
+of batch 3n against the source of
+`docs/reports/2026-11-16-coverage-phase-3n.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -911,10 +913,98 @@ The error paths of lowering, sorted by batch 3m of the third phase.
 | `lower_pointer_guard` | A guard without a symbol, or one after the end of a path. | The checker gives every `let` its symbol, and lowering writes no statement after the end of a path. |
 | `lower_guard_missing` | A handler of a guard that ends without leaving the block. | `check_pointer_guard` of `sema_stmt.c` holds the handler to leave the block or end with `yield`, as every handler does. |
 
+## `src/antic/sema_operator.c`
+
+The operators and the hooks of the checker, sorted by batch 3n of the
+third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `sema_hook_well_formed` | A hook without a function type, and a hook other than `next`, `value` and `iter`. | `check_hook` of `sema_class.c` returns before for a hook without a function type, and a loop asks once `sema_declare_all_members` gave every member its type. Every caller names one of the three hooks. |
+
+## `src/antic/lower.c`
+
+The shared parts of lowering, sorted by batch 3n of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `name_of_type` | The name of a type without its module. | Its one caller, `lower_agg_of`, asks for the qualified name. |
+| `lower_field_owner` | A field that no class of the chain declares, for which it gives the class itself. | The checker resolved every field that lowering names to a class of the chain. |
+| `lower_struct_of_expr` | An expression without a type. | The checker gives every expression it passes a type. |
+
+## `src/antic/lower_hook.c`
+
+The hooks of tracing, sorted by batch 3n of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_hook_call`, `lower_hook_failed` | A function that is not traced, a call after the end of a path, and a `failed` hook without an error. | `lower_function.c` calls the `enter` hook of a traced function alone, once it took the name, and the action of `leave` runs on an exit of such a function, inside its block. A failing exit carries its error. |
+
+## `src/antic/driver_library.c`
+
+The libraries for C, sorted by batch 3n of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `bundle` | `llvm-ar` that `bin/` of the archive lacks. | Its one caller, `build_static`, looks the tool up first and refuses the library without it. |
+
+## `src/anti/units.c`, `src/anti/bind.c` and `src/anti/doc.c`
+
+The units of `anti` and two commands that take the host, sorted by batch
+3n of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `unit_host`, `bind_header`, `doc_run` | A host that is none of the six targets. | `anti` builds for the six hosts alone, and `target_host` knows each. |
+| `unit_report_cycle` | A unit of the cycle that imports no unit left. | Every unit left imports one that is left, or it would have been placed, so the walk meets a unit it met before. |
+| `write_formatted` | A binding that does not lex. | The writer of `anti bind` writes names, numbers and texts it quoted, which the lexer takes. |
+
+## `src/anti/doc.c`, `src/anti/zip.c`, `src/anti/jsontree.c` and `src/anti/bindexpr.c`
+
+The pages, the archives and the readers of `anti`, sorted by batch 3n of
+the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `doc_markdown` | An empty doc text. | Its one caller, `doc_body`, returns before for one. |
+| `zip_write` | Entries of more than 4 GiB, which a zip without its 64-bit records cannot hold. | Every archive `anti` writes holds the map and the debug files of one program, far below the bound. |
+| `read_string` | A string that the second walk of the scanner refuses. | The first walk read the same bytes as a string. |
+| `list_add` | A list whose room doubled no longer fits a `size_t`. | It needs more memory than a machine holds. |
+| `apply` | An operator of integers that the switch does not name. | `binary` passes the ten operators of its levels alone, and the switch names each. |
+| `bind_eval_const` | A value of a kind the switch does not name. | `enum bind_eval_kind` has the three kinds the switch names. |
+
+## `src/rt/lock.c` and `src/rt/signal.c`
+
+The locks and the signals of the runtime, sorted by batch 3n of the
+third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `order_take` | A lock that the thread holds already. | A dev build stops at a Mutex its thread holds in `held_already` before the order is taken, and the hidden lock of an object that its thread holds is entered again without one. |
+| `order_take` | Both orders of a pair recorded, the first not reported. | The second order of a pair is recorded where the first is found, and that marks the pair reported. |
+| `order_give` | A release without a take. | Every `sync` releases what it took. |
+| `deliver` | A signal outside the table, and one without a function. | The runtime catches a signal that `on_signal` registered alone, inside the table and with the function it takes, which is no `?fn`. |
+
+## `src/antic/antl_io.c`, `src/antic/linker.c`, `src/antic/llvm_run.c`, `src/antic/userdirs.c`, `src/rt/regex.c` and `src/rt/cpu.c`
+
+The bounds and the memory of six files, sorted by batch 3n of the third
+phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `antl_put_count` | A count above `UINT32_MAX`. | A module that held one would not fit the memory of antic. |
+| `antl_get_name` | A name longer than `INT_MAX`. | `antl_get_count` refuses a count above the bytes left, so the name needs a library file of more than 2 GiB. |
+| `next` of `linker.c`, `push` of `llvm_run.c` | A command of more strings than the array holds. | Each bound covers the longest command, as the comment at each says, and the call aborts. |
+| `unix_dir`, `windows_dir` | A kind of directory that the switch does not name. | `enum user_dir` has the four kinds the switch names. |
+| `parent_of` | A path without a separator, or one at the root. | Its one caller passes the directory of antic itself, which stands below the root. |
+| `compile_failed`, `put` of `regex.c` | PCRE2 without memory, and a text whose map would not fit an `int64_t`. | Both need more memory than a machine holds. |
+| `anti_rt_cpu_level` | A failure of `anti_rt_getenv`. | It fails for memory alone. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
-  symbolizers of `src/rt/trace.c` and `anti_rt_fault_system_error`.
+  symbolizers of `src/rt/trace.c`, `anti_rt_fault_system_error` and the
+  refusal of `anti sdk export` off a Mac.
 - `work_not_waited`, which a test reaches, and which ends through `_Exit`
   before it writes its counts, with the message of
   `platform_run_on_stack` before it.
@@ -968,6 +1058,11 @@ The error paths of lowering, sorted by batch 3m of the third phase.
 - The sides of a condition in the eight files of batch 3l that its report
   did not sort.
 - The sides of a condition in the files of batch 3m that its report
-  did not sort. Among them are `rt.configure("")`, the name of a group of
-  a match past `u64` in a damaged library file, and the line of
-  `holds_short_class` that waits for T265.
+  did not sort. Among them are the name of a group of a match past `u64`
+  in a damaged library file and the line of `holds_short_class` that
+  waits for T265. Batch 3n tests `rt.configure("")`.
+- The sides of a condition in the files of batch 3n that its report did
+  not sort.
+- The lines of `src/rt/f16.h`. Each file that includes it holds a copy
+  of its two functions. The summary counts as missed the lines that some
+  copies do not reach, and one copy or more reaches every line.
