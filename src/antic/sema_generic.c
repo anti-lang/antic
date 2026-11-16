@@ -797,6 +797,12 @@ static void check_meets(struct checker *c, struct type *t,
     if (sema_is_error(t)) {
         return;
     }
+    /* The declaration refused the lanes, and that is the one message,
+       as at the operators of the struct, T266 of
+       docs/audit/tests-findings.md. */
+    if (types_is_simd(t) && sema_simd_lane_refused(types_simd_lane(t))) {
+        return;
+    }
     if (!meets_float(t, p)) {
         sema_error_at(c, pos, "`%s` is no `%s`, which `%.*s` needs for "
                       "`%.*s`: `%s` takes `f32` and `f64` alone", sema_tn(t),
