@@ -1,0 +1,1 @@
+generics_simd_struct_of_refused_lanes_as_an_argument.anti:5:23: error: a lane of a `simd struct` is an integer of a fixed width, a float or `bool`, not `char`

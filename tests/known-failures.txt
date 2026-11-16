@@ -22,3 +22,4 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_classes_default_literal_of_a_type_declared_later_dev T265 A field default that is a literal of a struct or a class the file declares later is refused, since the type has no fields yet.
 matrix_classes_default_literal_of_a_type_declared_later_release T265 A field default that is a literal of a struct or a class the file declares later is refused, since the type has no fields yet.
 matrix_classes_default_literal_of_a_type_declared_later_memory_checks T265 A field default that is a literal of a struct or a class the file declares later is refused, since the type has no fields yet.
+matrix_generics_simd_struct_of_refused_lanes_as_an_argument_refused T266 A simd struct whose lanes its declaration refuses gets a second message as the argument of a generic that needs add.

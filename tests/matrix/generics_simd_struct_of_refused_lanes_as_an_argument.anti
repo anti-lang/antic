@@ -1,0 +1,17 @@
+//! A simd struct whose lanes its declaration refuses is the argument of a
+//! generic whose parameter needs `add`. The refusal of the lanes is the one
+//! message, as it is at `+` and `==` on the struct.
+
+simd struct Letters { a: char, b: char }
+
+fn twice<T: add>(x: T) -> T
+{
+	return x + x;
+}
+
+fn main() -> int
+{
+	let l = Letters { a: 'a', b: 'b' };
+	let d = twice(l);
+	return 0;
+}
