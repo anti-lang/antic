@@ -61,6 +61,12 @@ pub class Canvas
 	protected count: int = 0,
 	private_note: int = 0,
 
+	/// The most shapes a canvas holds.
+	pub const MOST: int = 64;
+	/// How many canvases were made.
+	pub static atomic made: int = 0;
+	const SPARE: int = 2;
+
 	/// A canvas with a name.
 	pub fn new(name: str) -> *Canvas
 	{
@@ -81,7 +87,7 @@ pub class Canvas
 
 	fn secret(self) -> int
 	{
-		return self.private_note;
+		return self.private_note + SPARE;
 	}
 }
 

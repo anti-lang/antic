@@ -83,6 +83,10 @@ A drawing that counts the shapes put on it.
   Put `shape` on the canvas.
 - `pub fn size(self) -> int`
   How many shapes stand on the canvas.
+- `pub const MOST: int = 64`
+  The most shapes a canvas holds.
+- `pub static atomic made: int`
+  How many canvases were made.
 
 ## area
 
