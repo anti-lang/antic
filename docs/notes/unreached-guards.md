@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batch 3l stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l and 3m stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -47,7 +47,9 @@ files of batch 3i against the source of
 of batch 3j were checked against the source of
 `docs/reports/2026-11-15-coverage-phase-3j.md`, and those of the eight
 files of batch 3l against the source of
-`docs/reports/2026-11-16-coverage-phase-3l.md`. A guard named "the report
+`docs/reports/2026-11-16-coverage-phase-3l.md`. Those of the seven
+files of batch 3m were checked against the source of
+`docs/reports/2026-11-16-coverage-phase-3m.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -843,6 +845,72 @@ The module of the IR, sorted by batch 3l of the third phase.
 | `ir_table_write_add` | A write of a table that the module noted already. | `lower_class_global` keeps each table, which notes its write as it is built, and a class implements an interface once. |
 | `ir_same_scalar` | An operand of another kind than none, a temporary, an integer and a float. | Both callers answer a global, a function, a block and a symbol before, the four other kinds of operand. |
 
+## `src/rt/conf.c`
+
+The runtime configuration, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `format_text` | A message that `vsnprintf` cannot write, or writes at another length the second time. | Every format is a literal of the file, and its values are texts the runtime holds and numbers, which the C library writes the same way twice. |
+| `set_key` | A value of more than `INT_MAX` bytes. | A value comes from an option or from a file the runtime read whole, and a test cannot give a process an argument or a file of 2 GiB. |
+| `read_key` | A key of more than `INT_MAX` bytes. | The same bound on a file the runtime read whole. |
+| `help` | An option whose form is 34 bytes or longer, which takes no padding. | The table of the options is fixed, and its longest form stands below 34 bytes. |
+| `join_elements` | A key after an array that is `runtime` itself or `runtime.` alone. | A key after the array stands under `[runtime]` with a name of its own, or under another table, which the first test turns away. |
+
+## `src/antic/text.c`
+
+The text buffer of antic, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `text_format_name` | A generated name that does not fit its buffer, which aborts. | Each buffer holds the longest name it takes, which `test_name_size` of `tests/unit/test_text.c` checks with the largest count. |
+
+## `src/antic/sema_declare.c`
+
+The declarations of the checker, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `check_owned` | An `own` parameter whose type is the error type, and a function type of fewer parameters than the item. | `function_type_of` of `sema.c` gives the whole function the error type when one parameter has it, and `check_owned` returns before for that type. |
+
+`holds_short_class` of an aggregate whose item is a short class value
+waits for T265, whose program the checker refuses before it.
+
+## `src/rt/json.c`
+
+The JSON scanner of the runtime, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `anti_rt_json_member` | An object whose `{`, key, `:` or value fails on the second walk. | The first walk reads the whole input as one JSON object and refuses any other, so the second walk meets what the first read. |
+
+## `src/antic/sema_class.c`
+
+The rules of classes, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `check_replacement` | A qualified `concrete fn` whose qualifier names no table. | The caller skips such a function, whose message `check_qualifiers` gives, by T071. |
+
+## `src/antic/sema_export.c`
+
+The C side of the checker, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `has_plain_pointer`, `no_c_type` | No type. | The checker gives every pointer its element and every function type its result, `void` at the least. |
+| `sema_check_extern_fn` | A parameter of the error type. | The function then has the error type, and the check returns before its parameters. |
+
+## `src/antic/lower_error.c`
+
+The error paths of lowering, sorted by batch 3m of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_handle_error` | A call without a handler, and one that the enclosing `try` block handles outside such a block. | The checker refuses a call that may fail without a handler, and `check_handled` of `sema_call.c` marks a call as handled by the block inside a `try` block alone, where lowering holds the scope of the block. |
+| `lower_pointer_guard` | A guard without a symbol, or one after the end of a path. | The checker gives every `let` its symbol, and lowering writes no statement after the end of a path. |
+| `lower_guard_missing` | A handler of a guard that ends without leaving the block. | `check_pointer_guard` of `sema_stmt.c` holds the handler to leave the block or end with `yield`, as every handler does. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -898,6 +966,8 @@ The module of the IR, sorted by batch 3l of the third phase.
   `ast_dump.c`, `main.c` of `anti` and `driver_search.c` that the report
   of batch 3k did not sort.
 - The sides of a condition in the eight files of batch 3l that its report
-  did not sort. `ir_lane_bytes` of a lane that is no number stays open as
-  well, and a library file whose simd aggregate starts with a pointer
-  reaches it.
+  did not sort.
+- The sides of a condition in the files of batch 3m that its report
+  did not sort. Among them are `rt.configure("")`, the name of a group of
+  a match past `u64` in a damaged library file, and the line of
+  `holds_short_class` that waits for T265.
