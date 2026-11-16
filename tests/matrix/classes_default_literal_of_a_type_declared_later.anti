@@ -1,0 +1,33 @@
+//! The default of a field is a literal of a struct or a class that the file
+//! declares after the class of the field, with the fields it names: a struct, a
+//! class value and an array of class values.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Holder
+{
+	pub point: Point = Point { x: 5, y: 6 },
+	pub held: Later = Later { x: 5 },
+	pub pair: [2]Later = [Later { x: 3 }; 2],
+}
+
+struct Point
+{
+	x: int,
+	y: int,
+}
+
+class Later
+{
+	pub x: int = 0,
+	pub y: int = 7,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	printf("struct %d %d\n".ptr, h.point.x as c_int, h.point.y as c_int);
+	printf("class %d %d\n".ptr, h.held.x as c_int, h.held.y as c_int);
+	printf("array %d %d\n".ptr, h.pair[1].x as c_int, h.pair[1].y as c_int);
+	return 0;
+}
