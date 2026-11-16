@@ -1,0 +1,3 @@
+# A key under [runtime.plugins] whose part after the dot is no number.
+[runtime.plugins]
+- = 'a'

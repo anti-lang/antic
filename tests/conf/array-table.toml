@@ -1,0 +1,7 @@
+# An array value of a key, and a table after it that is no table of
+# the runtime configuration.
+[runtime]
+plugins = ['a']
+
+[other]
+x = 1

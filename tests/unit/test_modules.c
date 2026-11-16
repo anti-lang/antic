@@ -2245,6 +2245,21 @@ static void damaged_simd(void)
         refuses_poke(&bytes, lane, value, 5);
     }
 
+    /* Both lanes of `ZV` in the IR as pointers, which have no width of
+       their own, so the lanes agree and no shape of lanes holds them. */
+    {
+        size_t first = name_end(&bytes, "zq", true);
+        size_t second = name_end(&bytes, "zr", true);
+        uint8_t *both = alloc_zeroed(bytes.length, 1);
+        memcpy(both, bytes.data, bytes.length);
+        both[first] = IR_PTR;
+        poke_u32(both + first + 1, IR_NO_AGG);
+        both[second] = IR_PTR;
+        poke_u32(both + second + 1, IR_NO_AGG);
+        refuses_file(both, bytes.length, NULL);
+        free(both);
+    }
+
     /* The places of the flags hold what the source gave. */
     CHECK(((const uint8_t *)bytes.data)[type_flags(&bytes, "zq")] == 16);
     CHECK(((const uint8_t *)bytes.data)[agg_flags(&bytes, "zq")] == 2);

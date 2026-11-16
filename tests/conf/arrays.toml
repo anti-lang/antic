@@ -1,0 +1,6 @@
+# Array values of three keys, one after the other. threads has as many
+# letters as plugins.
+[runtime]
+plugins = ['a']
+threads = [2]
+trace = ['leaks']

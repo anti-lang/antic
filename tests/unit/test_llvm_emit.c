@@ -2731,8 +2731,34 @@ static void facts_left_out(void)
     end(&x);
 }
 
+/* A metadata string takes the escape \XX for a quote, a backslash and a
+   byte outside printable ASCII. A span of no bytes is no span, a list
+   that is none takes none, and a span that follows the last one without
+   a byte between them joins it. */
+static void debug_parts(void)
+{
+    struct text out = {0};
+    struct debug_spans spans = {0};
+
+    llvm_debug_string(&out, "a\"b\\c\x01\xc3\xa9");
+    CHECK_STR(text_cstr(&out), "\"a\\22b\\5Cc\\01\\C3\\A9\"");
+    text_free(&out);
+    llvm_debug_mark(NULL, 0, 4);
+    llvm_debug_mark(&spans, 4, 4);
+    llvm_debug_mark(&spans, 6, 5);
+    CHECK(spans.count == 0);
+    llvm_debug_mark(&spans, 0, 4);
+    llvm_debug_mark(&spans, 4, 9);
+    llvm_debug_mark(&spans, 12, 15);
+    CHECK(spans.count == 2);
+    CHECK(spans.items[0].start == 0 && spans.items[0].end == 9);
+    CHECK(spans.items[1].start == 12 && spans.items[1].end == 15);
+    llvm_debug_spans_free(&spans);
+}
+
 void test_llvm_emit(void)
 {
+    debug_parts();
     module_text();
     constants();
     float_bits();

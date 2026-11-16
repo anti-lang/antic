@@ -3,6 +3,7 @@
    generated name. */
 
 #include <stdint.h>
+#include <wchar.h>
 
 #include "../binary_stdio.h"
 #include "check.h"
@@ -12,7 +13,11 @@
 void test_text(void)
 {
     struct text t = {0};
+    char small[3];
+    char written[16];
+    char formatted[16];
     int i;
+    int n;
 
     CHECK_STR(text_cstr(&t), "");
     text_append(&t, "mov");
@@ -35,6 +40,25 @@ void test_text(void)
     text_append_bytes(&t, NULL, 0);
     CHECK(t.length == 0);
     CHECK_STR(text_cstr(&t), "");
+    text_free(&t);
+
+    /* A buffer of no bytes takes nothing, and one of fewer than four
+       takes the start of a text too long for it, without the dots. */
+    memcpy(small, "abc", 3);
+    text_format(small, 0, "%s", "xyz");
+    CHECK(memcmp(small, "abc", 3) == 0);
+    text_format(small, sizeof small, "%s", "xyz");
+    CHECK_STR(small, "xy");
+
+    /* U+D800 is no character, so the C library of the Mac writes no
+       bytes for it and gives -1. The buffer is then empty, and the text
+       stays as it was. Each part holds what the C library gives. */
+    n = snprintf(written, sizeof written, "%lc", (wint_t)0xD800);
+    text_format(formatted, sizeof formatted, "%lc", (wint_t)0xD800);
+    CHECK_STR(formatted, n < 0 ? "" : written);
+    text_append(&t, "a");
+    text_appendf(&t, "%lc", (wint_t)0xD800);
+    CHECK(t.length == (n < 0 ? 1 : 1 + (size_t)n));
     text_free(&t);
 }
 

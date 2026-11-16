@@ -108,6 +108,8 @@ static void bad_escapes(void)
     CHECK(reads_string("\"\\ud800\"", 16) == 0);
     CHECK(reads_string("\"\\udfff\"", 16) == 0);
     CHECK(reads_string("\"\\u00e9\"", 16) == 1);
+    /* U+E000 is the first code point past the surrogates. */
+    CHECK(reads_string("\"\\ue000\"", 16) == 1);
     /* Two bytes of UTF-8 do not fit in a room of one. */
     CHECK(reads_string("\"\\u00e9\"", 1) == 0);
     CHECK(reads_string("\"abcd\"", 3) == 0);
@@ -227,6 +229,46 @@ static void numbers_in_values(void)
     free(bytes);
 }
 
+/* The member of name in text as anti_rt_json_member gives it, or false. */
+static int member(const char *text, const char *name, int64_t name_length,
+                  int64_t *start, int64_t *value_length)
+{
+    size_t length;
+    unsigned char *bytes = copy(text, &length);
+    int ok = anti_rt_json_member(bytes, (int64_t)length,
+                                 (const unsigned char *)name, name_length,
+                                 start, value_length);
+
+    free(bytes);
+    return ok;
+}
+
+/* anti_rt_json_member refuses what no caller of anti.json passes: no
+   source, a length below zero, a name length below zero and no name with
+   a length. No name of no bytes finds the empty key alone, and spaces
+   alone and the empty object hold no member. */
+static void members(void)
+{
+    unsigned char brace = '{';
+    int64_t start = -1;
+    int64_t value_length = -1;
+
+    CHECK(anti_rt_json_member(NULL, 0, (const unsigned char *)"a", 1, &start,
+                              &value_length) == 0);
+    CHECK(anti_rt_json_member(&brace, -1, (const unsigned char *)"a", 1,
+                              &start, &value_length) == 0);
+    CHECK(member("{\"a\":1}", "a", -1, &start, &value_length) == 0);
+    CHECK(member("{\"a\":1}", NULL, 1, &start, &value_length) == 0);
+    CHECK(member("{\"a\":1}", NULL, 0, &start, &value_length) == 0);
+    CHECK(member("{\"a\":1, \"\":22}", NULL, 0, &start, &value_length) ==
+          1);
+    CHECK(start == 11 && value_length == 2);
+    CHECK(member("{\"a\":1}", "a", 1, &start, &value_length) == 1);
+    CHECK(start == 5 && value_length == 1);
+    CHECK(member("  ", "a", 1, &start, &value_length) == 0);
+    CHECK(member("{}", "a", 1, &start, &value_length) == 0);
+}
+
 static void garbage(void)
 {
     CHECK(skips("") == 0);
@@ -248,4 +290,5 @@ void test_json(void)
     numbers();
     numbers_in_values();
     garbage();
+    members();
 }
