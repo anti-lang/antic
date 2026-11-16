@@ -620,6 +620,17 @@ not re-open a settled decision without asking Eddie.
   four files. It ran each sanitizer suite in the six parts of `asan`,
   the last up to test 7476: `asan` 271 s, 187 s, 263 s, 174 s, 98 s and
   610 s, `ubsan` 299 s, 187 s, 261 s, 186 s, 101 s and 633 s.
+  Batch 3m of the third phase of coverage measured `host` in the same
+  three parts: 376 s, 266 s and 309 s before the commit of T265, up to
+  test 7481, where `fmt_canonical` failed on the new program, and 373 s,
+  264 s and 309 s once it stood in its canonical form, 374 s, 263 s and
+  309 s before the commit of T266, up to test 7482, 375 s, 265 s and
+  309 s before its fix, 372 s, 264 s and 309 s before the commit of the
+  tests of four files, up to test 7493, and 372 s, 267 s and 310 s
+  before the commit of the tests of three files, up to test 7499. It ran
+  each sanitizer suite in the six parts of `asan`, the last up to test
+  7497: `asan` 262 s, 184 s, 261 s, 176 s, 104 s and 579 s, `ubsan`
+  281 s, 184 s, 264 s, 181 s, 107 s and 594 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1230,11 +1241,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7478 ctest tests pass on the development Mac, and two of them, the
+- 7499 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  The two lines of `tests/known-failures.txt`, of T136 and T138, carry
-  `host=windows`.
-  The ASan and the UBSan builds run 7476 each
+  Of the five lines of `tests/known-failures.txt`, the two of T136 and
+  T138 carry `host=windows`, and the three of T265 hold on every host.
+  The ASan and the UBSan builds run 7497 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
