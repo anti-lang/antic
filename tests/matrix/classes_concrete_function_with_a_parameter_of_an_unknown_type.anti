@@ -1,0 +1,17 @@
+//! A `concrete fn` whose parameter names no type. The unknown type is the one
+//! message, and the comparison with the abstract function adds none.
+
+abstract class Greeter
+{
+	abstract fn words(self) -> str;
+}
+
+class Fancy inherits Greeter
+{
+	concrete fn words(self, x: Missing) -> str { return "fancy"; }
+}
+
+fn main() -> int
+{
+	return 0;
+}

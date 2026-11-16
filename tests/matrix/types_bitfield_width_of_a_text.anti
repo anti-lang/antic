@@ -1,0 +1,11 @@
+//! The width of a bitfield is an integer, and a text is refused.
+
+struct Flags
+{
+	a: i32 : "two",
+}
+
+fn main() -> int
+{
+	return 0;
+}

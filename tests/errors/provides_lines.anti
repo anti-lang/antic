@@ -1,6 +1,6 @@
 //! A `provides` line names an interface and a complete class of the module that
-//! inherits it or implements it. Anything else is refused, and one interface is
-//! provided once.
+//! inherits it or implements it. Anything else is refused, a struct in either
+//! place among it, and one interface is provided once.
 abstract class Greeter
 {
 	abstract fn words(self) -> str;
@@ -18,6 +18,11 @@ class Plain
 	n: int = 0,
 }
 
+struct Point
+{
+	x: int,
+}
+
 singleton class One
 {
 	implements g: Greeter,
@@ -31,6 +36,8 @@ provides Fancy as Fancy;
 provides Greeter as Missing;
 provides other.Greeter as Fancy;
 provides Greeter as One;
+provides Point as Fancy;
+provides Greeter as Point;
 
 fn main() -> int
 {

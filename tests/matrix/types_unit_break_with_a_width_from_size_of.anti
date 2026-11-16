@@ -1,0 +1,13 @@
+//! The width of the field `_` is a constant of `size_of`, whose value the
+//! target gives. It is no literal 0, so the zero-width bitfield is refused.
+
+struct Flags
+{
+	a: u8 : 3,
+	_: u8 : size_of(int) - size_of(int),
+}
+
+fn main() -> int
+{
+	return 0;
+}

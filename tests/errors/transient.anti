@@ -11,6 +11,7 @@ class Holder
 	transient own spare: ?*Leaf = none,
 	transient hook: ?fn() = none,
 	transient cache: ?*byte = none,
+	transient lost: Missing,
 }
 
 fn main() -> int

@@ -1,0 +1,12 @@
+//! `own` before a field whose type names nothing. The unknown type is the one
+//! message, and `own` adds none.
+
+class Node
+{
+	pub own next: Missing,
+}
+
+fn main() -> int
+{
+	return 0;
+}

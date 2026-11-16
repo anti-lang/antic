@@ -1,0 +1,14 @@
+//! An `operator fn eq` whose parameter names no type. The unknown type is the
+//! one message, and the rules of `eq` add none.
+
+class Point
+{
+	x: int = 0,
+
+	operator fn eq(self, other: Missing) -> bool { return true; }
+}
+
+fn main() -> int
+{
+	return 0;
+}

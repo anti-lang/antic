@@ -1,0 +1,19 @@
+//! The block of an `if let` takes the address of the pointer it binds, so
+//! anything may give the name another value through it. A closure in the block
+//! then reads the name as its type gives it, which may be `none`.
+
+fn read(q: ?*int) -> int
+{
+	if let p = q {
+		let pp = &p;
+		let g = fn() -> int { return *p; };
+		return g() + **pp;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let n = 4;
+	return read(&n);
+}

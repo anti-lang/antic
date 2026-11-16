@@ -1,10 +1,12 @@
-//! Two values of an enum have two names.
+//! Two values of an enum have two names. A value after them names both in its
+//! expression, and the one message is the second name.
 
 enum Level
 {
 	Low,
 	High,
 	Low,
+	Both = Low | High,
 }
 
 fn main() -> int

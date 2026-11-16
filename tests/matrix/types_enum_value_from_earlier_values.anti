@@ -1,7 +1,10 @@
 //! A value of an enum names the values before it in its constant expression, by
 //! R054 of "Answers of 2026-10-18": `All = Read | Write`. Each name is the
 //! number of that value in the base of the enum, and a value without `=` after
-//! it follows it. The values serve a `switch`, `as` and a field of a struct.
+//! it follows it. The values serve a `switch`, `as` and a field of a struct. A
+//! value of an enum of another module stands in the expression as well.
+
+import anti.text;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -20,6 +23,12 @@ enum Level
 	Low = -2,
 	High = -Low,
 	Span = High - Low,
+}
+
+enum Placed: u8
+{
+	Middle = text.Align.Center as u8,
+	After,
 }
 
 struct Access
@@ -58,6 +67,7 @@ fn main() -> int
 		Mode.Last as c_int);
 	printf("level %d %d %d\n".ptr, Level.Low as c_int, Level.High as c_int,
 		Level.Span as c_int);
+	printf("placed %d %d\n".ptr, Placed.Middle as c_int, Placed.After as c_int);
 	let a = Access { mode: Mode.All };
 	let n = name(a.mode);
 	printf("switch %.*s\n".ptr, n.len as c_int, n.ptr);

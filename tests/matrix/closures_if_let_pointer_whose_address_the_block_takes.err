@@ -1,0 +1,1 @@
+closures_if_let_pointer_whose_address_the_block_takes.anti:9:33: error: `p` may be `none`, check it or use `?*T`

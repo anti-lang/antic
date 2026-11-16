@@ -1,5 +1,6 @@
 //! `inject` needs a pointer to an abstract class. A nullable pointer, a pointer
-//! to a complete class, a default beside it and `own` are each refused.
+//! to a complete class, a default beside it and `own` are each refused. A type
+//! that names nothing has the one message of the type.
 abstract class Logger
 {
 	abstract fn say(self);
@@ -19,6 +20,7 @@ class Bad
 	inject c: *Console,
 	inject own d: *Logger,
 	inject e: *Logger = none,
+	inject f: Missing,
 }
 
 fn main() -> int

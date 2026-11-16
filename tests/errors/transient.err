@@ -1,3 +1,4 @@
+transient.anti:14:18: error: unknown type `Missing`
 transient.anti:8:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `count` has type `int`
 transient.anti:9:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `leaf` has type `Leaf`
 transient.anti:10:2: error: `transient` needs a `?*T` or a `?fn(...)`, and `always` has type `*Leaf`
