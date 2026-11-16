@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c` and `sema_thread.c` stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batch 3l stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -45,7 +45,9 @@ of batch 3h were checked against the source of
 files of batch 3i against the source of
 `docs/reports/2026-11-15-coverage-phase-3i.md`. Those of the six files
 of batch 3j were checked against the source of
-`docs/reports/2026-11-15-coverage-phase-3j.md`. A guard named "the report
+`docs/reports/2026-11-15-coverage-phase-3j.md`, and those of the eight
+files of batch 3l against the source of
+`docs/reports/2026-11-16-coverage-phase-3l.md`. A guard named "the report
 of the first batch" stands in `docs/reports/2026-11-09-coverage-phase-2a.md`,
 one of "the report of the second batch" in
 `docs/reports/2026-11-10-coverage-phase-2b.md` and one of "the report of
@@ -758,6 +760,89 @@ The search of the library files, sorted by batch 3k of the third phase.
 |---|---|---|
 | `link_names`, `driver_load_libraries` | A library file whose header does not read. | The driver reads the header of every library file of the command line before, and refuses such a file there. |
 
+## `src/antic/lower_eq.c`
+
+The default `==` and the parts it compares, sorted by batch 3l of the
+third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_part_of` | A kind of type the switch does not name. | The checker gives the default `==` and the default hash to the kinds the switch names alone, and a lock leaves before. |
+| `lower_root_fn` | A root class without the function of the name. | The callers ask for `equals` and `hash`, which `anti.lang.Object` declares with a function of the runtime. |
+| `compare_at` | A lock among the parts it compares. | The fields, the elements and the cases of a value pass over a lock before, by `lower_field_skipped`, and the checker refuses `==` on a Mutex and an array of them. |
+
+## `src/antic/lower_class.c`
+
+The singletons, the thunks and `T(args)`, sorted by batch 3l of the
+third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `singleton_instance` | A global of the instance that the module holds already. | `lower_singleton_get` runs once for each singleton, for the one `get` the compiler writes. |
+| `lower_singleton_get` | A `get` whose body a library file brought. | It runs over the items of the module that is lowered, whose functions follow those of the library files. |
+| `lower_find_member_fn` | No public function of the name in the chain. | `lower_interface_table` asks for an entry the class does not fill, which the interface fills, since a concrete class has a body for every abstract function and an abstract class gets no table. `lower_error.c` asks for `fatal`, which `anti.lang.Error` declares. |
+| `lower_interface_thunk` | A thunk the module holds already. | `lower_class_global` keeps the table of each sub-object, which is built once, and one function fills one entry. |
+| `lower_construct` | `T(args)` of a class without a `construct` of its own. | `check_construct` of `sema_call.c` refuses it with `` has no `construct` with arguments, so a literal builds it ``. |
+
+## `src/antic/antl_write.c`
+
+The writer of the library file, sorted by batch 3l of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `antl_visit_type` | A type parameter that the visit of its hook owner put in the table. | A parameter that a hook gives, `walked` or `indexed`, is named by its owner alone, which puts itself in the table before it visits that parameter. |
+| `antl_put_type_ref` | A type the table does not hold. | The writer visits every type the file names before it writes a reference. |
+| `put_ir` | A global with relocations. | Layout adds the relocations after the writer ran, and the reader adds them to the program it reads into, which no writer writes. |
+
+## `src/anti/fmt.c`
+
+The formatter, sorted by batch 3l of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `angle_list` | The first `>` of a `>>` taken at the start of a turn. | `angle_close` takes it and returns, and the list starts another turn after a `,` alone, which it reads with that mark clear. |
+| `space_before` | A comment. | `emit_comment` places every comment, and every other caller passes a token. |
+| `flush_doc_line`, `emit_comment` | An empty line below the first of a comment while a blank line waits. | The first line flushes before, and `flush` writes the blank line and clears the mark. |
+
+## `src/antic/antl_verify.c`
+
+The verifier of library files, sorted by batch 3l of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `mark_in` | A record that is none of the records of its table. | The reader builds every reference of a tree from an index into the table of its kind. |
+| `inits_found` | A struct literal without a type. | `stands_as` refuses one at every place but the callee, `callee_read` refuses one there, and the walk stops at the first refusal. |
+
+## `src/rt/symbols.c`
+
+The readers of the symbol tables and the line tables, sorted by batch 3l
+of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `dwarf_line` | No line table. | Both callers find the line section before and refuse a file without one. |
+| `elf_find` | A caller that asks for the index of the section. | Every caller passes `NULL` for it. |
+
+## `src/antic/docpage.c`
+
+The pages of `anti doc`, sorted by batch 3l of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `const_value` | A constant without a value. | The check gives every constant a value or refuses the module, and the reader reads one for every constant the file carries. |
+| `variant_cases` | A variant without the enum of its tags. | The checker gives every variant that enum as its base, and the reader reads it with the variant. |
+| `tree_item` | An item without a symbol or a type, or one of a `tests` or `fixtures` block. | `anti doc` builds without `--tests`, so the parser drops both blocks, and the check gives every item it keeps a symbol and a type or refuses the module. |
+
+## `src/antic/ir.c`
+
+The module of the IR, sorted by batch 3l of the third phase.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `ir_index`, `ir_temp`, `ir_const_agg` | A count above what an index of 32 bits or a `size_t` holds. | A module of that many records does not fit in memory before. |
+| `ir_table_write_add` | A write of a table that the module noted already. | `lower_class_global` keeps each table, which notes its write as it is built, and a class implements an interface once. |
+| `ir_same_scalar` | An operand of another kind than none, a temporary, an integer and a float. | Both callers answer a global, a function, a block and a symbol before, the four other kinds of operand. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -812,3 +897,7 @@ The search of the library files, sorted by batch 3k of the third phase.
 - The sides of a condition in `lower_owning.c`, `sema.c`, `toml.c`,
   `ast_dump.c`, `main.c` of `anti` and `driver_search.c` that the report
   of batch 3k did not sort.
+- The sides of a condition in the eight files of batch 3l that its report
+  did not sort. `ir_lane_bytes` of a lane that is no number stays open as
+  well, and a library file whose simd aggregate starts with a pointer
+  reaches it.
