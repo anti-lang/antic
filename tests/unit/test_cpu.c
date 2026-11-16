@@ -152,6 +152,20 @@ static void refusal(void)
     clear_level();
 }
 
+/* Without the variable, or with one that names no level, the check reads
+   the processor itself, which is of one of the two architectures. */
+static void machine(void)
+{
+    int32_t level;
+
+    clear_level();
+    level = anti_rt_cpu_level();
+    CHECK(level != ANTI_CPU_NONE);
+    set_level("v9");
+    CHECK(anti_rt_cpu_level() == level);
+    clear_level();
+}
+
 /* A level of another architecture than that of the target, which main.c
    and anti refuse before the driver runs. The message goes to the
    standard error, which unit_cpu_messages compares. */
@@ -173,5 +187,6 @@ void test_cpu(void)
     features();
     ids();
     refusal();
+    machine();
     driver_refusal();
 }

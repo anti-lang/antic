@@ -1,0 +1,11 @@
+//! `rt.configure("")` names a file of no name, which the runtime cannot read,
+//! so the program ends at once with status 70, as for a file that is not there.
+
+import anti.lang;
+import anti.runtime as rt;
+
+fn main() -> int
+{
+	rt.configure("");
+	return 0;
+}

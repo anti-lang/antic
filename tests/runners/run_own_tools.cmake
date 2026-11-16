@@ -23,8 +23,10 @@ file(REMOVE_RECURSE "${WORK}")
 file(MAKE_DIRECTORY "${WORK}")
 set(source "${ROOT}/tests/programs/return42.anti")
 set(path_sep ":")
+set(exe "")
 if(CMAKE_HOST_WIN32)
     set(path_sep ";")
+    set(exe ".exe")
 endif()
 
 # A stand-in archive at dir: lib/, std/ and licenses/ of the real one, and
@@ -136,6 +138,34 @@ run_antic("a bundled macOS library" 0 ".*"
                   "${ROOT}/tests/clib/com/example/doubling.anti")
 if(NOT EXISTS "${WORK}/libbundled.a")
     message(FATAL_ERROR "antic wrote no bundled library for macos-arm64")
+endif()
+
+# A bundled runtime of a Windows target is joined into one COFF object
+# from the members of its anti_rt.lib. An archive whose anti_rt.lib holds
+# a member that is no object is refused, and the message names the
+# member, so a damaged package is named and never bundled.
+set(damaged "${WORK}/damaged")
+set(damaged_level "${damaged}/lib/windows-x86_64/v3")
+stand_in("${damaged}" bin)
+file(REMOVE "${damaged}/lib")
+file(MAKE_DIRECTORY "${damaged_level}")
+file(COPY "${RUNTIME}/lib/windows-x86_64/v3/anti_rt_license_stub.obj"
+     DESTINATION "${damaged_level}")
+file(WRITE "${WORK}/junk.obj" "not an object")
+execute_process(COMMAND "${RUNTIME}/bin/llvm-ar${exe}" rc
+                        "${damaged_level}/anti_rt.lib" "${WORK}/junk.obj"
+                RESULT_VARIABLE ar_status)
+if(NOT ar_status EQUAL 0)
+    message(FATAL_ERROR "llvm-ar could not write the damaged anti_rt.lib")
+endif()
+run_antic("a damaged member of a bundled Windows runtime" 1
+          "antic: joining the runtime into the library: [^\n]*junk\\.obj is no COFF object\nantic: cannot bundle [^\n]*anti_rt\\.lib\n"
+          COMMAND --runtime "${damaged}" --target windows-x86_64 --lib static
+                  --bundle-runtime -I "${ROOT}/tests/clib"
+                  -o "${WORK}/libdamaged.lib"
+                  "${ROOT}/tests/clib/com/example/doubling.anti")
+if(EXISTS "${WORK}/libdamaged.lib")
+    message(FATAL_ERROR "antic wrote a bundled library over a damaged runtime")
 endif()
 
 # The two Windows checks need the Windows sysroot of the archive.

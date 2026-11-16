@@ -394,4 +394,12 @@ if(CMAKE_HOST_APPLE)
         FAULT stat:3:EACCES
         ARGS sdk export --sdk MacOSX.sdk -o out
         ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
+    # The third stat above is the kind of the stub through a link, and the
+    # second the kind of the entry itself, which this case refuses.
+    anti_message(fault_sdk_export_entry_kind_unread
+        FILES ${sdk_files}
+        DIRECTORIES MacOSX.sdk/System/Library/Frameworks
+        FAULT stat:2:EACCES
+        ARGS sdk export --sdk MacOSX.sdk -o out
+        ERR "anti: cannot copy the stubs of MacOSX.sdk/usr/lib")
 endif()
