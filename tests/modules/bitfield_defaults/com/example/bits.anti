@@ -1,5 +1,7 @@
 //! A class whose bitfields carry defaults. The library file carries each one,
-//! and a client writes them into the unit they share.
+//! and a client writes them into the unit they share. A struct with a unit
+//! break between its bitfields is the value of a constant and the default of a
+//! field, and the library file carries the break as a constant of no value.
 
 pub class Bits
 {
@@ -7,4 +9,28 @@ pub class Bits
 	pub flag: u8 : 1 = 1,
 	pub mid: i8 : 3 = -2,
 	pub whole: int = 7,
+}
+
+/// Two bitfields with a unit break between them.
+pub struct Split
+{
+	a: u32 : 4,
+	_: u32 : 0,
+	b: u32 : 4,
+}
+
+/// A constant of the split struct.
+pub const SPLIT: Split = Split { a: 1, b: 2 };
+
+/// The constant, as a function of the library gives it.
+pub fn split() -> Split
+{
+	let s = SPLIT;
+	return s;
+}
+
+/// A class whose field takes the split struct by default.
+pub class Halves
+{
+	pub split: Split = Split { a: 3, b: 4 },
 }

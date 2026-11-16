@@ -1,6 +1,7 @@
 //! The client of the bitfields library. It builds the class without naming a
 //! field, alone and as a field of a class of its own, and prints every default
-//! the library file carried.
+//! the library file carried, the constant and the default of a struct with a
+//! unit break among them.
 
 import com.example.bits;
 
@@ -30,5 +31,11 @@ fn main() -> int
 	let h = Holder { };
 	show("field", &h.inner);
 	printf("after %lld\n".ptr, h.after);
+	let s = bits.SPLIT;
+	printf("split %d %d\n".ptr, s.a as c_int, s.b as c_int);
+	let given = bits.split();
+	printf("given %d %d\n".ptr, given.a as c_int, given.b as c_int);
+	let halves = bits.Halves { };
+	printf("halves %d %d\n".ptr, halves.split.a as c_int, halves.split.b as c_int);
 	return 0;
 }

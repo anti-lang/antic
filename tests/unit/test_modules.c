@@ -3602,6 +3602,32 @@ static struct symbol *own_symbol(struct damaged *s, struct expr *e)
     return copy;
 }
 
+/* The callee of the copy `tpair(x, n)` written as an extern of the file
+   without its item, so no generic gives the count of the type arguments
+   the copy records. */
+static void copy_without_generic(struct damaged *s)
+{
+    own_symbol(s, tree_let(s, "kept")->as.call.callee)->item = NULL;
+}
+
+/* The anonymous function of `f` in a second place, as the value of
+   `neg`. An anonymous function stands in one place. */
+static void fn_twice(struct damaged *s)
+{
+    struct item *it = tree_of(s);
+    struct expr *copy = arena_alloc(s->arena, sizeof *copy);
+    size_t i;
+
+    *copy = *tree_let(s, "f");
+    for (i = 0; i < it->body->count; i++) {
+        struct stmt *st = it->body->stmts[i];
+        if (st->kind == STMT_LET && st->as.let.name.length == 3 &&
+            memcmp(st->as.let.name.text, "neg", 3) == 0) {
+            st->as.let.value = copy;
+        }
+    }
+}
+
 /* The private function `thelper` written with the type `int`. */
 static void extern_fn_not_fn(struct damaged *s)
 {
@@ -3939,7 +3965,8 @@ static void damaged_trees(void)
         line_negative,           field_past_struct,
         init_past_struct,        init_past_case,
         variant_without_case,    init_past_slice,
-        callee_literal_without_type, callee_field_without_type};
+        callee_literal_without_type, callee_field_without_type,
+        copy_without_generic,    fn_twice};
     size_t i;
 
     tree_file(NULL, true);

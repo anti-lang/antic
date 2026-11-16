@@ -1278,40 +1278,52 @@ static void macho_debug_map(void)
     CHECK(!maps_to(&t, 0x103f, "/tmp/a.o", "_g"));
 }
 
-/* An object file with one section, __debug_line of __DWARF, the symbol
-   _f at 0x1000 and the line table line. Its relocations follow the
-   section, and the symbol table and its names end the file. Gives the
-   size. */
+/* An object file with the section __debug_line of __DWARF, and
+   __debug_line_str after it when line_str is not NULL, the symbol _f at
+   0x1000 and the line table line. Its relocations follow the sections,
+   and the symbol table and its names end the file. Gives the size. */
 static size_t macho_object(uint8_t *out, size_t room, const struct blob *line,
-                           const uint8_t *relocs, uint32_t nreloc)
+                           const struct blob *line_str, const uint8_t *relocs,
+                           uint32_t nreloc)
 {
     static const struct t_nlist f[] = {{10, N_SECT, 1, 0x1000}};
-    size_t section = 32 + 152 + 24;
-    size_t reloff = section + line->size;
+    uint32_t nsect = line_str != NULL ? 2 : 1;
+    size_t segment = 72 + 80 * (size_t)nsect;
+    size_t section = 32 + segment + 24;
+    size_t strs = section + line->size;
+    size_t reloff = strs + (line_str != NULL ? line_str->size : 0);
     size_t symbols = reloff + 8 * (size_t)nreloc;
     size_t strings = symbols + 16;
     uint8_t *s = out + 32 + 72;
+    uint8_t *table = out + 32 + segment;
 
     CHECK(strings + sizeof macho_names <= room);
     memset(out, 0, room);
     put(out, 0xfeedfacf, 4);
     put(out + 16, 2, 4);
-    put(out + 20, 152 + 24, 4);
+    put(out + 20, segment + 24, 4);
     put(out + 32, 0x19, 4);
-    put(out + 36, 152, 4);
-    put(out + 32 + 64, 1, 4);
+    put(out + 36, segment, 4);
+    put(out + 32 + 64, nsect, 4);
     memcpy(s, "__debug_line", 12);
     memcpy(s + 16, "__DWARF", 7);
     put(s + 40, line->size, 8);
     put(s + 48, section, 4);
     put(s + 56, reloff, 4);
     put(s + 60, nreloc, 4);
-    put(out + 184, 0x2, 4);
-    put(out + 188, 24, 4);
-    put(out + 192, symbols, 4);
-    put(out + 196, 1, 4);
-    put(out + 200, strings, 4);
-    put(out + 204, sizeof macho_names, 4);
+    if (line_str != NULL) {
+        memcpy(s + 80, "__debug_line_str", 16);
+        memcpy(s + 80 + 16, "__DWARF", 7);
+        put(s + 80 + 40, line_str->size, 8);
+        put(s + 80 + 48, strs, 4);
+        memcpy(out + strs, line_str->bytes, line_str->size);
+    }
+    put(table, 0x2, 4);
+    put(table + 4, 24, 4);
+    put(table + 8, symbols, 4);
+    put(table + 12, 1, 4);
+    put(table + 16, strings, 4);
+    put(table + 20, sizeof macho_names, 4);
     memcpy(out + section, line->bytes, line->size);
     if (nreloc > 0) {
         memcpy(out + reloff, relocs, 8 * (size_t)nreloc);
@@ -1364,7 +1376,7 @@ static void macho_object_lines(void)
     size_t cut;
 
     simple_lines(&line, 6);
-    size = macho_object(image, sizeof image, &line, NULL, 0);
+    size = macho_object(image, sizeof image, &line, NULL, NULL, 0);
     CHECK(object_line(image, size) == 7);
     for (cut = 0; cut < size; cut++) {
         CHECK(object_line(image, cut) == 0);
@@ -1392,7 +1404,7 @@ static void macho_object_lines(void)
     line_unit(&zero, 4, &h, &p);
     operand = (uint32_t)(4 + 2 + 4 + h.size + 3);
     relocation(r, operand, 0, 3);
-    size = macho_object(image, sizeof image, &zero, r, 1);
+    size = macho_object(image, sizeof image, &zero, NULL, r, 1);
     CHECK(object_line(image, size) == 7);
     for (cut = 0; cut < size; cut++) {
         CHECK(object_line(image, cut) == 0);
@@ -1400,25 +1412,68 @@ static void macho_object_lines(void)
     /* A symbol past the table, an address past the section, a field of 4
        bytes and a scattered relocation are each passed over. */
     relocation(r, operand, 1, 3);
-    size = macho_object(image, sizeof image, &zero, r, 1);
+    size = macho_object(image, sizeof image, &zero, NULL, r, 1);
     CHECK(object_line(image, size) == 0);
     relocation(r, (uint32_t)zero.size - 7, 0, 3);
-    size = macho_object(image, sizeof image, &zero, r, 1);
+    size = macho_object(image, sizeof image, &zero, NULL, r, 1);
     CHECK(object_line(image, size) == 0);
     relocation(r, operand, 0, 2);
-    size = macho_object(image, sizeof image, &zero, r, 1);
+    size = macho_object(image, sizeof image, &zero, NULL, r, 1);
     CHECK(object_line(image, size) == 0);
     relocation(r, operand | 0x80000000u, 0, 3);
-    size = macho_object(image, sizeof image, &zero, r, 1);
+    size = macho_object(image, sizeof image, &zero, NULL, r, 1);
     CHECK(object_line(image, size) == 0);
     /* Relocations past the end of the file, or more than it holds. */
     relocation(r, operand, 0, 3);
-    size = macho_object(image, sizeof image, &zero, r, 1);
+    size = macho_object(image, sizeof image, &zero, NULL, r, 1);
     put(image + 32 + 72 + 56, (uint32_t)size, 4);
     CHECK(object_line(image, size) == 0);
     put(image + 32 + 72 + 56, 208 + (uint32_t)zero.size, 4);
     put(image + 32 + 72 + 60, 0xffffffffu, 4);
     CHECK(object_line(image, size) == 0);
+
+    /* A symbol the object does not hold has no line. */
+    size = macho_object(image, sizeof image, &line, NULL, NULL, 0);
+    {
+        uint8_t *copy = exactly(image, size);
+        struct anti_found found;
+        memset(&found, 0, sizeof found);
+        CHECK(!anti_rt_macho_object_line(copy, size, "_g", 4, &found));
+        free(copy);
+    }
+}
+
+/* DWARF 5 in an object: the files of the line table name their paths
+   with DW_FORM_line_strp, offsets into the section __debug_line_str. The
+   file register starts at 1, so the row names the second file. */
+static void macho_object_strings(void)
+{
+    struct blob d = {{0}, 0};
+    struct blob f = {{0}, 0};
+    struct blob h = {{0}, 0};
+    struct blob p = {{0}, 0};
+    struct blob line = {{0}, 0};
+    struct blob strs = {{0}, 0};
+    uint8_t image[1024];
+    size_t size;
+
+    add_int(&d, 1, 1);
+    add_uleb(&d, 1);            /* DW_LNCT_path */
+    add_uleb(&d, 0x08);         /* DW_FORM_string */
+    add_uleb(&d, 1);
+    add(&d, "d", 2);
+    add_int(&f, 1, 1);
+    add_uleb(&f, 1);            /* DW_LNCT_path */
+    add_uleb(&f, 0x1f);         /* DW_FORM_line_strp */
+    add_uleb(&f, 2);
+    add_int(&f, 0, 4);
+    add_int(&f, 2, 4);
+    add(&strs, "x\0a.anti", 9);
+    v5_header(&h, &d, &f);
+    two_rows(&p, 6);
+    line_unit(&line, 5, &h, &p);
+    size = macho_object(image, sizeof image, &line, &strs, NULL, 0);
+    CHECK(object_line(image, size) == 7);
 }
 
 void test_symbols(void)
@@ -1465,4 +1520,5 @@ void test_symbols(void)
     macho_symbols();
     macho_debug_map();
     macho_object_lines();
+    macho_object_strings();
 }

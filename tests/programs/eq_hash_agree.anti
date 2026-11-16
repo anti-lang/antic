@@ -3,7 +3,8 @@
 //! inside a struct compares through it. An `f16` compares as its `f32`, so zero
 //! of either sign is one value in a class as in a struct of `f32`. A function
 //! with its context compares and hashes by its code. A Mutex in an array is no
-//! data, whether or not it is held.
+//! data, whether or not it is held, and the hash of a Mutex or of an array of
+//! them is that of no part.
 
 import anti.lang;
 
@@ -90,6 +91,8 @@ fn main() -> int
 	let h = alloc Locks { locks: [Mutex.new(), Mutex.new()], n: 1 };
 	sync g.locks[0] {
 		printf("locks %d %d\n".ptr, b(*g == *h), same(g.hash(), h.hash()));
+		printf("lock hash %d %d\n".ptr, same(g.locks.hash(), h.locks.hash()),
+			same(g.locks[0].hash(), h.locks[1].hash()));
 	}
 	delete(g);
 	delete(h);
