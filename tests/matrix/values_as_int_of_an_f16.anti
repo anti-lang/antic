@@ -1,0 +1,8 @@
+//! `as int` of the `f16` that `as f16` gives. An `f16` converts to an `f32`
+//! alone, and to itself.
+
+fn main() -> int
+{
+	let n = 1.5 as f16 as int;
+	return 0;
+}
