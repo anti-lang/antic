@@ -649,6 +649,21 @@ not re-open a settled decision without asking Eddie.
   It ran each sanitizer suite in the six parts of `asan`, the last up to
   test 7508: `asan` 264 s, 185 s, 264 s, 176 s, 104 s and 580 s, `ubsan`
   275 s, 186 s, 260 s, 182 s, 106 s and 596 s.
+  Batch 3o of the third phase of coverage measured `host` in the same
+  three parts: 368 s, 264 s and 314 s before the commit of T268 to T273
+  and of the tests of `regex.c`, up to test 7521, 372 s, 265 s and 311 s
+  before the commit of T274 and T275, up to test 7523, 372 s, 265 s and
+  311 s before the fix of T268, 373 s, 266 s and 310 s before that of
+  T269, 374 s, 268 s and 314 s before that of T270, 373 s, 268 s and
+  308 s before that of T271, 371 s, 267 s and 309 s before that of T272,
+  369 s, 264 s and 308 s before that of T273, 368 s, 260 s and 308 s
+  before that of T274, 368 s, 261 s and 311 s before that of T275,
+  366 s, 261 s and 309 s before the commits of the tests of three files,
+  up to test 7531, and 361 s, 265 s and 310 s before the commit of the
+  tests of the fixes, up to test 7535. It ran each sanitizer suite in the
+  six parts of `asan`, the last up to test 7533: `asan` 261 s, 184 s,
+  261 s, 175 s, 104 s and 580 s, `ubsan` 267 s, 184 s, 259 s, 179 s,
+  103 s and 599 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1259,11 +1274,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7510 ctest tests pass on the development Mac, and two of them, the
+- 7535 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   The two lines of `tests/known-failures.txt`, of T136 and T138, carry
   `host=windows`.
-  The ASan and the UBSan builds run 7508 each
+  The ASan and the UBSan builds run 7533 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
