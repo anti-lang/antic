@@ -1,0 +1,13 @@
+call_forms.anti:89:10: error: `Made` has no `construct` with arguments, so a literal builds it
+call_forms.anti:90:15: error: expected `int`, found `str`
+call_forms.anti:92:10: error: cannot call `int`
+call_forms.anti:93:11: error: `H` is a type, not a value
+call_forms.anti:95:10: error: `int` has no field `compile`
+call_forms.anti:96:11: error: `Object` has no function `nothing`
+call_forms.anti:98:24: error: `text` has no public class `Missing`
+call_forms.anti:99:24: error: `text` has no public class `equal`
+call_forms.anti:101:10: error: `Vec4` has no function `missing`
+call_forms.anti:102:10: error: cannot call `f32`
+call_forms.anti:103:10: error: `Vec4` has no function `nope`
+call_forms.anti:107:10: error: `Flags` has no field `missing`
+call_forms.anti:68:10: error: `SECRET` is private to `A`

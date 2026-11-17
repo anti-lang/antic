@@ -1,0 +1,109 @@
+//! Calls and members that the checker refuses, one mistake per line. Each gets
+//! its one message: a class whose `construct` takes no arguments called with
+//! one, a `construct` whose first argument does not convert, a struct called as
+//! a function, a struct whose field `hash` is called, a local named `Regex`, a
+//! function of `Object` that is not there, `lib.instance` of a name that is no
+//! class of a module, a function of a simd struct that is not there, a lane
+//! called, a private constant of another class and a field of `Flags` that is
+//! not there. A class field without a default takes the literal of a class that
+//! implements an interface.
+
+import anti.lang;
+import anti.text;
+import anti.plugin;
+
+abstract class Runner
+{
+	abstract fn run(self) -> int;
+}
+
+class Runs
+{
+	implements runner: Runner,
+	pub n: int = 1,
+
+	concrete fn Runner::run(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Outer
+{
+	pub inner: Runs,
+}
+
+class Made
+{
+	pub n: int = 0,
+
+	fn construct(self)
+	{
+		self.n = 1;
+	}
+}
+
+class Pair
+{
+	pub n: int = 0,
+
+	fn construct(self, a: int, b: int)
+	{
+		self.n = a + b;
+	}
+}
+
+class A
+{
+	const SECRET: int = 1;
+	pub n: int = 0,
+}
+
+class B
+{
+	pub n: int = 0,
+
+	pub fn peek(self) -> int
+	{
+		return A.SECRET;
+	}
+}
+
+struct H
+{
+	n: int,
+	hash: int,
+}
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let o = Outer { };
+	let m = Made(1);
+	let p = Pair("a", 2);
+	let h = H { n: 1, hash: 2 };
+	let s = h.hash();
+	let hh = H(1);
+	let Regex = 1;
+	let r = Regex.compile("a");
+	let ob = Object.nothing;
+	let lib = plugin.load("x") catch fatal;
+	let i1 = lib.instance(text.Missing);
+	let i2 = lib.instance(text.equal);
+	let v = Vec4.splat(1.0);
+	let w = Vec4.missing();
+	let a = v.x();
+	let b = v.nope();
+	let x = 1;
+	let y = 2;
+	let (sum, fl) = x + y;
+	let q = fl.missing;
+	return 0;
+}
