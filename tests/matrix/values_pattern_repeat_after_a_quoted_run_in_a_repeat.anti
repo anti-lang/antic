@@ -1,0 +1,22 @@
+//! A quantifier after `\Q...\E` repeats the last character of the quoted text,
+//! as PCRE2 reads it. `(\Qxa\E+)+` is `(xa+)+`, whose next round starts with an
+//! `x` that the inner repeat cannot take, so the literal passes the check of
+//! exponential time. A line of the output says whether a text matched.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	show("rounds_of_a_run", "xaaxa".matches(re"^(\Qxa\E+)+$") != none);
+	show("one_long_round", "xaaa".matches(re"^(\Qxa\E+)+$") != none);
+	show("x_alone", "x".matches(re"^(\Qxa\E+)+$") != none);
+	return 0;
+}
