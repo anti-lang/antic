@@ -2375,7 +2375,10 @@ static struct type *infer(struct checker *c, struct expr *e,
                 open = true;
             }
         }
-        if (!open) {
+        /* `none` takes its type from its parameter and gives nothing,
+           as in the field of a literal, by T283 of
+           docs/audit/tests-findings.md. */
+        if (!open || e->as.call.args[i]->kind == EXPR_NONE) {
             continue;
         }
         t = sema_check_kept(c, e->as.call.args[i], NULL,

@@ -1,0 +1,23 @@
+//! `none` as an argument of a generic function gives its parameter nothing, and
+//! another argument gives the type. The call takes `none` as the `?*T` of that
+//! type.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pick<T>(a: ?*T, b: *T) -> *T
+{
+	if let found = a {
+		return found;
+	}
+	return b;
+}
+
+fn main() -> int
+{
+	let x = 4;
+	let y = 9;
+	let p = pick(none, &x);
+	let q = pick(&y, &x);
+	printf("%d %d\n".ptr, *p as c_int, *q as c_int);
+	return 0;
+}
