@@ -57,6 +57,13 @@ anti_message(front_end_all_targets_with_a_file_that_does_not_parse
     ARGS check --targets all --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/broken.anti:6:9: error: expected an expression")
 
+# A named file of any other suffix is no source, as antic refuses it.
+anti_message(source_of_another_suffix
+    FILES anti.toml "${check_manifest}" notes.txt "Notes.\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings, 1 failed"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}" notes.txt
+    ERR "anti: notes.txt: expected a .anti file")
+
 # The formatting class. Two files that each hold a line `anti fmt` writes
 # otherwise are two findings.
 anti_message(format_two_files

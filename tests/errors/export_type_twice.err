@@ -1,0 +1,1 @@
+export_type_twice.anti:15:13: error: `export type B` names `Box<int>`, which `export type A` names already

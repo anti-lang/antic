@@ -1,0 +1,2 @@
+private_function_named_on_a_value.anti:24:10: error: `helper` is private to `A`
+private_function_named_on_a_value.anti:16:11: error: a bound function takes a public function, and `helper` is private to `A`

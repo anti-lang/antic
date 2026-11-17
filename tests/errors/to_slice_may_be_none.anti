@@ -1,0 +1,30 @@
+//! `to_slice` on a `?*T` of an iterator reads through a pointer that may be
+//! `none`, as a field does, and gets the message of that rule.
+
+struct Countdown
+{
+	left: int,
+}
+
+operator fn next(c: *Countdown) -> bool
+{
+	c.left = c.left - 1;
+	return c.left >= 0;
+}
+
+operator fn value(c: *Countdown) -> int
+{
+	return c.left;
+}
+
+fn maybe() -> ?*Countdown
+{
+	return none;
+}
+
+fn main() -> int
+{
+	let q = maybe();
+	let left = q.to_slice();
+	return 0;
+}

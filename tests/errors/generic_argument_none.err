@@ -1,0 +1,1 @@
+generic_argument_none.anti:11:2: error: nothing in the arguments gives `T` of `on_ptr`, so the call writes it out after the name

@@ -19,3 +19,23 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
+error_to_slice_may_be_none T276 `to_slice` on a `?*T` of an iterator says the type has no function `to_slice`.
+matrix_values_none_of_a_class_to_an_interface_dev T277 `none` of a class pointer converted to an interface becomes the offset of the sub-object.
+matrix_values_none_of_a_class_to_an_interface_release T277 `none` of a class pointer converted to an interface becomes the offset of the sub-object.
+matrix_values_none_of_a_class_to_an_interface_memory_checks T277 `none` of a class pointer converted to an interface becomes the offset of the sub-object.
+program_handler_yields_none_for_a_base T278 A handler yields `none` against the result of a call and not against the `?*T` of a base that the `let` names.
+program_handler_yields_none_for_a_base_macos-x86_64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+emit_identity T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+llvm_verify_macos-arm64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+llvm_verify_macos-x86_64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+llvm_verify_linux-arm64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+llvm_verify_linux-x86_64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+llvm_verify_windows-arm64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+llvm_verify_windows-x86_64 T278 The front end refuses programs/handler_yields_none_for_a_base.anti, whose handler yields `none` against the `?*T` of a base.
+error_static_function_named_on_a_value T279 A static function with a parameter named on a value is bound with the object as its first argument.
+error_private_function_named_on_a_value T280 A private function named on a value says the class has no field of its name.
+error_export_type_twice T281 A second `export type` of one copy is taken, and the header leaves it out.
+error_generic_constant_of_another_type T282 A constant argument of another type, or one that had its message, says it must be a constant.
+error_generic_argument_none T283 `none` as an argument of a generic function says it needs a type from its context.
+anti_doc_message_source_of_another_suffix T284 `anti doc` reads a file of another suffix as a source.
+anti_check_message_source_of_another_suffix T284 `anti check` reads a file of another suffix as a source.

@@ -1,0 +1,15 @@
+//! Two `export type` items that name one copy. The copy has one name in C, so
+//! the second is refused and names the first.
+
+class Box<T>
+{
+	pub v: T,
+
+	pub fn get(self) -> T
+	{
+		return self.v;
+	}
+}
+
+export type A = Box<int>;
+export type B = Box<int>;

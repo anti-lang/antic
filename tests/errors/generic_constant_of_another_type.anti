@@ -1,0 +1,20 @@
+//! A constant argument of a generic that names a constant of a type that is no
+//! integer, and one whose value had its message. The first gets a message that
+//! names its type, and the second no message of its own.
+
+class Count<N: int>
+{
+	pub n: int = N,
+}
+
+const NAME: str = "a";
+const HALF: f64 = 0.5;
+const BAD: int = missing;
+
+fn main() -> int
+{
+	let a = Count<NAME> { };
+	let b = Count<HALF> { };
+	let c = Count<BAD> { };
+	return 0;
+}

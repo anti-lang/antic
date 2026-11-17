@@ -1,0 +1,7 @@
+exit 0
+call 1
+failed call none
+alloc 2
+failed alloc none
+catch none none
+interface 4

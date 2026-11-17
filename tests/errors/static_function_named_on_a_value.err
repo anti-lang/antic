@@ -1,0 +1,2 @@
+static_function_named_on_a_value.anti:23:10: error: `twice` is a static function of `A`, called as `A.twice()`
+static_function_named_on_a_value.anti:24:10: error: `zero` is a static function of `A`, called as `A.zero()`

@@ -1,0 +1,26 @@
+//! A static function named on a value and not called is no bound function,
+//! since it takes no `self`. It is reached through its class, as a call of it
+//! is, with or without parameters of its own.
+
+class A
+{
+	pub n: int = 7,
+
+	pub fn twice(n: int) -> int
+	{
+		return n * 2;
+	}
+
+	pub fn zero() -> int
+	{
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	let a = A { };
+	let f = a.twice;
+	let g = a.zero;
+	return 0;
+}

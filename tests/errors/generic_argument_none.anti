@@ -1,0 +1,13 @@
+//! `none` as the argument of a generic function gives its parameter no type, as
+//! it gives the field of a literal none. The call names the parameter that
+//! nothing gives.
+
+fn on_ptr<T>(p: ?*T)
+{
+}
+
+fn main() -> int
+{
+	on_ptr(none);
+	return 0;
+}

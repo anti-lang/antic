@@ -1,0 +1,26 @@
+//! A function that is not public, named on a value and not called. Outside its
+//! class it is private, as a call of it is. Inside, a bound function takes a
+//! public function alone, and the message says so.
+
+class A
+{
+	pub n: int = 0,
+
+	fn helper(self) -> int
+	{
+		return 1;
+	}
+
+	pub fn inside(self) -> int
+	{
+		let f = self.helper;
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	let a = A { };
+	let f = a.helper;
+	return 0;
+}

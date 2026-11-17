@@ -1,0 +1,3 @@
+generic_constant_of_another_type.anti:12:18: error: unknown name `missing`
+generic_constant_of_another_type.anti:16:16: error: `NAME` is a `str`, and `N` of `Count` takes an integer
+generic_constant_of_another_type.anti:17:16: error: `HALF` is a `f64`, and `N` of `Count` takes an integer

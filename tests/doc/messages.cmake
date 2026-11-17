@@ -33,6 +33,11 @@ anti_message(source_named_by_its_suffix
     FILES .anti "//! One.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" .anti
     ERR "anti: .anti: the file has no name, only its suffix")
+# A file of any other suffix is neither, as antic refuses it.
+anti_message(source_of_another_suffix
+    FILES notes.txt "Notes.\n"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" notes.txt
+    ERR "anti: notes.txt: expected a .anti or a .antl file")
 # A library file is read as the driver of antic reads one.
 anti_message(library_damaged
     FILES one.antl "A text where the library file belongs.\n"

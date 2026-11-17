@@ -1,0 +1,83 @@
+//! A `let` of a `?*T` of a base or of an interface takes a call that gives a
+//! pointer of a class below it, and the handler of the call yields `none` or
+//! counts the failure as `none` against it, as for a `?*T` of the class itself.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Counter
+{
+	abstract fn add(self, n: int) -> int;
+}
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Kid inherits Base
+{
+	implements counter: Counter,
+
+	fn construct(self, k: int) may fail
+	{
+		if k < 0 {
+			fail "below";
+		}
+		self.n = k;
+	}
+
+	concrete fn Counter::add(self, n: int) -> int
+	{
+		return self.n + n;
+	}
+}
+
+fn make(k: int) -> *Kid may fail
+{
+	if k < 0 {
+		fail "below";
+	}
+	return alloc Kid(k) catch fatal;
+}
+
+fn show(name: str, b: ?*Base)
+{
+	if let found = b {
+		printf("%.*s %d\n".ptr, name.len as c_int, name.ptr, found.n as c_int);
+		delete(found);
+	} else {
+		printf("%.*s none\n".ptr, name.len as c_int, name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let a: ?*Base = make(1) catch e {
+		yield none;
+	};
+	show("call", a);
+	let b: ?*Base = make(-1) catch e {
+		yield none;
+	};
+	show("failed call", b);
+	let c: ?*Base = alloc Kid(2) catch e {
+		yield none;
+	};
+	show("alloc", c);
+	let d: ?*Base = alloc Kid(-2) catch e {
+		yield none;
+	};
+	show("failed alloc", d);
+	let f: ?*Base = make(-1) catch none;
+	show("catch none", f);
+	let g: ?*Counter = make(3) catch e {
+		yield none;
+	};
+	if let counter = g {
+		printf("interface %d\n".ptr, counter.add(1) as c_int);
+		delete(counter);
+	}
+	return 0;
+}

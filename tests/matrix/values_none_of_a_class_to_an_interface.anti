@@ -1,0 +1,72 @@
+//! A `?*T` of a class that converts to a `?*I` of an interface it implements.
+//! `none` stays `none` in every place the conversion stands: a `let`, an
+//! argument, a result and a field. An object moves to its sub-object, so a call
+//! through the interface reaches it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Counter
+{
+	abstract fn add(self, n: int) -> int;
+}
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Kid inherits Base
+{
+	implements counter: Counter,
+
+	concrete fn Counter::add(self, n: int) -> int
+	{
+		return self.n + n;
+	}
+}
+
+class Holder
+{
+	pub held: ?*Counter = none,
+}
+
+fn show(place: str, c: ?*Counter)
+{
+	if let found = c {
+		printf("%.*s %d\n".ptr, place.len as c_int, place.ptr,
+			found.add(1) as c_int);
+	} else {
+		printf("%.*s none\n".ptr, place.len as c_int, place.ptr);
+	}
+}
+
+fn passed(c: ?*Counter) -> ?*Counter
+{
+	return c;
+}
+
+fn returned(k: ?*Kid) -> ?*Counter
+{
+	return k;
+}
+
+fn walk(place: str, k: ?*Kid)
+{
+	let c: ?*Counter = k;
+	show(place, c);
+	show(place, passed(k));
+	show(place, returned(k));
+	let h = Holder { };
+	h.held = k;
+	show(place, h.held);
+}
+
+fn main() -> int
+{
+	walk("none", none);
+	let kid = Kid { n: 4 };
+	walk("kid", &kid);
+	return 0;
+}
