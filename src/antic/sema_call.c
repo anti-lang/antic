@@ -2829,6 +2829,24 @@ static struct type *check_member_name(struct checker *c, struct expr *e,
             c->types,
             sema_member_type(c, m->symbol->type, s));
     }
+    /* A function that is not public is no bound function. Outside its
+       level it is hidden, as a call of it is, and inside the message
+       names the rule, by T280 of docs/audit/tests-findings.md. */
+    if (m != NULL && m->kind == ITEM_FN && !m->pub) {
+        const struct type *owner = sema_declaring_class(m);
+        if (!member_visible(c, s, m)) {
+            sema_refuse_hidden(c, e->pos, name, m->vis,
+                               owner != NULL ? owner : s);
+        } else {
+            sema_error_at(c, e->pos, "a bound function takes a public "
+                          "function, and `%.*s` is %s `%s`",
+                          (int)name->length, name->text,
+                          m->vis == VIS_PROTECTED ? "protected in"
+                                                  : "private to",
+                          sema_tn(owner != NULL ? owner : s));
+        }
+        return sema_builtin(c, TYPE_ERROR);
+    }
     /* DESIGN: a constant of a body is reached as `T.N`, never
        through a value, so a constant is never mistaken for a
        field. */
