@@ -8,7 +8,8 @@
 #             ast_malformed,
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree,
 #             clang_of_the_tree_relative, enum_declared_first, shift_types,
-#             cast_types or struct_literal_ranges
+#             cast_types, struct_literal_ranges, clang_sides, macro_sides,
+#             ast_sides or ast_refusals
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -816,6 +817,293 @@ elseif(CASE STREQUAL "clang_of_the_tree_relative")
         message(FATAL_ERROR "anti of the tree run as ../${name} took no "
                             "pinned clang: ${status}\n${out}${err}")
     endif()
+elseif(CASE STREQUAL "clang_sides")
+    # The sides of the conditions of the reader of a header that a header
+    # of C reaches, bound for three targets: a header of another file that
+    # packs, two typedefs of one name, declarations before definitions,
+    # enums of every base, two typedefs of one anonymous enum, anonymous
+    # records and const ones in a directory whose name holds parentheses,
+    # an aligned record with a field aligned less, functions declared more
+    # than once, macros undefined and defined again, macros of one
+    # parameter that are no identity, compound literals that are none and
+    # a stack of `#pragma pack` deeper than its 64 entries.
+    set(dir "${WORK}/dir(x)")
+    file(MAKE_DIRECTORY "${dir}")
+    file(WRITE "${dir}/other.h"
+         "#pragma pack(push, 1)\nstruct Hidden { char c; int i; };\n"
+         "#pragma pack(pop)\n")
+    file(WRITE "${dir}/first.h"
+         "#pragma pack(push, 1)\nstruct PackedFirst { char a; int b; };\n"
+         "#pragma pack(pop)\n")
+    string(CONCAT text "#include \"other.h\"\ntypedef struct Hidden HiddenName;\n"
+        "typedef int Count;\ntypedef int Count;\n"
+        "struct Fwd;\nstruct Fwd;\nstruct Fwd { int a; };\n"
+        "enum Low { LOW_MIN = -0x80000001LL, LOW_ZERO = 0 };\n"
+        "enum Fixed : int { FIXED_A = 1 };\nenum : __int128 { BIG = 1 };\n"
+        "enum __attribute__((deprecated)) Old { OLD_A };\n"
+        "enum Huge { HUGE_TOP = 0xFFFFFFFFFFFFFFFFull };\n"
+        "typedef enum { TWO_A } TwoA, TwoB;\n"
+        "struct Outer {\n    struct { struct { int deep; } inner; };\n"
+        "    struct { int x; } named;\n    union { int i; float f; } u;\n};\n"
+        "struct Const {\n    const struct { int a; } s;\n"
+        "    const union { int i; float f; } u;\n};\n"
+        "struct ConstEnum {\n    struct { int a; } s;\n    const enum { CE_A } e;\n};\n"
+        "struct __attribute__((aligned(16))) Big { int a __attribute__((aligned(4))); };\n"
+        "struct Late { char a; int b; };\n"
+        "void redecl(void);\nvoid redecl(void);\n"
+        "static int st(void);\nstatic int st(void) { return 1; }\n"
+        "extern int ex(void);\nextern int ex(void);\n"
+        "inline int inl(void) { return 2; }\nint inl(void);\n"
+        "inline int inl2(void) { return 2; }\ninline int inl2(void);\n"
+        "int plain(void) { return 3; }\n"
+        "void take(struct Outer *o, struct Const *c, struct Late *l, enum Huge h,\n"
+        "          HiddenName *n, struct PackedFirst *p, TwoB t, Count k);\n"
+        "#define GONE 1\n#undef GONE\n#undef NEVER\n#define USES_GONE GONE\n"
+        "#define TWICE 1\n#undef TWICE\n#define TWICE 2\n#define NOBODY(x)\n"
+        "#define P(x) (x + 1)\n#define Q(x) (y)\n#define R(x) (x)z\n#define K(x) x + 1\n"
+        "#define USEP P(struct Fwd){ 1 }\n#define USEQ Q(struct Fwd){ 1 }\n"
+        "#define USER R(struct Fwd){ 1 }\n#define USEK K(struct Fwd){ 1 }\n"
+        "#define IDX IDEA\n#define SPACED (struct Fwd) { 7 }\n"
+        "#define NO_BRACE (struct Fwd) 7\n#define OPEN_ONLY (1\n"
+        "#define NOT_TYPE (Unknown){ 1 }\n#define INT_LIT (int){ 1 }\n"
+        "struct { int a; } anon_var;\n#pragma pack(push, 2)\n#pragma pack(pop)\n")
+    foreach(i RANGE 1 66)
+        string(APPEND text "#pragma pack(push, 1)\n")
+    endforeach()
+    foreach(i RANGE 1 66)
+        string(APPEND text "#pragma pack(pop)\n")
+    endforeach()
+    string(APPEND text "struct { int last; };\n")
+    file(WRITE "${dir}/sides.h" "${text}")
+    foreach(target macos-x86_64 linux-arm64 windows-x86_64)
+        tool_run("" "${ANTI}" bind --clang "${dir}/first.h" "${dir}/sides.h"
+                    --module bindtest.sides --target ${target}
+                    -o "${WORK}/out-${target}" --runtime "${RUNTIME}")
+        file(READ "${WORK}/out-${target}/sides.anti" module)
+        set(huge "pub enum Huge: c_ulonglong\n{\n\tHUGE_TOP = 18446744073709551615,")
+        if(target MATCHES "^windows-")
+            set(huge "pub enum Huge\n{\n\tHUGE_TOP = -1,")
+        endif()
+        foreach(line "pub const CE_A: c_int = 0;" "pub const TWICE: c_int = 2;"
+                "pub const SPACED: Fwd = Fwd { a: 7 };"
+                "pub enum Low: c_longlong\n{\n\tLOW_MIN = -2147483649,"
+                "pub enum Fixed\n{" "${huge}" "pub enum TwoA\n{\n\tTWO_A = 0,\n}"
+                "pub struct Big align(16)\n{\n\ta: c_int,\n}"
+                "pub struct Outer\n{\n\tanon0: Outer_anon0,\n\tnamed: Outer_named,\n\tu: Outer_u,\n}"
+                "pub struct Const\n{\n\ts: Const_s,\n\tu: Const_u,\n}"
+                "pub extern fn take(o: ?*Outer, c: ?*Const, l: ?*Late, h: Huge, n: ?*byte, p: ?*PackedFirst, t: TwoA, k: c_int);")
+            string(FIND "${module}" "${line}" at)
+            if(at EQUAL -1)
+                message(FATAL_ERROR "sides.anti for ${target} holds no "
+                                    "`${line}`\n${module}")
+            endif()
+        endforeach()
+        foreach(gone "pub const USES_GONE" "pub const BIG" "pub struct ConstEnum\n"
+                "pub const USEP" "pub const NO_BRACE" "pub const INT_LIT")
+            string(FIND "${module}" "${gone}" at)
+            if(NOT at EQUAL -1)
+                message(FATAL_ERROR "sides.anti for ${target} holds "
+                                    "`${gone}`\n${module}")
+            endif()
+        endforeach()
+        file(READ "${WORK}/out-${target}/shim_sides.c" shim)
+        if(NOT shim MATCHES "int st\\(void\\)\n" OR
+           NOT shim MATCHES "extern __typeof__\\(inl2\\) inl2;" OR
+           shim MATCHES "__typeof__\\(inl\\) inl;")
+            message(FATAL_ERROR "shim_sides.c for ${target} wraps another "
+                                "set of functions\n${shim}")
+        endif()
+    endforeach()
+elseif(CASE STREQUAL "ast_sides")
+    # The sides of the conditions of the reader of a header that only an
+    # AST or an output of `clang -E` written by hand reaches, by a clang
+    # of the shell: locations of the wrong kinds, a record without an id
+    # and one defined twice, a typedef that names a record of no header, a
+    # constant without its value, enumerators without a name, a base that
+    # does not parse, typedefs without a name or a type, nodes without a
+    # kind, functions of no function type and with more parameters than
+    # their type, and the lines of `-E` that are no marker, a macro whose
+    # parameters no `)` closes, a tab before `{` and a marker of a file
+    # whose name ends in a backslash. The resource directory ends in
+    # `\r\n`, as on Windows, so the target is one whose headers stand
+    # there.
+    fake_clang()
+    file(WRITE "${WORK}/fake/version" "clang version ${CLANG_VERSION}\nTarget: x\n")
+    file(WRITE "${WORK}/fake/clang" "#!/bin/sh
+d=`dirname \"$0\"`
+for a in \"$@\"; do
+    case \"$a\" in
+    --version) cat \"$d/version\"; exit 0 ;;
+    -print-resource-dir) printf '%s\\r\\n' \"$d\"; exit 0 ;;
+    -E) cat \"$d/pre\"; exit 0 ;;
+    esac
+done
+cat \"$d/ast\"
+")
+    file(WRITE "${WORK}/fake/pre" "# 1 \"${h}\"\n# !\n# a\n#define F(x\n"
+         "#define G(x)\n#define  SPACE 1\n#pragma pack\n"
+         "#define TABBED (struct Twice)\t{ 2 }\n# 1 \"x\\\"\n")
+    set(loc "\"loc\": {\"file\": \"${h}\", \"line\": 1}")
+    set(int "\"type\": {\"qualType\": \"int\"}")
+    set(field "{\"kind\": \"FieldDecl\", \"name\": \"a\", ${int}}")
+    file(WRITE "${WORK}/fake/ast" "{\"kind\": \"TranslationUnitDecl\", \"inner\": [
+ {\"kind\": \"TypedefDecl\", \"loc\": {\"file\": 5, \"line\": \"x\"}, \"name\": \"Early\", ${int}},
+ {\"kind\": \"RecordDecl\", ${loc}, \"name\": \"NoId\", \"tagUsed\": \"struct\",
+  \"completeDefinition\": true, \"inner\": [${field}]},
+ {\"kind\": \"RecordDecl\", \"name\": \"Twice\", \"id\": \"0x20\", \"tagUsed\": \"struct\",
+  \"completeDefinition\": true, \"inner\": [${field}]},
+ {\"kind\": \"RecordDecl\", \"name\": \"Twice\", \"id\": \"0x20\", \"tagUsed\": \"struct\",
+  \"completeDefinition\": true, \"inner\": [${field}]},
+ {\"kind\": \"TypedefDecl\", \"name\": \"Owns\", \"type\": {\"qualType\": \"struct Missing\"},
+  \"inner\": [{\"kind\": \"RecordType\", \"decl\": {\"id\": \"0x99\", \"kind\": \"RecordDecl\", \"name\": \"Missing\"}}]},
+ {\"kind\": \"EnumDecl\", \"name\": \"Vals\", \"id\": \"0x30\", \"inner\": [
+   {\"kind\": \"EnumConstantDecl\", \"name\": \"V0\", \"inner\": [{\"kind\": \"ConstantExpr\"}]},
+   {\"kind\": \"EnumConstantDecl\", \"name\": \"V1\", \"inner\": [{\"kind\": \"ConstantExpr\", \"value\": \"\"}]},
+   {\"kind\": \"EnumConstantDecl\"}, {\"name\": \"kindless\"}]},
+ {\"kind\": \"EnumDecl\", \"name\": \"Odd\", \"id\": \"0x31\", \"fixedUnderlyingType\": {\"qualType\": \"@@\"},
+  \"inner\": [{\"kind\": \"EnumConstantDecl\", \"name\": \"ODD_A\"}]},
+ {\"kind\": \"TypedefDecl\", ${int}},
+ {\"kind\": \"TypedefDecl\", \"name\": \"Empty\", ${int}, \"inner\": []},
+ {\"kind\": \"TypedefDecl\", \"name\": \"NoName\", ${int},
+  \"inner\": [{\"kind\": \"RecordType\", \"decl\": {\"id\": \"0x40\"}}]},
+ {\"name\": \"kindless\"},
+ {\"kind\": \"RecordDecl\", \"tagUsed\": \"struct\", \"completeDefinition\": true, \"id\": \"0x50\",
+  \"inner\": [${field}]},
+ {\"kind\": \"TypedefDecl\", ${int}},
+ {\"kind\": \"FunctionDecl\", \"name\": \"not_fn\", ${int}},
+ {\"kind\": \"FunctionDecl\", \"name\": \"extra\", \"type\": {\"qualType\": \"void (int)\"},
+  \"inner\": [{\"name\": \"kindless\"},
+             {\"kind\": \"ParmVarDecl\", \"name\": \"\", ${int}},
+             {\"kind\": \"ParmVarDecl\", \"name\": \"b\", ${int}}]},
+ {\"kind\": \"FunctionDecl\", \"name\": \"uses\", \"type\": {\"qualType\": \"void (Owns *, struct NoId *)\"},
+  \"inner\": [{\"kind\": \"ParmVarDecl\", \"name\": \"o\", \"type\": {\"qualType\": \"Owns *\"}},
+             {\"kind\": \"ParmVarDecl\", \"name\": \"n\", \"type\": {\"qualType\": \"struct NoId *\"}}]}
+]}")
+    set(fake ${fake} --target linux-x86_64)
+    tool_run("" ${fake})
+    file(READ "${WORK}/out/fake.anti" module)
+    foreach(line "pub enum Vals\n{\n\tV0 = 0,\n\tV1 = 1,\n}" "pub struct NoId\n{"
+            "pub struct Twice\n{\n\ta: c_int,\n}\n" "pub extern fn extra(p0: c_int);"
+            "pub extern fn uses(o: ?*byte, n: ?*NoId);"
+            "pub const TABBED: Twice = Twice { a: 2 };")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "fake.anti holds no `${line}`\n${module}")
+        endif()
+    endforeach()
+    foreach(gone "SPACE" "Odd" "ODD_A" "not_fn")
+        string(FIND "${module}" "${gone}" at)
+        if(NOT at EQUAL -1)
+            message(FATAL_ERROR "fake.anti holds `${gone}`\n${module}")
+        endif()
+    endforeach()
+    string(REGEX REPLACE "[ \n]+" " " said "${tool_stderr}")
+    foreach(warning "`Odd` is left out: Anti has no form for its base `@@`"
+            "the macro `F` takes arguments" "the macro `G` takes arguments")
+        string(FIND "${said}" "${warning}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "no warning `${warning}`:\n${tool_stderr}")
+        endif()
+    endforeach()
+elseif(CASE STREQUAL "ast_refusals")
+    # A clang of the shell whose version names no number, whose first
+    # line names no version, whose `-E` fails, whose AST has no members
+    # and whose `-E` defines names that are no identifier of C. A version
+    # without a line end is read as well.
+    fake_clang()
+    file(WRITE "${WORK}/fake/pre" "# 1 \"${h}\"\n")
+    file(WRITE "${WORK}/fake/ast" "{\"kind\": \"TranslationUnitDecl\"}")
+    foreach(version "clang version x.1\nTarget: x\n" "Target: x\n")
+        file(WRITE "${WORK}/fake/version" "${version}")
+        expect_refusal("cannot read the version of .* from `.* --version`, and bind --clang ${clang_where}" ${fake})
+    endforeach()
+    file(WRITE "${WORK}/fake/version" "clang version ${CLANG_VERSION}")
+    tool_run("" ${fake})
+    file(READ "${WORK}/out/fake.anti" module)
+    if(module MATCHES "pub ")
+        message(FATAL_ERROR "an AST without members bound items\n${module}")
+    endif()
+    file(WRITE "${WORK}/fake/clang" "#!/bin/sh
+d=`dirname \"$0\"`
+for a in \"$@\"; do
+    case \"$a\" in
+    --version) cat \"$d/version\"; exit 0 ;;
+    -E) exit 1 ;;
+    esac
+done
+cat \"$d/ast\"
+")
+    expect_refusal("clang could not preprocess the header, status 1" ${fake})
+    fake_clang()
+    file(WRITE "${WORK}/fake/version" "clang version ${CLANG_VERSION}\nTarget: x\n")
+    file(WRITE "${WORK}/fake/ast" "{\"kind\": \"TranslationUnitDecl\"}")
+    foreach(pair "a{|#define a{ 1" "A\\$|#define A$")
+        string(FIND "${pair}" "|" bar)
+        string(SUBSTRING "${pair}" 0 ${bar} name)
+        math(EXPR bar "${bar} + 1")
+        string(SUBSTRING "${pair}" ${bar} -1 define)
+        file(WRITE "${WORK}/fake/pre" "# 1 \"${h}\"\n${define}")
+        expect_refusal("names the macro `${name}`, which is no C identifier" ${fake})
+    endforeach()
+elseif(CASE STREQUAL "macro_sides")
+    # The sides of the conditions of the evaluator of a macro: the
+    # suffixes and the forms of a literal, a name that starts with `_`,
+    # the types of mixed operands, the least long long divided, and the
+    # elements of a compound literal that nest, close not, are too many,
+    # are too long or fill a bitfield, an unnamed bitfield and a struct.
+    # A description gives a tab inside an expression and after an element.
+    string(REPEAT "1 + " 40 long)
+    file(WRITE "${WORK}/macros.h"
+         "struct Pair { int a; int b; };\nstruct Bits { int x : 3; int y; };\n"
+         "struct Gap { int a; int : 3; int b; };\nstruct HasPair { struct Pair p; };\n"
+         "#define HEXU 0X1F\n#define EXP 1e3\n#define EXPU 1E3\n#define FSUF 1.5F\n"
+         "#define LSUF 5l\n#define BIGD 3000000000\n#define DOT .5\n#define _UNDER 4\n"
+         "#define USE_UNDER _UNDER\n#define MIX (1.5 + 1)\n#define FD (1.5f + 2.0)\n"
+         "#define MINDIV ((-9223372036854775807LL-1) / 2)\n#define USHR (5u >> 1)\n"
+         "#define BAR (_UNDER|1)\n#define LT (1 < 2)\n#define TOOBIG ((int)1e30)\n"
+         "#define TOOSMALL ((int)-1e30)\n#define STRADD (\"a\" + 1)\n#define TRAIL 1 x\n"
+         "#define NESTED (struct Pair){ (1 + 2), 3 }\n#define UNCLOSED (struct Pair){ 1, 2\n"
+         "#define TOO_MANY (struct Pair){ 1, 2, 3 }\n#define BITS (struct Bits){ 1, 2 }\n"
+         "#define GAP (struct Gap){ 1, 2, 3 }\n#define HAS (struct HasPair){ 1 }\n"
+         "#define LONG_ELEMENT (struct Pair){ ${long}1, 2 }\n"
+         "void take(struct Pair p, struct Bits b, struct Gap g, struct HasPair h);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/macros.h"
+                --module bindtest.macros -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/macros.anti" module)
+    foreach(line "pub const HEXU: c_int = 31;" "pub const EXP: c_double = 1000.0;"
+            "pub const EXPU: c_double = 1000.0;" "pub const FSUF: c_float = 1.5;"
+            "pub const LSUF: c_long = 5;" "pub const BIGD: c_longlong = 3000000000;"
+            "pub const DOT: c_double = 0.5;" "pub const USE_UNDER: c_int = 4;"
+            "pub const MIX: c_double = 2.5;" "pub const FD: c_double = 3.5;"
+            "pub const MINDIV: c_longlong = -4611686018427387904;"
+            "pub const USHR: c_uint = 2;" "pub const BAR: c_int = 5;"
+            "pub const NESTED: Pair = Pair { a: 3, b: 3 };")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "macros.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+    string(REGEX REPLACE "[ \n]+" " " said "${tool_stderr}")
+    foreach(name LT TOOBIG TOOSMALL STRADD TRAIL UNCLOSED TOO_MANY BITS GAP HAS
+            LONG_ELEMENT)
+        string(FIND "${said}" "the macro `${name}` is no constant" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "no warning on `${name}`:\n${tool_stderr}")
+        endif()
+    endforeach()
+    file(WRITE "${WORK}/tabs.json" "{\"functions\": [], \"structs\": [{\"name\": \"Pair\",
+        \"fields\": [{\"name\": \"a\", \"type\": \"int\"}, {\"name\": \"b\", \"type\": \"int\"}]}],
+        \"defines\": [{\"name\": \"TABBED\", \"type\": \"INT\", \"value\": \"1 +\\t2\"},
+        {\"name\": \"PAIR\", \"type\": \"COLOR\", \"value\": \"CLITERAL(Pair){ 1,\\t2 }\"}]}")
+    tool_run("" "${ANTI}" bind "${WORK}/tabs.json" --module bindtest.tabs
+                -o "${WORK}/out")
+    file(READ "${WORK}/out/tabs.anti" module)
+    foreach(line "pub const TABBED: c_int = 3;" "pub const PAIR: Pair = Pair { a: 1, b: 2 };")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "tabs.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
 elseif(CASE STREQUAL "enum_declared_first")
     # T270: a declaration of an enum before its definition, which C23
     # allows with a fixed base, is the same enum. The binding holds it

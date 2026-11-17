@@ -7812,6 +7812,8 @@ endforeach()
 # binds an enum declared before its definition, shift_types the type of a
 # shift, cast_types the casts to a typedef and struct_literal_ranges the
 # elements of a compound literal outside the range of their fields.
+# clang_sides, macro_sides, ast_sides and ast_refusals reach the sides of
+# the conditions of the reader of a header and of the evaluator.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
@@ -7823,11 +7825,12 @@ set(anti_bind_cases header clang headers escaped_path raymath raylib
     api_words words unsigned_bitfield fixed_enum api_typedef_chain
     clang_of_the_tree clang_of_the_tree_relative api_aliases miniaudio
     api_alias_chain_long api_docs enum_declared_first shift_types cast_types
-    struct_literal_ranges)
+    struct_literal_ranges clang_sides macro_sides)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
-    # The cases refusals, ast_malformed and clang_typedef_chain stand a
-    # shell script in for clang.
-    list(APPEND anti_bind_cases refusals ast_malformed clang_typedef_chain)
+    # The cases refusals, ast_malformed, clang_typedef_chain, ast_sides and
+    # ast_refusals stand a shell script in for clang.
+    list(APPEND anti_bind_cases refusals ast_malformed clang_typedef_chain
+         ast_sides ast_refusals)
 endif()
 # The headers and the definitions under which the build binds anti.raylib,
 # from src/native/raylib-source.cmake.

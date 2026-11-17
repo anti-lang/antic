@@ -110,7 +110,8 @@ foreach(case
         "value|enum E { a$b };\nvoid take(enum E e);\n|value"
         "function|int a$b(void);\n|function"
         "parameter|int f(int a$b);\n|parameter"
-        "macro|#define a$b 1\n|macro")
+        "macro|#define a$b 1\n|macro"
+        "macro_with_a_parameter|#define a$b(x) x\n|macro")
     string(REGEX MATCH "^([^|]*)[|](.*)[|]([^|]*)$" parts "${case}")
     anti_message(clang_name_${CMAKE_MATCH_1}
         FILES api.h "${CMAKE_MATCH_2}"
@@ -216,6 +217,24 @@ anti_message(clang_no_runtime
     ENV "XDG_DATA_HOME=${WORK}/data"
     ARGS bind --clang api.h -o "${WORK}/out" --target linux-x86_64
     ERR "anti: found no runtime archive in ${anti_above}, above the directory of anti, or in ${user_data}, the data directory of the user. `--runtime <dir>` names one.")
+# Without --runtime, and with no data directory of the user, the message
+# names the one place above the directory of anti.
+if(NOT CMAKE_HOST_WIN32)
+    anti_message(clang_no_runtime_nor_data_directory
+        FILES api.h "int count(void);\n"
+        ENV "XDG_DATA_HOME=" "HOME="
+        ARGS bind --clang api.h -o "${WORK}/out" --target linux-x86_64
+        ERR "anti: found no runtime archive in ${anti_above}, above the directory of anti. `--runtime <dir>` names one.")
+endif()
+# A header before the last in a directory that is not there keeps the
+# spelling of the command line, and clang names it so. Windows makes a
+# path absolute without the directory.
+if(NOT CMAKE_HOST_WIN32)
+    anti_message(clang_header_in_no_directory
+        FILES api.h "int count(void);\n"
+        ARGS bind --clang nowhere/first.h api.h -o "${WORK}/out" --runtime "${RUNTIME}"
+        ERR_MATCH "[^\n]*fatal error: 'nowhere/first\\.h' file not found\n(.*\n)*anti: clang could not preprocess the header, status 1\n")
+endif()
 # clang writes its own lines on the header before the one of anti.
 anti_message(clang_refuses_the_header
     FILES api.h "int count(;\n"
