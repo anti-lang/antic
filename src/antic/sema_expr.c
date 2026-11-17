@@ -1295,6 +1295,17 @@ static bool check_collect(struct checker *c, struct expr *e)
     if (owner->kind == TYPE_POINTER && !owner->nullable) {
         owner = owner->element;
     }
+    /* A `?*T` of an iterator is read through a pointer that may be
+       `none`, so `to_slice` gets the message of that rule, as a field
+       read through it does, by T276 of docs/audit/tests-findings.md. */
+    if (!sema_is_error(t) && t->kind == TYPE_POINTER && t->nullable &&
+        types_has_fields(t->element) &&
+        sema_method_symbol(c, t->element, &callee->as.field.name) == NULL &&
+        sema_is_iterator(c, types_without_none(c->types, t))) {
+        sema_error_may_be_none(c, base, t);
+        e->type = NULL;
+        return true;
+    }
     if (sema_is_error(t) || !types_has_fields(owner) ||
         sema_method_symbol(c, owner, &callee->as.field.name) != NULL ||
         !sema_is_iterator(c, t)) {
