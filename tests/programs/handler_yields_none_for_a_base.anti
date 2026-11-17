@@ -1,6 +1,8 @@
 //! A `let` of a `?*T` of a base or of an interface takes a call that gives a
 //! pointer of a class below it, and the handler of the call yields `none` or
 //! counts the failure as `none` against it, as for a `?*T` of the class itself.
+//! An object then moves to its sub-object of the interface, in a `let` and in
+//! an assignment.
 
 import anti.lang;
 
@@ -78,6 +80,40 @@ fn main() -> int
 	if let counter = g {
 		printf("interface %d\n".ptr, counter.add(1) as c_int);
 		delete(counter);
+	}
+	let h: ?*Counter = alloc Kid(5) catch e {
+		yield none;
+	};
+	if let counter = h {
+		printf("interface alloc %d\n".ptr, counter.add(1) as c_int);
+		delete(counter);
+	}
+	let i: ?*Counter = make(-3) catch e {
+		yield none;
+	};
+	if i == none {
+		printf("interface failed none\n".ptr);
+	}
+	let j: ?*Counter = none;
+	j = make(6) catch e {
+		yield none;
+	};
+	if let counter = j {
+		printf("assigned %d\n".ptr, counter.add(1) as c_int);
+		delete(counter);
+	}
+	j = alloc Kid(8) catch e {
+		yield none;
+	};
+	if let counter = j {
+		printf("assigned alloc %d\n".ptr, counter.add(1) as c_int);
+		delete(counter);
+	}
+	j = make(-1) catch e {
+		yield none;
+	};
+	if j == none {
+		printf("assigned none\n".ptr);
 	}
 	return 0;
 }

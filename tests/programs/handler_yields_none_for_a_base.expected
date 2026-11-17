@@ -5,3 +5,8 @@ alloc 2
 failed alloc none
 catch none none
 interface 4
+interface alloc 6
+interface failed none
+assigned 7
+assigned alloc 9
+assigned none

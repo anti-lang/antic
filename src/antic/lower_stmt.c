@@ -801,7 +801,10 @@ static void lower_assign(struct lowerer *l, const struct stmt *s)
 {
     const struct expr *target = s->as.assign.target;
     const struct expr *value = s->as.assign.value;
-    bool handled = lower_is_handled_call(value) && value->as.call.out != NULL;
+    /* A value that moves to an interface afterwards is no place of the
+       call, by T278 of docs/audit/tests-findings.md. */
+    bool handled = lower_is_handled_call(value) && value->as.call.out != NULL &&
+                   value->to_iface == NULL;
     /* DESIGN: E2 of "Compile-time checks of 2026-10-20". An `own` field
        of `self` that `delete`, `destroy` or a move left dead holds no
        value, and `=` tears nothing down there. */
@@ -1087,8 +1090,9 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
     }
 }
 
-/* DESIGN: `alloc T(args)` writes its pointer into the slot of the `let`,
-   and its handler yields a value of the same type. Where the `let` names
+/* DESIGN: `alloc T(args)` and a call whose error a handler takes write
+   their pointer into the slot of the `let`, and the handler yields a
+   value of the same type, by T278. Where the `let` names
    an interface of that class, the slot then moves to the sub-object once
    every path has left its value there. `none` stays `none`, by T285 of
    docs/audit/tests-findings.md. */
@@ -1151,6 +1155,9 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         l->out_address = out;
         err = lower_call(l, s->as.let.value);
         lower_handle_error(l, s->as.let.value, err, out, has_out, lower_none());
+        if (has_out) {
+            convert_in_place(l, s->as.let.value, out);
+        }
         /* DESIGN: the binding is a local of its type and is torn down at
            the end of its block like any other. It is registered after the
            handler. Every path that reaches this point has a value in the

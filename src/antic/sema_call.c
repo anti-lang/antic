@@ -1428,10 +1428,19 @@ static struct type *check_handled(struct checker *c, struct expr *e,
     /* DESIGN: `yield` gives the value that takes the place of the
        result, so it is checked against the type the binding holds. A
        `let n: ?*T = alloc T(args) catch e { yield none; }` names that
-       type, and the handler yields `none` against it. */
+       type, and the handler yields `none` against it. A `let` of a `?*B`
+       of a base or an interface of the class takes the `?*T` of the
+       result, which converts to it as the `*T` does, so the handler
+       yields `none` there too, by T278 of docs/audit/tests-findings.md. */
     if (expected != NULL && types_is_nullable(expected) &&
         result->kind == TYPE_POINTER && result->element == expected->element) {
         result = expected;
+    } else if (expected != NULL && types_is_nullable(expected) &&
+               expected->kind == TYPE_POINTER && result->kind == TYPE_POINTER &&
+               !result->nullable &&
+               (sema_descends_from(result->element, expected->element) ||
+                sema_implemented_in(result->element, expected->element))) {
+        result = types_pointer_nullable(c->types, result->element);
     }
 
     if (h->kind == HANDLE_TRY && sema_refuse_in_deferred(c, h->pos, "try")) {
