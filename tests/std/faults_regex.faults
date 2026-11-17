@@ -2,9 +2,10 @@
 # tests/CMakeLists.txt. alloc counts the memory of the runtime after the
 # start: the compile keeps the pattern and its text with the fifth and the
 # sixth, and each search takes match data and room from the seventh on.
-# The compile of the byte pattern at the end takes the pattern it hands to
-# PCRE2 with the twentieth and the map of its bytes with the 21st. The
-# pattern that does not compile after it takes its message with the 24th.
+# The compile of the byte pattern takes the pattern it hands to PCRE2 with
+# the twentieth and the map of its bytes with the 21st. The empty pattern
+# after it keeps its text of one byte with the 25th, and the pattern that
+# does not compile at the end takes its message with the 26th.
 compile_memory alloc:5:ENOMEM
 compile_text_memory alloc:6:ENOMEM
 match_memory alloc:7:ENOMEM
@@ -15,4 +16,5 @@ find_all_memory alloc:12:ENOMEM
 split_memory alloc:17:ENOMEM
 bytes_memory alloc:20:ENOMEM
 bytes_map_memory alloc:21:ENOMEM
-message_memory alloc:24:ENOMEM
+empty_text_memory alloc:25:ENOMEM
+message_memory alloc:26:ENOMEM
