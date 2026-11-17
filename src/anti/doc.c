@@ -853,9 +853,14 @@ int doc_run(const struct doc_request *r)
        its suffix alone has no name, by Q8 of "Answers of 2026-11-10" in
        docs/decisions.md. */
     for (i = 0; i < r->source_count; i++) {
-        if ((is_library(r->sources[i]) ||
-             files_ends_with(r->sources[i], SOURCE_SUFFIX)) &&
-            platform_suffix_alone(r->sources[i])) {
+        if (!is_library(r->sources[i]) &&
+            !files_ends_with(r->sources[i], SOURCE_SUFFIX)) {
+            say_anti("%s: expected a %s or a %s file\n", r->sources[i],
+                     SOURCE_SUFFIX, ANTL_SUFFIX);
+            status = 1;
+            goto done;
+        }
+        if (platform_suffix_alone(r->sources[i])) {
             say_anti("%s: the file has no name, only its suffix\n",
                      r->sources[i]);
             status = 1;

@@ -135,6 +135,12 @@ bool unit_read(const char *source, const char *const *roots,
 
     memset(out, 0, sizeof *out);
     out->source = source;
+    /* The suffix gives the kind of a file, as antic reads it, by T284 of
+       docs/audit/tests-findings.md. */
+    if (!files_ends_with(source, SOURCE_SUFFIX)) {
+        say_anti("%s: expected a %s file\n", source, SOURCE_SUFFIX);
+        goto done;
+    }
     if (!files_read_reported(source, &bytes)) {
         goto done;
     }
