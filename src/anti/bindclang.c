@@ -966,8 +966,22 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     bool above_int64 = false;
     const char *fixed;
     const struct bind_type *fixed_type;
+    size_t before = r->enums.count;
     size_t i;
 
+    /* DESIGN: the declarations of one tag name one enum, C11 6.7.2.3, as
+       `enum E : unsigned char;` before the definition, which C23 allows.
+       The definition takes the place of a declaration before it, and a
+       declaration after it adds nothing, by T270. */
+    for (i = 0; tag != NULL && i < r->enums.count; i++) {
+        const struct enum_entry *earlier = r->enums.items[i];
+        if (earlier->tag != NULL && strcmp(earlier->tag, tag) == 0) {
+            before = i;
+        }
+    }
+    if (before < r->enums.count && inner == NULL) {
+        return;
+    }
     if (tag != NULL) {
         hold_name(r, "enum", tag);
         if (type_name_taken(r, tag, tag)) {
@@ -1045,7 +1059,11 @@ static void declare_enum(struct reader *r, const struct json_value *node)
     } else if (high > 0x7FFFFFFF || low < -0x7FFFFFFF - 1) {
         e->base = low >= 0 && high <= 0xFFFFFFFFll ? "c_uint" : "c_longlong";
     }
-    bind_list_add(&r->enums, entry);
+    if (before < r->enums.count) {
+        r->enums.items[before] = entry;
+    } else {
+        bind_list_add(&r->enums, entry);
+    }
     r->generation++;
 }
 
