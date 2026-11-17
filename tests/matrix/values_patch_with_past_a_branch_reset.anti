@@ -1,0 +1,12 @@
+//! A branch reset gives the reader of a pattern no fewest bytes for a group, so
+//! `with` fits it when it is empty alone.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"(?|(ab)|(cd))", b"x", 1);
+	return 0;
+}

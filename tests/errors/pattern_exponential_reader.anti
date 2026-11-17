@@ -1,0 +1,30 @@
+//! The forms of a pattern literal that the reader of the check
+//! `exponential-pattern` takes apart and that no other test holds. A tab under
+//! `(?x)`, the flag `s`, a name of three letters and a verb of six with a name,
+//! a forward reference, a hex escape that a `)` ends, a POSIX name that holds
+//! `\\`, an empty branch, a counted repeat, a lookahead that may be empty, `\C`
+//! and a second branch reset before `\b`. A repeat that may take exponential
+//! time fails the check, and every other literal passes.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let spaced = re"(?x)(\d+	\.)+";
+	let dotall = re"(?s)(a+)+";
+	let script = re"(*asr:(a+)+)";
+	let commit = re"(*COMMIT:a)(b+)+";
+	let forward = re"(\g+1a|b)+(c)";
+	let hex = re"(a+\x4)+";
+	let posix = re"([[:\\x]+)+";
+	let empty = re"((|a)+)*";
+	let boundary = re"((a+\b)+x)+";
+	let counted = re"((a+){1})+";
+	let ahead = re"((?=a+)a)+";
+	let possessive = re"(a+)++";
+	let maybe = re"(a+(?=b?))+";
+	let repeats = re"(?:(?:a?)*)+";
+	let single = re"(\C+)+";
+	let reset = re"(?|a)(?|b)\b(c+)+";
+	return 0;
+}
