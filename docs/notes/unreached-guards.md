@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p and 3q stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q and 3r stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1060,6 +1060,23 @@ which no batch had chosen by their branches. The sides of
 | `sets_stmt` | A `let` without a value. | The parser gives every `let` its value, which "Core language" in `docs/decisions.md` makes mandatory. |
 | `sema_points_into_fields` | An array field that leaves a public function as a slice, and the `ptr` of an array field. | An array converts to a slice nowhere a `return` stands, and an array has no field `ptr`, so the checker refuses both before the check runs. |
 
+## `src/antic/sema_call.c`, `src/antic/sema_generic.c`, `src/antic/sema_const.c`, `src/antic/sema_copies.c`, `src/antic/sema_expr.c` and `src/antic/lower_expr.c`
+
+Batch 3r of the third phase sorted the sides of an error type in three
+files of the checker. Batches 3p and 3q had named them. It sorted sides
+of files that no batch had chosen by their branches as well. The rows
+hold the probes that reached no side.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `check_handled` | A call that may fail whose result has no type, beside `catch none` and in an expression statement. | A result type that had its message stops the check before the call: the type of a signature ends the check of the bodies, and a local of that type gives no call. |
+| `unfailing_result` | The type an `instance` of a plugin gives, on a call that cannot fail. | `lib.instance(I)` may fail, by R134 of "Answers of 2026-10-18", so its call takes `check_handled`. |
+| `names_param` | A parameter whose type is a case of a variant. | A case of a generic variant has no type syntax, `Maybe<T>.Some` does not parse, and a case of a variant that is not generic names no parameter. |
+| `float_as_literal` | A float below 1 in magnitude, and a last digit 0. | A float that `as` converts to an integer type has a magnitude of 1 or more, since `trunc` gives 0 for a smaller one, which fits every type. The fewest digits that read back as the float end in no 0, or fewer would. |
+| `defined_integer` | `mul_high` of a type whose width the target decides. | The checker refuses it where the generic declares it, as `types_generic_length_of_mul_high_of_a_c_long` shows. |
+| `xfor` | A slice or an array in the place of a parameter that a loop walks. | A slice and an array meet no `iter`, so no copy holds one there. |
+| `refuse_tried` | A name whose type is not nullable and whose narrowed type is. | Narrowing takes `none` away and never adds it. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1142,6 +1159,13 @@ which no batch had chosen by their branches. The sides of
   writes, `lower_expr.c` 84, `sema_const.c` 81, `sema_copies.c` 80 and the
   sides of an error type in `sema_call.c` 152, `sema_generic.c` 148 and
   `sema_expr.c` 98.
+- The sides of a condition in the files of batch 3r that its report
+  did not sort. Most take a NULL operand, a symbol without a type or an
+  error type after a message. Others are a short circuit whose other
+  operand decides. Among them is the merge of two declarations of a C
+  function in `antl_read_ir.c`, whose result carries no range and whose
+  code writes no table. `antl_tree.c`, which batch 3r named and did not
+  test, keeps its sides.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
