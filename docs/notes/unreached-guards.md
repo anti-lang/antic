@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n and 3o stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o and 3p stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1026,6 +1026,25 @@ that the suite misses.
 | `resolve_name` | A name that ends in `(` and a byte other than `)`. | `is_name` refuses a `(` that is not the `()` at its end. |
 | `doc_html` | A list without an item. | A list starts with its first item. |
 
+## `src/antic/sema_expr.c`, `src/antic/sema_call.c`, `src/antic/sema_generic.c` and `src/anti/doc.c`
+
+Batch 3p of the third phase sorted the sides of the conditions of three
+files of the checker and the sides of `doc.c` that batch 3o left. The
+sides of `watch_changes`, `sema_iterate`, `check_optional`,
+`check_expr_inner`, `hook_result`, `walks_as`, `builtin_meets`,
+`chan_field_pos`, `check_handled`, `refuse_own_member` and
+`check_type_member` that the suite misses are the guards of their rows
+above.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `sema_is_place`, `sema_mark_address_taken`, `refuse_lent`, `refuse_ending`, `sema_whole_optional` | A name without a symbol. | The checker gives every name it resolves its symbol, and a name it does not resolve had its message, after which the caller returns. |
+| `sema_bitfield_of`, `through_lent`, `destroy_of_local`, `refuse_ending` | A base or an operand without a type. | Each runs after the check of its operand, which gives every node a type. |
+| `is_fn_dup`, `owned_fn` | An object node of another operation, and a value of no type. | The callers pass a value of a function type, which `delete` and `destroy` never give. |
+| `require_owned` | A name of an `own fn` that is no parameter. | A local never holds an `own fn`. A `let` of one and a tuple taken apart give a function that is not kept, as `expression_conversions` shows. |
+| `sema_null_pointer_maker`, `sema_error_maker`, `sema_error_text_maker`, `trace_capture`, `sema_resolve_origin` | A class of `anti.lang` that lacks the function the compiler calls, or a field of `Error` that is not there. | The library file of `anti.lang` of the runtime archive has each, and a module without the import gets the message of the import first. |
+| `write_interfaces` | A source that does not parse, in the loop that compiles the interface files. | The first loop returns for one, by T123. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1089,6 +1108,14 @@ that the suite misses.
   waits for T265. Batch 3n tests `rt.configure("")`.
 - The sides of a condition in the files of batch 3n that its report did
   not sort.
+- The sides of a condition in `sema_expr.c`, `sema_call.c` and
+  `sema_generic.c` that batch 3p did not sort: 98, 152 and 148 after its
+  tests. Most take a NULL operand or an error type after a message, or
+  are a short circuit whose other operand decides. Among them are an
+  anonymous function that captures nothing where a function is kept, a
+  capture that is both changed and called at a `concurrent` parameter
+  and the unification of the parameters of a generic operator of a
+  class.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
