@@ -1,0 +1,18 @@
+//! The client of the ends library. It declares `exit` of C without `never`, and
+//! the library file declared it to never return. The two are one function of
+//! the program, so the call here ends its path as well, and nothing after it
+//! runs.
+
+import com.example.ends;
+
+extern fn exit(code: c_int);
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	printf("before\n".ptr);
+	exit(0);
+	printf("after\n".ptr);
+	ends.stop(1);
+	return 1;
+}

@@ -4149,6 +4149,14 @@ antic_modules_test(optional_class_field
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/optional-class-field-modules")
 
+# `exit` of C that a library declares to never return and the client
+# declares without `never`, so the call of the client ends its path too.
+antic_modules_test(never_extern
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/never_extern"
+    LIBRARIES ends
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/never-extern-modules")
+
 # A field `own ?fn` of a class of a library with the default `none`, which
 # a client that derives from the class and one that builds it take from
 # the library file and free at `delete`. T239 of

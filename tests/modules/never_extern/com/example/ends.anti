@@ -1,0 +1,9 @@
+//! A module that declares `exit` of C to never return.
+
+extern fn exit(code: c_int) -> never;
+
+/// Ends the program with `code`.
+pub fn stop(code: int)
+{
+	exit(code as c_int);
+}
