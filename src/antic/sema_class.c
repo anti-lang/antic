@@ -1760,12 +1760,18 @@ static bool sets_stmt(struct checker *c, const struct required *r,
             meet(r, out, copy, &any);
         }
         break;
+    /* `catch fatal` ends the program, so its handler is no path that
+       goes on, as `try_ends` of sema_stmt.c reads it. T286 of
+       docs/audit/tests-findings.md. */
     case STMT_TRY:
         memcpy(copy, set, r->count);
         if (sets_block(c, r, s->as.try_block.body, copy)) {
             meet(r, out, copy, &any);
         }
         memcpy(copy, set, r->count);
+        if (s->as.try_block.handler.kind == HANDLE_FATAL) {
+            break;
+        }
         if (s->as.try_block.handler.kind != HANDLE_BLOCK ||
             sets_block(c, r, s->as.try_block.handler.body, copy)) {
             meet(r, out, copy, &any);
