@@ -496,15 +496,25 @@ static struct bind_eval apply(struct eval *e, struct bind_eval a,
                               struct bind_eval b, const char *op)
 {
     const char *type;
+    bool shift = op[0] == '<' || op[0] == '>';
 
     if (a.kind == BIND_EVAL_STRING || b.kind == BIND_EVAL_STRING ||
         e->failed) {
         fail(e);
         return a;
     }
-    type = common(&a, &b);
+    /* A shift takes the type of its left operand after the promotions,
+       C11 6.5.7, and the count keeps its own, by T272. A float shifts
+       not at all. */
+    if (shift && (a.kind == BIND_EVAL_FLOAT || b.kind == BIND_EVAL_FLOAT)) {
+        fail(e);
+        return a;
+    }
+    type = shift ? common(&a, &a) : common(&a, &b);
     a = converted(e, a, type);
-    b = converted(e, b, type);
+    if (!shift) {
+        b = converted(e, b, type);
+    }
     if (a.kind == BIND_EVAL_FLOAT) {
         switch (op[0]) {
         case '*': a.f *= b.f; break;
