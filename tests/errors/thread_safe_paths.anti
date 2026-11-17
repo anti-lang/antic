@@ -1,0 +1,57 @@
+//! Reaches of the fields of thread-safe classes that the checker refuses, one
+//! mistake per line. A field guarded by the lock of its class stays unguarded
+//! under the lock of another class and stands under that of a value of its
+//! class. A slice of a local that holds a slice of the fields gives them out.
+
+import anti.lang;
+
+concurrent class Other
+{
+	pub lock: Mutex,
+}
+
+concurrent class Tally
+{
+	struct Cell
+	{
+		n: int guarded by Tally.lock,
+	}
+
+	pub lock: Mutex,
+	cell: Cell = Cell { n: 1 } guarded by lock,
+
+	pub fn wrong(self, o: *Other) -> int
+	{
+		let c = Cell { n: 2 };
+		sync o.lock {
+			c.n += 1;
+		}
+		return 0;
+	}
+
+	pub fn local(self) -> int
+	{
+		let t = Tally { lock: Mutex.new() };
+		let c = Cell { n: 2 };
+		sync t.lock {
+			c.n += 1;
+		}
+		return 0;
+	}
+}
+
+synchronized class Shape
+{
+	points: [4]int = [0, 0, 0, 0],
+
+	pub fn again(self) -> []int
+	{
+		let s = self.points[0..4];
+		return s[1..2];
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

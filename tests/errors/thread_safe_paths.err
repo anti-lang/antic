@@ -1,0 +1,2 @@
+thread_safe_paths.anti:27:4: error: `n` is guarded by `lock`, and no `sync` holds it here [unguarded-field]
+thread_safe_paths.anti:50:10: error: `again` of the thread-safe class `Shape` gives out a pointer into its fields, return a copy

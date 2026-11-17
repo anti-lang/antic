@@ -5671,6 +5671,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "expression_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_forms.anti"
         "construct_paths|--front-end,--runtime,${ANTIC_RUNTIME_DIR},construct_paths.anti"
         "class_members|--front-end,--runtime,${ANTIC_RUNTIME_DIR},class_members.anti"
+        "thread_safe_paths|--front-end,--runtime,${ANTIC_RUNTIME_DIR},thread_safe_paths.anti"
         "call_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},call_forms.anti"
         "generic_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},generic_forms.anti"
         "to_slice_may_be_none|--front-end,to_slice_may_be_none.anti"
