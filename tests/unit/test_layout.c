@@ -414,6 +414,38 @@ static void unit_past_aggregate(void)
     arena_free(&arena);
 }
 
+/* A struct that holds itself, or a second struct that holds the first,
+   has no layout. The checker and the reader of a library file refuse
+   it first, so the module is built by hand, and the layout ends with
+   the message of its guard, T267 of docs/audit/tests-findings.md. */
+static void holds_itself(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_field fields[2];
+    uint32_t a;
+    uint32_t b;
+
+    ir_module_init(&m, &arena, "main");
+    fields[0] = field("n", IR_I32);
+    fields[1] = field("self", IR_I32);
+    a = ir_struct_add(&m, IR_AGG_STRUCT, "main.Self", fields, 2, false, 0);
+    m.aggs[a]->fields[1].type = ir_aggregate(a);
+    refused(&m, TARGET_MACOS_ARM64,
+            "the layout of `main.Self` depends on itself");
+    ir_module_free(&m);
+    arena_free(&arena);
+    ir_module_init(&m, &arena, "main");
+    a = ir_struct_add(&m, IR_AGG_STRUCT, "main.A", fields, 2, false, 0);
+    b = ir_struct_add(&m, IR_AGG_STRUCT, "main.B", fields, 2, false, 0);
+    m.aggs[a]->fields[1].type = ir_aggregate(b);
+    m.aggs[b]->fields[1].type = ir_aggregate(a);
+    refused(&m, TARGET_LINUX_X86_64,
+            "the layout of `main.A` depends on itself");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* The first failure of a layout is its message. The struct is laid out
    before its array, whose length is 0 on the target, and its align(2)
    then stands below the alignment 4 of its first field, a second failure
@@ -585,6 +617,7 @@ void test_layout(void)
     shift_out_of_range();
     unit_past_aggregate();
     second_failure();
+    holds_itself();
     not_binary();
     size_overflows();
     zero_width();
