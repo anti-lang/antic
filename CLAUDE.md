@@ -664,6 +664,20 @@ not re-open a settled decision without asking Eddie.
   six parts of `asan`, the last up to test 7533: `asan` 261 s, 184 s,
   261 s, 175 s, 104 s and 580 s, `ubsan` 267 s, 184 s, 259 s, 179 s,
   103 s and 599 s.
+  Batch 3p of the third phase of coverage measured `host` in the same
+  three parts: 364 s, 262 s and 317 s before the commits of the tests of
+  four files and of T276 to T284, up to test 7559, 370 s, 265 s and
+  306 s before the fix of T276, 368 s, 265 s and 308 s before that of
+  T277, 368 s, 264 s and 306 s before the commit of T285, up to test
+  7562, 367 s, 265 s and 333 s before its fix, 372 s, 266 s and 312 s
+  before that of T278, 370 s, 267 s and 315 s before that of T279,
+  373 s, 266 s and 308 s before that of T280, 371 s, 268 s and 335 s
+  before that of T281, 377 s, 273 s and 321 s before that of T282,
+  372 s, 271 s and 319 s before that of T283, up to test 7564, and
+  379 s, 270 s and 315 s before that of T284. It ran each sanitizer
+  suite in the six parts of `asan`, the last up to test 7562: `asan`
+  265 s, 188 s, 263 s, 170 s, 105 s and 577 s, `ubsan` 272 s, 186 s,
+  261 s, 181 s, 107 s and 599 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1274,11 +1288,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7535 ctest tests pass on the development Mac, and two of them, the
+- 7564 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   The two lines of `tests/known-failures.txt`, of T136 and T138, carry
   `host=windows`.
-  The ASan and the UBSan builds run 7533 each
+  The ASan and the UBSan builds run 7562 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
