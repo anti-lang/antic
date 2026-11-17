@@ -275,6 +275,8 @@ struct tag {
     bool is_union;
     const char *id;             /* of the RecordDecl that defines it */
     struct bind_record *record;
+    /* The record has no tag in C, and a typedef or the reader named it. */
+    bool anonymous;
 };
 
 struct typedef_entry {
@@ -492,6 +494,44 @@ static struct enum_entry *enum_by_id(struct reader *r, const char *id)
         }
     }
     return NULL;
+}
+
+/* DESIGN: C keeps the tags of records and enums apart from the names of
+   typedefs, and a module of Anti has one name for each of its types. A
+   record or an enum takes its tag, or the name of the typedef that names
+   it where it has none. A name that two types of the header take that
+   way refuses the header, as a description that names one struct twice
+   is refused, by T269 of docs/audit/tests-findings.md. The two types
+   joined into one record before, whose layout was the one of the type
+   declared first, or stood as two items of one name. */
+static bool type_name_taken(struct reader *r, const char *name,
+                            const char *enum_tag)
+{
+    size_t i;
+
+    for (i = 0; i < r->tags.count; i++) {
+        const struct tag *t = r->tags.items[i];
+        if (strcmp(t->name, name) == 0) {
+            return true;
+        }
+    }
+    /* A declaration of the tag of an enum names the enum it declared
+       before. */
+    for (i = 0; i < r->enums.count; i++) {
+        const struct enum_entry *e = r->enums.items[i];
+        if (e->e->name != NULL && strcmp(e->e->name, name) == 0 &&
+            (enum_tag == NULL || e->tag == NULL ||
+             strcmp(e->tag, enum_tag) != 0)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void refuse_type_name(struct reader *r, const char *name)
+{
+    say_anti("%s names two types `%s`\n", r->b->source, name);
+    r->failed = true;
 }
 
 static const struct bind_type *parse(struct reader *r, const char *c);
@@ -837,19 +877,31 @@ static struct bind_record *declare_record(struct reader *r,
     const char *id = json_member_string(node, "id");
     bool is_union = tag_used != NULL && strcmp(tag_used, "union") == 0;
     bool complete = json_member_true(node, "completeDefinition");
+    bool tagged = json_get(node, "name") != NULL;
     struct tag *t = tag_named(r, name, is_union);
     struct bind_record *rec;
     int64_t align;
 
+    /* A record without a tag is declared once, so a second declaration of
+       its name, or a tag that another type has as its name, names a type
+       of its own. */
+    if (t != NULL && (t->anonymous || !tagged)) {
+        refuse_type_name(r, name);
+        return t->record;
+    }
     if (t == NULL) {
         /* A record without a tag takes a name the reader checked or
            made. */
-        if (json_get(node, "name") != NULL) {
+        if (tagged) {
             hold_name(r, is_union ? "union" : "struct", name);
+        }
+        if (type_name_taken(r, name, NULL)) {
+            refuse_type_name(r, name);
         }
         t = arena_alloc(&r->b->arena, sizeof *t);
         t->name = bind_strdup(r->b, name);
         t->is_union = is_union;
+        t->anonymous = !tagged;
         rec = arena_alloc(&r->b->arena, sizeof *rec);
         rec->name = t->name;
         rec->is_union = is_union;
@@ -869,7 +921,7 @@ static struct bind_record *declare_record(struct reader *r,
     r->generation++;
     {
         struct text c_name = {0};
-        if (json_get(node, "name") != NULL) {
+        if (tagged) {
             text_appendf(&c_name, "%s %s", is_union ? "union" : "struct", name);
         } else {
             text_append(&c_name, name);
@@ -918,6 +970,9 @@ static void declare_enum(struct reader *r, const struct json_value *node)
 
     if (tag != NULL) {
         hold_name(r, "enum", tag);
+        if (type_name_taken(r, tag, tag)) {
+            refuse_type_name(r, tag);
+        }
     }
     entry->id = id != NULL ? bind_strdup(r->b, id) : "";
     entry->tag = tag != NULL ? bind_strdup(r->b, tag) : NULL;
@@ -1062,6 +1117,9 @@ static void name_owned(struct reader *r, const struct json_value *node)
     e = enum_by_id(r, id);
     if (e != NULL && e->e->name == NULL) {
         hold_name(r, "enum", name);
+        if (type_name_taken(r, name, NULL)) {
+            refuse_type_name(r, name);
+        }
         e->e->name = bind_strdup(r->b, name);
         e->e->c_name = e->e->name;
         r->generation++;
