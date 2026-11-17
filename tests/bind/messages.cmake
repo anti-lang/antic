@@ -143,6 +143,42 @@ anti_message(clang_aligned_without_a_value
     FILES api.h "struct __attribute__((aligned)) Most { int a; };\nvoid take(struct Most *m);\n"
     ARGS ${clang_bind}
     ERR "anti: api.h: `Most` is aligned without a value")
+# T268: the first field, aligned without a value, is no field other than
+# the first.
+anti_message(clang_field_aligned_without_a_value
+    FILES api.h "struct NoValue { int a __attribute__((aligned)); };\nvoid take(struct NoValue *p);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: `NoValue` aligns its first field without a value")
+# T269: C keeps the tags apart from the names of typedefs, and Anti has
+# one name for every type of a module. A typedef that names an anonymous
+# record or enum by a tag of another type of the header is refused, in
+# either order, as a description that names one struct twice is.
+anti_message(clang_typedef_named_as_a_tag
+    FILES api.h "struct S { int a; };\ntypedef struct { double b; char c; } S;\nvoid take(S v);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `S`")
+anti_message(clang_tag_named_as_a_typedef
+    FILES api.h "typedef struct { double b; char c; } S;\nstruct S { int a; };\nvoid take(struct S v);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `S`")
+anti_message(clang_union_named_as_a_struct
+    FILES api.h "struct U { int x; };\ntypedef union { int a; float b; } U;\nvoid take(U *p);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `U`")
+anti_message(clang_enum_named_as_a_struct
+    FILES api.h "struct E { int a; };\ntypedef enum { E_A } E;\nvoid take(E e);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `E`")
+# T271: an enum whose attribute sets its layout, which Anti has no form
+# for, is refused as a record with a layout directive other than packed
+# and aligned is.
+foreach(case "packed|packed" "aligned|aligned(8)" "mode|mode(byte)")
+    string(REGEX MATCH "^([^|]*)[|](.*)$" parts "${case}")
+    anti_message(clang_enum_${CMAKE_MATCH_1}
+        FILES api.h "enum __attribute__((${CMAKE_MATCH_2})) Small { SMALL_A };\nvoid take(enum Small s);\n"
+        ARGS ${clang_bind}
+        ERR "anti: api.h: `Small` is an enum with a layout attribute, which Anti has no form for")
+endforeach()
 anti_message(clang_target
     FILES api.h "int count(void);\n"
     ARGS ${clang_bind} --target plan9-x86_64

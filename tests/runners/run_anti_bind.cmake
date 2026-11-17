@@ -6,8 +6,9 @@
 #   CASE      header, clang, headers, escaped_path, raymath, raylib,
 #             raylib_shipped, api, refusals, api_malformed, clang_malformed,
 #             ast_malformed,
-#             api_typedef_chain, clang_typedef_chain, clang_of_the_tree or
-#             clang_of_the_tree_relative
+#             api_typedef_chain, clang_typedef_chain, clang_of_the_tree,
+#             clang_of_the_tree_relative, enum_declared_first, shift_types
+#             or cast_types
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -815,6 +816,57 @@ elseif(CASE STREQUAL "clang_of_the_tree_relative")
         message(FATAL_ERROR "anti of the tree run as ../${name} took no "
                             "pinned clang: ${status}\n${out}${err}")
     endif()
+elseif(CASE STREQUAL "enum_declared_first")
+    # T270: a declaration of an enum before its definition, which C23
+    # allows with a fixed base, is the same enum. The binding holds it
+    # once, with its values, and compiles.
+    file(WRITE "${WORK}/first.h" "enum E : unsigned char;\n"
+         "enum E : unsigned char { E_A, E_B };\nvoid take(enum E e);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/first.h"
+                --module bindtest.first -o "${WORK}/out" --runtime "${RUNTIME}")
+    compile_binding(first bindtest.first)
+    file(READ "${WORK}/out/first.anti" module)
+    if(NOT module MATCHES "pub enum E: c_uchar\n{\n\tE_A = 0,\n\tE_B = 1,\n}")
+        message(FATAL_ERROR "first.anti holds no enum E with its values\n${module}")
+    endif()
+elseif(CASE STREQUAL "shift_types")
+    # T272: a shift has the type of its left operand after the integer
+    # promotions, C11 6.5.7, and the type of the count changes neither its
+    # type nor its value.
+    file(WRITE "${WORK}/shifts.h" "#define SHR (-8 >> 1u)\n"
+         "#define SHL (1 << 2ull)\n#define SHU (1u << 2)\n"
+         "#define SHLL (1LL << 40u)\n#define SHC ((unsigned char)200 >> 1u)\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/shifts.h"
+                --module bindtest.shifts -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/shifts.anti" module)
+    foreach(line "pub const SHR: c_int = -4;" "pub const SHL: c_int = 4;"
+            "pub const SHU: c_uint = 4;" "pub const SHLL: c_longlong = 1099511627776;"
+            "pub const SHC: c_int = 100;")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "shifts.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+elseif(CASE STREQUAL "cast_types")
+    # T273: a cast to a typedef of an arithmetic type is a cast to that
+    # type, a typedef of the C library as well as one of the header, and
+    # the value takes the width of its type.
+    file(WRITE "${WORK}/casts.h" "#include <stddef.h>\n#include <stdint.h>\n"
+         "typedef int Count;\n#define BYTE ((uint8_t)259)\n"
+         "#define WORD ((int32_t)-1)\n#define SIZE ((size_t)3)\n"
+         "#define COUNT ((Count)7)\n#define SUM ((uint8_t)250 + 10)\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/casts.h"
+                --module bindtest.casts -o "${WORK}/out" --runtime "${RUNTIME}")
+    expect_same_text("the warnings of the casts" "" "${tool_stderr}")
+    file(READ "${WORK}/out/casts.anti" module)
+    foreach(line "pub const BYTE: u8 = 3;" "pub const WORD: i32 = -1;"
+            "pub const SIZE: c_size_t = 3;" "pub const COUNT: c_int = 7;"
+            "pub const SUM: c_int = 260;")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "casts.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()

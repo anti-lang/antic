@@ -19,3 +19,14 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
+anti_bind_message_clang_field_aligned_without_a_value T268 A first field aligned without a value is refused as a field other than the first.
+anti_bind_message_clang_typedef_named_as_a_tag T269 A typedef that names an anonymous struct by the tag of another struct joins the two into the first.
+anti_bind_message_clang_tag_named_as_a_typedef T269 A tag that names another struct by the name of a typedef of an anonymous struct joins the two into the first.
+anti_bind_message_clang_union_named_as_a_struct T269 A union named by a typedef and a struct of the same tag become two items of one name.
+anti_bind_message_clang_enum_named_as_a_struct T269 An enum named by a typedef and a struct of the same tag become two items of one name.
+anti_bind_enum_declared_first T270 An enum declared before its definition becomes two enums of one name.
+anti_bind_message_clang_enum_packed T271 A packed enum is bound with the base c_int.
+anti_bind_message_clang_enum_aligned T271 An aligned enum is bound with the base c_int.
+anti_bind_message_clang_enum_mode T271 An enum of another mode is bound with the base c_int.
+anti_bind_shift_types T272 A shift takes the common type of both operands in place of the promoted left one.
+anti_bind_cast_types T273 A cast to a typedef of an arithmetic type is no constant.

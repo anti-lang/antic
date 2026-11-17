@@ -7808,7 +7808,9 @@ endforeach()
 # api_typedef_chain and clang_typedef_chain each bind a chain of aliases
 # that names every link three times. clang_of_the_tree runs a copy of anti in a tree whose deps/clang is the
 # pinned clang, with no clang on PATH, and clang_of_the_tree_relative runs
-# it by a relative path from a directory below its own.
+# it by a relative path from a directory below its own. enum_declared_first
+# binds an enum declared before its definition, shift_types the type of a
+# shift and cast_types the casts to a typedef.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
@@ -7819,7 +7821,7 @@ set(anti_bind_cases header clang headers escaped_path raymath raylib
     nested_enum api_parts api_callbacks api_literals api_types
     api_words words unsigned_bitfield fixed_enum api_typedef_chain
     clang_of_the_tree clang_of_the_tree_relative api_aliases miniaudio
-    api_alias_chain_long api_docs)
+    api_alias_chain_long api_docs enum_declared_first shift_types cast_types)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # The cases refusals, ast_malformed and clang_typedef_chain stand a
     # shell script in for clang.
