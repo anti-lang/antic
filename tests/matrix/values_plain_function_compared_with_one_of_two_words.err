@@ -1,0 +1,1 @@
+values_plain_function_compared_with_one_of_two_words.anti:14:9: error: the operands of `==` have the types `fn(int) -> int` and `fn(int) -> int`, the plain form on the left and the form of two words on the right
