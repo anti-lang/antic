@@ -5669,6 +5669,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "switch_refused_returns|--front-end,switch_refused_returns.anti"
         "expression_operands|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_operands.anti"
         "generic_arguments_unbound|--front-end,generic_arguments_unbound.anti"
+        "generic_shape_of_an_optional|--front-end,generic_shape_of_an_optional.anti"
         "expression_conversions|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_conversions.anti"
         "expression_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_forms.anti"
         "construct_paths|--front-end,--runtime,${ANTIC_RUNTIME_DIR},construct_paths.anti"

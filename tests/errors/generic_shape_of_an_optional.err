@@ -1,0 +1,1 @@
+generic_shape_of_an_optional.anti:12:16: error: `x` of `first` takes `*?T`, found `int`

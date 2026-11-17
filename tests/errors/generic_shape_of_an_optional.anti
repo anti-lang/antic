@@ -1,0 +1,14 @@
+//! A generic function whose parameter is a pointer to a `?T`, called with an
+//! `int`. The argument binds nothing, and the message names the parameter and
+//! the shape it needs, as for a slice of `T`.
+
+fn first<T>(x: *?T) -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let a = first(3);
+	return 0;
+}

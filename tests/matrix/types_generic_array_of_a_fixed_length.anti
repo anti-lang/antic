@@ -1,0 +1,33 @@
+//! A generic function whose parameter is an array of three `T`, called with an
+//! array of `int` and one of `f64`, beside one whose length is a constant
+//! parameter, which a generic function calls with an array of its own constant
+//! parameter. The fixed length binds nothing, and the element binds `T`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn middle<T>(a: [3]T) -> T
+{
+	return a[1];
+}
+
+fn total<N: int>(a: [N]int) -> int
+{
+	let s = 0;
+	for x in a {
+		s += x;
+	}
+	return s;
+}
+
+fn outer<M: int>(b: [M]int) -> int
+{
+	return total(b) + M;
+}
+
+fn main() -> int
+{
+	let a = [4, 5, 6];
+	let f = [1.5, 2.5, 3.5];
+	printf("%lld %.1f %lld %lld\n".ptr, middle(a), middle(f), total(a), outer(a));
+	return 0;
+}

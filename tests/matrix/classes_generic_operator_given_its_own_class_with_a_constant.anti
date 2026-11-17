@@ -1,0 +1,30 @@
+//! An operator of the generic class `Cells<T, N: int>` with a type parameter
+//! `U` of its own, called in the body of the class with `*self` and outside it
+//! with another copy. In the body the call binds `U` to `T` and the `N` of the
+//! copy to the `N` of the class.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cells<T: Number, N: int>
+{
+	pub x: T,
+
+	operator fn add<U: Number>(self, other: Cells<U, N>) -> Cells<T, N>
+	{
+		return Cells<T, N> { x: self.x + self.x + self.x };
+	}
+
+	pub fn thrice(self) -> Cells<T, N>
+	{
+		return *self + *self;
+	}
+}
+
+fn main() -> int
+{
+	let c = Cells<int, 2> { x: 4 };
+	let d = c.thrice();
+	let e = c + Cells<i16, 2> { x: 1 };
+	printf("%lld %lld\n".ptr, d.x, e.x);
+	return 0;
+}

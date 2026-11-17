@@ -1,0 +1,26 @@
+//! A literal of a generic struct that writes no type arguments, whose fields
+//! hold an anonymous function, a named function and `none` beside a value that
+//! gives `T`. The function and `none` take their types from the field, so the
+//! value alone binds `T`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Holder<T>
+{
+	value: T,
+	step: fn(T) -> T,
+	maybe: ?*T,
+}
+
+fn twice(x: int) -> int
+{
+	return x * 2;
+}
+
+fn main() -> int
+{
+	let h = Holder { value: 3, step: fn(x) { return x + 1; }, maybe: none };
+	let g = Holder { step: twice, value: 4, maybe: none };
+	printf("%lld %lld\n".ptr, h.step(h.value), g.step(g.value));
+	return 0;
+}
