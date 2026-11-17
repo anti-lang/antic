@@ -112,7 +112,7 @@ static void spellings(void)
 static bool value_of(struct bind_module *b, const char *expr,
                      struct bind_eval *out)
 {
-    return bind_eval(b, expr, NULL, NULL, out);
+    return bind_eval(b, expr, NULL, NULL, NULL, out);
 }
 
 static void expressions(void)

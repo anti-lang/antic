@@ -235,15 +235,23 @@ static const char *enum_named(void *context, const char *tag)
                                                  : NULL;
 }
 
-static const struct bind_type *parse(struct api *a, const char *c)
+/* The names a spelling of the description resolves through. */
+static struct bind_names names_of(struct api *a)
 {
     struct bind_names names;
-    const struct bind_type *t;
 
     names.typedef_named = typedef_named;
     names.record_named = record_named;
     names.enum_named = enum_named;
     names.context = a;
+    return names;
+}
+
+static const struct bind_type *parse(struct api *a, const char *c)
+{
+    struct bind_names names = names_of(a);
+    const struct bind_type *t;
+
     t = bind_parse_type(a->b, c, &names);
     /* R170 of "Rules of 2026-10-13": the entry that leaves something out
        names the type in its one warning. The innermost type that does
@@ -500,7 +508,10 @@ static bool color(struct api *a, const char *name, const char *value,
     const char *close = open != NULL ? strchr(open, ')') : NULL;
     const char *brace = close != NULL ? strchr(close, '{') : NULL;
     struct bind_record *r;
+    struct bind_names names = names_of(a);
+    const char *before = a->unparsed;
     char type[64];
+    bool ok;
 
     if (brace == NULL || (size_t)(close - open - 1) >= sizeof type) {
         return false;
@@ -508,8 +519,23 @@ static bool color(struct api *a, const char *name, const char *value,
     memcpy(type, open + 1, (size_t)(close - open - 1));
     type[close - open - 1] = '\0';
     r = record_of(a, type);
-    return r != NULL && bind_struct_const(a->b, name, r, brace + 1, lookup,
-                                          a, doc);
+    ok = r != NULL && bind_struct_const(a->b, name, r, brace + 1, lookup, a,
+                                        &names, doc);
+    a->unparsed = before;
+    return ok;
+}
+
+/* The value of the expression of a define. A cast in it resolves an
+   alias as a type of an entry does, and the type that did not parse stays
+   the one of the entry before it. */
+static bool evaluated(struct api *a, const char *expr, struct bind_eval *v)
+{
+    struct bind_names names = names_of(a);
+    const char *before = a->unparsed;
+    bool ok = bind_eval(a->b, expr, lookup, a, &names, v);
+
+    a->unparsed = before;
+    return ok;
 }
 
 /* DESIGN: rlparser gives each define a kind. INT, FLOAT, FLOAT_MATH,
@@ -574,8 +600,7 @@ static bool read_defines(struct api *a)
                     strcmp(kind, "FLOAT_MATH") == 0 ||
                     strcmp(kind, "STRING") == 0 ||
                     strcmp(kind, "UNKNOWN") == 0) &&
-                   expr.length > 0 &&
-                   bind_eval(a->b, text_cstr(&expr), lookup, a, &v)) {
+                   expr.length > 0 && evaluated(a, text_cstr(&expr), &v)) {
             ok = bind_eval_const(a->b, name, &v, doc);
         }
         if (!ok) {

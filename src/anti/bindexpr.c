@@ -31,6 +31,8 @@ struct eval {
     size_t pos;
     bind_lookup lookup;
     void *context;
+    /* The typedefs a cast may name, or NULL for the keywords of C alone. */
+    const struct bind_names *names;
     bool failed;
 };
 
@@ -118,17 +120,18 @@ static void narrow(struct bind_eval *v)
     if (v->kind != BIND_EVAL_INT) {
         return;
     }
-    if (strcmp(v->type, "c_int") == 0) {
+    if (strcmp(v->type, "c_int") == 0 || strcmp(v->type, "i32") == 0) {
         v->i = sign_extended(x, 32);
-    } else if (strcmp(v->type, "c_uint") == 0) {
+    } else if (strcmp(v->type, "c_uint") == 0 || strcmp(v->type, "u32") == 0) {
         v->i = (int64_t)(uint32_t)x;
-    } else if (strcmp(v->type, "c_short") == 0) {
+    } else if (strcmp(v->type, "c_short") == 0 || strcmp(v->type, "i16") == 0) {
         v->i = sign_extended(x, 16);
-    } else if (strcmp(v->type, "c_ushort") == 0) {
+    } else if (strcmp(v->type, "c_ushort") == 0 ||
+               strcmp(v->type, "u16") == 0) {
         v->i = (int64_t)(uint16_t)x;
-    } else if (strcmp(v->type, "c_char") == 0) {
+    } else if (strcmp(v->type, "c_char") == 0 || strcmp(v->type, "i8") == 0) {
         v->i = sign_extended(x, 8);
-    } else if (strcmp(v->type, "c_uchar") == 0) {
+    } else if (strcmp(v->type, "c_uchar") == 0 || strcmp(v->type, "u8") == 0) {
         v->i = (int64_t)(uint8_t)x;
     }
 }
@@ -281,7 +284,7 @@ static struct bind_eval string(struct eval *e)
 
 /* The words of a cast that the evaluator knows, as `(float)` or
    `(unsigned int)`, with the type the value takes. */
-static const char *cast_type(const char *words)
+static const char *cast_type(const struct eval *e, const char *words)
 {
     static const struct {
         const char *c;
@@ -297,12 +300,20 @@ static const char *cast_type(const char *words)
     };
     size_t i;
 
+    const struct bind_type *t;
+
     for (i = 0; i < sizeof casts / sizeof casts[0]; i++) {
         if (strcmp(casts[i].c, words) == 0) {
             return casts[i].anti;
         }
     }
-    return NULL;
+    /* A typedef of an arithmetic type, of the C library or of the input,
+       is a cast to that type, by T273. */
+    if (e->names == NULL) {
+        return NULL;
+    }
+    t = bind_parse_type(e->b, words, e->names);
+    return t != NULL && t->kind == BIND_SCALAR ? t->name : NULL;
 }
 
 static struct bind_eval conditional(struct eval *e);
@@ -355,7 +366,7 @@ static struct bind_eval primary(struct eval *e)
             if (n < sizeof words) {
                 memcpy(words, e->s + e->pos + 1, n);
                 words[n] = '\0';
-                type = cast_type(words);
+                type = cast_type(e, words);
             }
             if (type != NULL) {
                 e->pos += n + 2;
@@ -464,6 +475,29 @@ static struct bind_eval unary(struct eval *e)
     return primary(e);
 }
 
+/* The type of C whose rank a fixed type of Anti has in the conversions of
+   C11 6.3.1.8. A type narrower than int promotes to int, and the types
+   of 64 bits rank as long long. */
+static const char *rank_type(const char *type)
+{
+    static const struct {
+        const char *fixed;
+        const char *c;
+    } ranks[] = {
+        {"i32", "c_int"},        {"u32", "c_uint"},
+        {"i64", "c_longlong"},   {"u64", "c_ulonglong"},
+        {"c_size_t", "c_ulong"},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof ranks / sizeof ranks[0]; i++) {
+        if (strcmp(ranks[i].fixed, type) == 0) {
+            return ranks[i].c;
+        }
+    }
+    return type;
+}
+
 /* The type of a binary operation of C, from the usual arithmetic
    conversions: a float wins, and a wider or unsigned integer wins. */
 static const char *common(const struct bind_eval *a, const struct bind_eval *b)
@@ -471,6 +505,8 @@ static const char *common(const struct bind_eval *a, const struct bind_eval *b)
     static const char *const ranks[] = {
         "c_int", "c_uint", "c_long", "c_ulong", "c_longlong", "c_ulonglong",
     };
+    const char *ta = rank_type(a->type);
+    const char *tb = rank_type(b->type);
     size_t i;
     size_t ra = 0;
     size_t rb = 0;
@@ -482,10 +518,10 @@ static const char *common(const struct bind_eval *a, const struct bind_eval *b)
                    : "c_float";
     }
     for (i = 0; i < sizeof ranks / sizeof ranks[0]; i++) {
-        if (strcmp(ranks[i], a->type) == 0) {
+        if (strcmp(ranks[i], ta) == 0) {
             ra = i;
         }
-        if (strcmp(ranks[i], b->type) == 0) {
+        if (strcmp(ranks[i], tb) == 0) {
             rb = i;
         }
     }
@@ -615,7 +651,8 @@ static struct bind_eval conditional(struct eval *e)
 }
 
 bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
-               void *context, struct bind_eval *out)
+               void *context, const struct bind_names *names,
+               struct bind_eval *out)
 {
     struct eval e;
 
@@ -624,6 +661,7 @@ bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
     e.s = expr;
     e.lookup = lookup;
     e.context = context;
+    e.names = names;
     space(&e);
     if (e.s[e.pos] == '\0' || !enter(&e)) {
         return false;
@@ -741,7 +779,8 @@ bool bind_eval_const(struct bind_module *b, const char *name,
 
 bool bind_struct_const(struct bind_module *b, const char *name,
                        const struct bind_record *r, const char *elements,
-                       bind_lookup lookup, void *context, const char *doc)
+                       bind_lookup lookup, void *context,
+                       const struct bind_names *names, const char *doc)
 {
     const char *s = elements;
     struct text type = {0};
@@ -774,7 +813,7 @@ bool bind_struct_const(struct bind_module *b, const char *name,
         if (f->name == NULL || f->bits >= 0 ||
             (f->type->kind != BIND_SCALAR &&
              f->type->kind != BIND_UNSUPPORTED) ||
-            !bind_eval(b, element, lookup, context, &v) ||
+            !bind_eval(b, element, lookup, context, names, &v) ||
             v.kind == BIND_EVAL_STRING) {
             goto done;
         }

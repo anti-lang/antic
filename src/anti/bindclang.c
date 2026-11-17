@@ -610,7 +610,8 @@ static const char *enum_named(void *context, const char *name)
     return NULL;
 }
 
-static const struct bind_type *parse(struct reader *r, const char *c)
+/* The names a spelling of the header resolves through. */
+static struct bind_names names_of(struct reader *r)
 {
     struct bind_names names;
 
@@ -618,6 +619,13 @@ static const struct bind_type *parse(struct reader *r, const char *c)
     names.record_named = record_named;
     names.enum_named = enum_named;
     names.context = r;
+    return names;
+}
+
+static const struct bind_type *parse(struct reader *r, const char *c)
+{
+    struct bind_names names = names_of(r);
+
     return bind_parse_type(r->b, c, &names);
 }
 
@@ -1312,8 +1320,11 @@ static bool evaluate(struct reader *r, struct macro *m)
         m->state = 3;
     }
     if (m->state == 0) {
+        struct bind_names names = names_of(r);
         m->state = 1;
-        m->state = bind_eval(r->b, m->text, lookup, r, &m->value) ? 2 : 3;
+        m->state = bind_eval(r->b, m->text, lookup, r, &names, &m->value)
+                       ? 2
+                       : 3;
     }
     return m->state == 2;
 }
@@ -1603,6 +1614,7 @@ static bool compound_literal(struct reader *r, const struct macro *m)
     const char *s = skip_space(expand_identity(r, m->text));
     const char *close;
     const struct bind_type *t;
+    struct bind_names names;
     char type[128];
 
     if (*s != '(' || (close = strchr(s, ')')) == NULL ||
@@ -1616,8 +1628,9 @@ static bool compound_literal(struct reader *r, const struct macro *m)
     if (t == NULL || t->kind != BIND_RECORD || *s != '{') {
         return false;
     }
+    names = names_of(r);
     return bind_struct_const(r->b, m->name, t->record, s + 1, lookup, r,
-                             NULL);
+                             &names, NULL);
 }
 
 static void read_macros(struct reader *r)

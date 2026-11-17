@@ -41,11 +41,13 @@ typedef bool (*bind_lookup)(void *context, const char *name,
 
 /* Evaluate expr, the text of a macro or of a define. It may hold the
    integer, float and string literals of C, names through lookup and casts
-   to an arithmetic type. It may hold the unary operators - + ~ and the
-   binary operators of arithmetic, shifts and bits. Returns false when
-   expr is anything else, or divides by zero. */
+   to an arithmetic type, a typedef that names resolves among them. It may
+   hold the unary operators - + ~ and the binary operators of arithmetic,
+   shifts and bits. Returns false when expr is anything else, or divides
+   by zero. */
 bool bind_eval(struct bind_module *b, const char *expr, bind_lookup lookup,
-               void *context, struct bind_eval *out);
+               void *context, const struct bind_names *names,
+               struct bind_eval *out);
 
 /* Append a float as Anti writes it, with the digits of type that give
    the same value back. Digits without a point gain `.0`. */
@@ -63,6 +65,7 @@ bool bind_eval_const(struct bind_module *b, const char *name,
    Returns false for any other literal. */
 bool bind_struct_const(struct bind_module *b, const char *name,
                        const struct bind_record *r, const char *elements,
-                       bind_lookup lookup, void *context, const char *doc);
+                       bind_lookup lookup, void *context,
+                       const struct bind_names *names, const char *doc);
 
 #endif
