@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o and 3p stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p and 3q stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1045,6 +1045,21 @@ above.
 | `sema_null_pointer_maker`, `sema_error_maker`, `sema_error_text_maker`, `trace_capture`, `sema_resolve_origin` | A class of `anti.lang` that lacks the function the compiler calls, or a field of `Error` that is not there. | The library file of `anti.lang` of the runtime archive has each, and a module without the import gets the message of the import first. |
 | `write_interfaces` | A source that does not parse, in the loop that compiles the interface files. | The first loop returns for one, by T123. |
 
+## `src/antic/sema_class.c`, `src/anti/fmt.c` and `src/antic/sema_safety.c`
+
+Batch 3q of the third phase sorted the sides of the conditions of the
+rules of classes, the formatter and the checks of thread-safe classes,
+which no batch had chosen by their branches. The sides of
+`check_replacement`, `angle_list`, `space_before`, `flush_doc_line`,
+`emit_comment`, `sema_note_guarded_pointer`, `sema_check_reach` and
+`written_field` that the suite misses are the guards of their rows above.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `same_signature`, `check_hook`, `eq_signature_allowed`, `check_free_operators`, `member_params`, `sema_entry_signature` | A function without a symbol, or one whose type is no function type. | The declaration gives every function of a body and of the module its symbol and a function type before the checks of the classes and of the operators run. |
+| `sets_stmt` | A `let` without a value. | The parser gives every `let` its value, which "Core language" in `docs/decisions.md` makes mandatory. |
+| `sema_points_into_fields` | An array field that leaves a public function as a slice, and the `ptr` of an array field. | An array converts to a slice nowhere a `return` stands, and an array has no field `ptr`, so the checker refuses both before the check runs. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1116,6 +1131,17 @@ above.
   capture that is both changed and called at a `concurrent` parameter
   and the unification of the parameters of a generic operator of a
   class.
+- The sides of a condition in `sema_class.c`, `fmt.c` and
+  `sema_safety.c` that batch 3q did not sort: 70, 72 and 84 after its
+  tests. Most take a member without a symbol, a piece that is no token or
+  a field without a home, or are a short circuit whose other operand
+  decides. A source that lexes and does not parse reaches some sides of
+  `fmt.c`, such as an `if (` that no `)` closes. The files that batch 3q
+  named and did not test keep their sides: `antl_read_ir.c` 96, most of
+  them a value of a damaged library file that no case of `unit_modules`
+  writes, `lower_expr.c` 84, `sema_const.c` 81, `sema_copies.c` 80 and the
+  sides of an error type in `sema_call.c` 152, `sema_generic.c` 148 and
+  `sema_expr.c` 98.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
