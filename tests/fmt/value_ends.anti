@@ -1,0 +1,118 @@
+//! Forms whose canonical form turns on what ends a value and on what opens a
+//! type: a `-` after a char, a bytes literal, a pattern literal, `none` and
+//! `here`, the `-` after a field reached through `?.` and `::`, an anonymous
+//! function after `[`, `yield`, `=>` and `??`, `union` named after `?.` and
+//! `::`, lists of types inside angle brackets and the block doc comments.
+
+type Pairs = Map<[N]int, fn(keep fn(int), int) -> int may fail>;
+type Plain = List<fn(int)>;
+
+union Bits
+{
+	i: int,
+	f: f64,
+}
+
+class Base
+{
+	pub n: int = 0,
+
+	fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+class Kid inherits Base
+{
+	fn twice(self) -> int
+	{
+		return self.super.get() * 2;
+	}
+}
+
+fn chars(c: char, b: []byte, p: ?*int, q: ?*Kid) -> int
+{
+	let d = c as int - 'a' as int;
+	let e = 'b' - 'a';
+	let f = b"xy"[0];
+	let g = re"x+";
+	let h = (p ?? &d);
+	let s = here;
+	let r = q?.twice();
+	let k: ?*int = none;
+	let m = [](fn(int) -> int) { ptr: none, len: 0 };
+	let size = size_of(?*int) + size_of([4]int);
+	return d - e + f as int - *h;
+}
+
+fn pick(f: ?fn(int) -> int) -> int
+{
+	let g = f ?? fn(x: int) -> int {
+		return x;
+	};
+	return g(1);
+}
+
+fn forms(q: ?*int) -> int
+{
+	let a = re"x" - 1;
+	let b = self.super - 1;
+	let c = none - 1;
+	let d = here - 1;
+	let e = q?.n - 1;
+	let g = q?.by - 3;
+	let h = Shape::by - 3;
+	let k = [2]?*int { none, none };
+	let m = x[?*int];
+	let n = q?.fn(1);
+	let o = x.union(1);
+	let r = q?.union(1);
+	let s = Shape::union(1);
+	let t = [fn(x: int) -> int { return x; }];
+	let u = sw ?? fn(x: int) -> int { return x; };
+	return a;
+}
+
+fn arms() -> int
+{
+	switch x {
+		1 => fn(x: int) -> int { return x; },
+		else => 0,
+	}
+	let v = q catch e { yield fn(x: int) -> int { return x; }; };
+	return 0;
+}
+
+/** */
+pub fn a() -> int
+{
+	return 0;
+}
+
+/**
+A doc comment on one line that is far too long to stand on one line within
+eighty columns.
+*/
+pub fn b() -> int
+{
+	return 0;
+}
+
+/**
+*bold text * and more
+*/
+pub fn c() -> int
+{
+	return 0;
+}
+
+/**
+Gutter
+
+After a blank line.
+*/
+pub fn d() -> int
+{
+	return 0;
+}

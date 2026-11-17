@@ -7688,6 +7688,15 @@ add_expect_test(fmt_handler_in_parentheses STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/handler_in_parentheses.anti")
 
+# What ends a value and what opens a type, in the canonical form: a char,
+# a bytes literal, a pattern literal, `none` and `here` before an operator,
+# a field after `?.` and `::`, anonymous functions after `[`, `yield`, `=>`
+# and `??`, lists of types inside angle brackets and block doc comments.
+add_expect_test(fmt_value_ends STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/value_ends.anti")
+
 # Every source of the standard library and of the tests stands in the
 # canonical form, so that `anti fmt` over the checkout writes nothing.
 add_test(NAME fmt_canonical
