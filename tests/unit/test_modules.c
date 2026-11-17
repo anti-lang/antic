@@ -3813,6 +3813,179 @@ static void deep_chain(struct damaged *s)
     unary_chain(s, ANTL_TREE_DEPTH_MAX + 16);
 }
 
+/* The record of the private function `thelper` with an item of its own,
+   which the file then writes beside the symbol. */
+static struct item *own_item(struct damaged *s)
+{
+    struct symbol *sym = own_symbol(s, helper_call(s)->as.call.callee);
+    struct item *it = arena_alloc(s->arena, sizeof *it);
+
+    *it = *sym->item;
+    sym->item = it;
+    return it;
+}
+
+/* The function record of `thelper` with a contract past the three of
+   enum fn_contract. */
+static void extern_fn_past_contract(struct damaged *s)
+{
+    own_item(s)->contract = (enum fn_contract)(FN_CONCRETE + 1);
+}
+
+/* The function record of `thelper` with a visibility past `pub`. */
+static void extern_fn_past_visibility(struct damaged *s)
+{
+    own_item(s)->vis = (enum visibility)(VIS_PUB + 1);
+}
+
+/* The private function `thelper` written with a kind past the last of
+   enum symbol_kind. */
+static void extern_past_kinds(struct damaged *s)
+{
+    own_symbol(s, helper_call(s)->as.call.callee)->kind =
+        (enum symbol_kind)(SYMBOL_CONSTRAINT + 1);
+}
+
+/* A generic that shuffles the lanes of a simd struct. */
+static const char shuffle_source[] =
+    "pub simd struct SV4 { x: f32, y: f32, z: f32, w: f32 }\n"
+    "pub fn flip<T>(a: SV4, t: T) -> SV4 {\n"
+    "    return a.shuffle(3, 2, 1, 0);\n"
+    "}\n";
+
+/* The shuffle of `flip` without its simd struct, so the file writes no
+   lanes for it. */
+static void shuffle_without_simd(struct damaged *s)
+{
+    const struct item *flip = generic_of(s->written, "flip");
+
+    if (flip == NULL) {
+        check_failures++;
+        fprintf(stderr, "no generic `flip`\n");
+        return;
+    }
+    flip->body->stmts[0]->as.return_value->as.simd.simd = NULL;
+}
+
+/* A generic struct and a generic function, whose declarations the tests
+   below change. */
+static const char generic_decls[] = "pub struct GP<T> { v: T }\n"
+                                    "pub fn gp<T>(x: T) -> int {\n"
+                                    "    return 1;\n"
+                                    "}\n";
+
+/* A private generic that a public one calls. */
+static const char hidden_generic[] = "fn hidden<T>(x: T) -> int {\n"
+                                     "    return 1;\n"
+                                     "}\n"
+                                     "pub fn shown<T>(x: T) -> int {\n"
+                                     "    return hidden<T>(x);\n"
+                                     "}\n";
+
+/* The declaration of the generic struct `GP` as a class. */
+static void struct_as_class(struct damaged *s)
+{
+    size_t i;
+
+    for (i = 0; i < s->written->generic_count; i++) {
+        struct item *it = s->written->generics[i];
+        if (it->kind == ITEM_STRUCT) {
+            it->kind = ITEM_CLASS;
+        }
+    }
+}
+
+/* The declaration of a generic carries the marks of its kind, and each
+   tree names the generic it belongs to. The reader refuses a function
+   whose byte of marks holds more than its four marks or that names more
+   parameters than its type has, a tree of no kind or of a function the
+   generic lacks, and a struct that the declaration calls a class. */
+static void damaged_declarations(void)
+{
+    static const uint8_t marks = 16;
+    static const uint8_t names = 2;
+    static const uint8_t tree[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0};
+    static const uint8_t past_kinds = 2;
+    static const uint8_t of_struct[] = {1, 0, 0, 0, 0};
+    struct compilation s;
+    struct text bytes = {0};
+    size_t at;
+    size_t found = SIZE_MAX;
+
+    compilation_open(&s);
+    if (build_library(&s, "gd", generic_decls, &bytes)) {
+        CHECK(reads_file(&bytes));
+        /* The declaration of `gp`: its kind, its name, line 2, its column,
+           its visibility and its type, before the marks. */
+        for (at = 0; at + 24 <= bytes.length; at++) {
+            const uint8_t *p = (const uint8_t *)bytes.data + at;
+            if (p[0] == ITEM_FN && u32_at(&bytes, at + 1) == 2 &&
+                memcmp(p + 5, "gp", 2) == 0 && u32_at(&bytes, at + 7) == 2) {
+                found = at + 1 + 4 + 2 + 4 + 4 + 1 + 4;
+                break;
+            }
+        }
+        CHECK(found != SIZE_MAX);
+        refuses_poke(&bytes, found, &marks, 1);
+        /* The one tree, of `gp`: its kind 0, the generic 1 and the
+           function 0 of the generic, after the count of the trees. A kind
+           past 1 is refused, and so is a function past the functions of
+           the struct `GP`, which has none. */
+        found = SIZE_MAX;
+        for (at = 0; at + sizeof tree <= bytes.length; at++) {
+            if (memcmp(bytes.data + at, tree, sizeof tree) == 0) {
+                CHECK(found == SIZE_MAX);
+                found = at + 4;
+            }
+        }
+        CHECK(found != SIZE_MAX);
+        refuses_poke(&bytes, found, &past_kinds, 1);
+        refuses_poke(&bytes, found, of_struct, sizeof of_struct);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+
+    /* The private generic `hidden`, whose symbol takes the names of its
+       parameters from the declaration: two names, where its type has one
+       parameter. */
+    memset(&bytes, 0, sizeof bytes);
+    found = SIZE_MAX;
+    compilation_open(&s);
+    if (build_library(&s, "gn", hidden_generic, &bytes)) {
+        CHECK(reads_file(&bytes));
+        for (at = 0; at + 28 <= bytes.length; at++) {
+            const uint8_t *p = (const uint8_t *)bytes.data + at;
+            if (p[0] == ITEM_FN && u32_at(&bytes, at + 1) == 6 &&
+                memcmp(p + 5, "hidden", 6) == 0 &&
+                u32_at(&bytes, at + 11) == 1) {
+                found = at + 1 + 4 + 6 + 4 + 4 + 1 + 4 + 1;
+                break;
+            }
+        }
+        CHECK(found != SIZE_MAX);
+        refuses_poke(&bytes, found, &names, 1);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+
+    memset(&bytes, 0, sizeof bytes);
+    compilation_open(&s);
+    if (build_damaged(&s, "gd", generic_decls, struct_as_class, &bytes)) {
+        refuses_file((const uint8_t *)bytes.data, bytes.length, NULL);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+
+    memset(&bytes, 0, sizeof bytes);
+    compilation_open(&s);
+    if (build_damaged(&s, "sh", shuffle_source, shuffle_without_simd,
+                      &bytes)) {
+        refuses_file((const uint8_t *)bytes.data, bytes.length, NULL);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
 /* Read the library of tree_source written with damage, or refuse it. */
 static void tree_file(void (*damage)(struct damaged *),
                       bool reads)
@@ -4105,7 +4278,9 @@ static void damaged_trees(void)
         init_past_struct,        init_past_case,
         variant_without_case,    init_past_slice,
         callee_literal_without_type, callee_field_without_type,
-        copy_without_generic,    fn_twice};
+        copy_without_generic,    fn_twice,
+        extern_fn_past_contract, extern_fn_past_visibility,
+        extern_past_kinds};
     size_t i;
 
     tree_file(NULL, true);
@@ -5376,6 +5551,7 @@ void test_modules(void)
     wide_addresses();
     declared_types();
     damaged_trees();
+    damaged_declarations();
     damaged_bytes();
     tree_counts();
     signed_numbers();
