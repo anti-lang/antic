@@ -544,27 +544,34 @@ struct expr *sema_class_eq_operator(struct checker *c, struct type *t,
    still the one the program means. Two pointers of one element compare
    whether or not either of them may hold `none`, which is what
    `p != none` is written for. */
-static bool comparable_pointers(const struct type *a, const struct type *b)
+/* Whether the function types a and b have one signature, and one form
+   as well when form is set. Each type keeps a list of parameters of its
+   own, so the lists compare by their elements. */
+static bool same_signature(const struct type *a, const struct type *b,
+                           bool form)
 {
     size_t i;
 
-    /* A function value follows the pointer rule: two of one signature
-       and one form compare whether or not either may hold `none`. Each
-       type keeps a list of parameters of its own, so the lists compare
-       by their elements. */
-    if (a->kind == TYPE_FN && b->kind == TYPE_FN) {
-        if (a->param_count != b->param_count || a->result != b->result ||
-            a->bound != b->bound || a->may_fail != b->may_fail ||
-            a->has_out != b->has_out || a->context != b->context ||
-            a->owned != b->owned) {
+    if (a->param_count != b->param_count || a->result != b->result ||
+        a->bound != b->bound || a->may_fail != b->may_fail ||
+        a->has_out != b->has_out || (form && a->context != b->context) ||
+        a->owned != b->owned) {
+        return false;
+    }
+    for (i = 0; i < a->param_count; i++) {
+        if (a->params[i] != b->params[i]) {
             return false;
         }
-        for (i = 0; i < a->param_count; i++) {
-            if (a->params[i] != b->params[i]) {
-                return false;
-            }
-        }
-        return true;
+    }
+    return true;
+}
+
+static bool comparable_pointers(const struct type *a, const struct type *b)
+{
+    /* A function value follows the pointer rule: two of one signature
+       and one form compare whether or not either may hold `none`. */
+    if (a->kind == TYPE_FN && b->kind == TYPE_FN) {
+        return same_signature(a, b, true);
     }
     if (a->kind != TYPE_POINTER || b->kind != TYPE_POINTER) {
         return false;
@@ -722,6 +729,32 @@ static struct type *default_equality(struct checker *c, struct expr *e,
     return sema_builtin(c, TYPE_ERROR);
 }
 
+/* DESIGN: the plain form of a function type and the form of two words
+   are two types of one name, by the entry on parameters of function type
+   under "Anonymous functions and closures" in docs/decisions.md. A
+   refusal of two operands of one signature in the two forms names the
+   forms, since the names of the types alone say nothing, T290 of
+   docs/audit/tests-findings.md, as T177 names the owned form. */
+static void refuse_operands(struct checker *c, const struct expr *e,
+                            const char *o, const struct type *left,
+                            const struct type *right)
+{
+    if (left->kind == TYPE_FN && right->kind == TYPE_FN &&
+        left->context != right->context &&
+        same_signature(left, right, false)) {
+        sema_error_at(c, e->pos,
+                      "the operands of `%s` have the types `%s` and `%s`, "
+                      "the %s on the left and the %s on the right",
+                      o, sema_tn(left), sema_tn(right),
+                      left->context ? "form of two words" : "plain form",
+                      right->context ? "form of two words" : "plain form");
+        return;
+    }
+    sema_error_at(c, e->pos,
+                  "the operands of `%s` have the types `%s` and `%s`", o,
+                  sema_tn(left), sema_tn(right));
+}
+
 static struct type *check_comparison(struct checker *c, struct expr *e)
 {
     enum token_kind op = e->as.binary.op;
@@ -747,9 +780,7 @@ static struct type *check_comparison(struct checker *c, struct expr *e)
         return shared;
     }
     if (left != right && !(equality && comparable_pointers(left, right))) {
-        sema_error_at(c, e->pos,
-                      "the operands of `%s` have the types `%s` and "
-                      "`%s`", o, sema_tn(left), sema_tn(right));
+        refuse_operands(c, e, o, left, right);
         return sema_builtin(c, TYPE_ERROR);
     }
     if (equality && unrelated_pointers(left, right)) {
