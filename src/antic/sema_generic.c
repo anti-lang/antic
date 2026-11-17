@@ -1761,9 +1761,23 @@ static bool resolve_arg(struct checker *c, const struct name *name,
                 ? sema_lookup(c, &a->name)
                 : sema_library_item(c, sema_lookup(c, &a->module)->home,
                                     &a->name);
+        /* A constant whose value was refused had its message, and one
+           of another type names its type, by T282 of
+           docs/audit/tests-findings.md. */
         if (sym != NULL && sym->kind == SYMBOL_CONST &&
-            sema_const_symbol(c, sym, a->pos) && sym->value != NULL &&
-            types_is_integer(sym->type)) {
+            (!sema_const_symbol(c, sym, a->pos) || sym->value == NULL)) {
+            return false;
+        }
+        if (sym != NULL && sym->kind == SYMBOL_CONST &&
+            !types_is_integer(sym->type)) {
+            sema_error_at(c, a->pos, "`%.*s` is a `%s`, and `%.*s` of `%.*s` "
+                          "takes an integer", (int)a->name.length,
+                          a->name.text, sema_tn(sym->type),
+                          (int)p->name.length, p->name.text,
+                          (int)name->length, name->text);
+            return false;
+        }
+        if (sym != NULL && sym->kind == SYMBOL_CONST) {
             if (sym->value->kind == CONST_SYMBOLIC) {
                 *value = sym->value->as.symbolic;
             } else {
