@@ -1076,6 +1076,7 @@ hold the probes that reached no side.
 | `defined_integer` | `mul_high` of a type whose width the target decides. | The checker refuses it where the generic declares it, as `types_generic_length_of_mul_high_of_a_c_long` shows. |
 | `xfor` | A slice or an array in the place of a parameter that a loop walks. | A slice and an array meet no `iter`, so no copy holds one there. |
 | `refuse_tried` | A name whose type is not nullable and whose narrowed type is. | Narrowing takes `none` away and never adds it. |
+| `own_marks`, `lower_expr_value` | A callee of a bound function type that names a function, and a field of that type read as a value. | The checker takes `(s.area)()` for a call of the method. A `let` and a literal build a bound function into their slot, and a parameter of a function type refuses one. The probes found no other place that reads one. |
 
 ## Not in this note
 
