@@ -66,10 +66,11 @@ expression. That covers the literals of C, the names of macros and
 enumerators and the casts to an arithmetic type. It covers the unary
 operators and the binary operators of arithmetic, shifts and bits. The type
 follows C, a suffix included, and a value wraps at the width of its type. A
+shift takes the type of its left operand, by T272. A cast may name a
+typedef of the C library or of the input whose type is a scalar, by T273. A
 float is written with the digits that give it back, 9 for a `c_float` and 17
-for a `c_double`. A macro that is one enumerator
-becomes a constant of the enum. Every other macro is skipped with a
-warning.
+for a `c_double`. A macro that is one enumerator becomes a
+constant of the enum. Every other macro is skipped with a warning.
 
 The macros `anti bind` skips, each with a warning, by R174 of "Rules of
 2026-10-13":
@@ -94,7 +95,8 @@ The macros `anti bind` skips, each with a warning, by R174 of "Rules of
 
 A compound literal of a bound struct, `(Color){ 200, 200, 200, 255 }`,
 becomes a constant of the struct when it gives one constant per field in
-field order. A leading call of a macro whose body is its one parameter, as
+field order. An integer element converts to the type of its field, as an
+initializer of C does, by T275. A leading call of a macro whose body is its one parameter, as
 raylib's `CLITERAL(Color)` is, is put in place first.
 
 rlparser gives each define a kind. `INT`, `FLOAT`, `FLOAT_MATH`, `STRING`
