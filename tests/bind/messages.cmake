@@ -179,6 +179,16 @@ foreach(case "packed|packed" "aligned|aligned(8)" "mode|mode(byte)")
         ARGS ${clang_bind}
         ERR "anti: api.h: `Small` is an enum with a layout attribute, which Anti has no form for")
 endforeach()
+# T274: a declaration that bind_settle leaves out is named with the header
+# that holds it, the second of two.
+anti_message(clang_left_out_in_a_second_header STATUS 0
+    FILES a.h "int one(void);\n"
+          b.h "struct Wide { long double x; };\nvoid two(struct Wide *w);\nvoid three(long double x);\n#define WIDE_ZERO (struct Wide){ 0 }\n"
+    OUT "bind: anti.a from a.h and b.h, 2 functions, 3 warnings"
+    ARGS bind --clang a.h b.h -o "${WORK}/out" --runtime "${RUNTIME}"
+    ERR "anti: b.h: warning: `Wide` is left out: Anti has no form for the type of its field `x`"
+        "anti: b.h: warning: `three` is left out: Anti has no form for the type of a parameter"
+        "anti: b.h: warning: `WIDE_ZERO` is left out: its struct is left out")
 anti_message(clang_target
     FILES api.h "int count(void);\n"
     ARGS ${clang_bind} --target plan9-x86_64

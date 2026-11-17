@@ -7,8 +7,8 @@
 #             raylib_shipped, api, refusals, api_malformed, clang_malformed,
 #             ast_malformed,
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree,
-#             clang_of_the_tree_relative, enum_declared_first, shift_types
-#             or cast_types
+#             clang_of_the_tree_relative, enum_declared_first, shift_types,
+#             cast_types or struct_literal_ranges
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -865,6 +865,24 @@ elseif(CASE STREQUAL "cast_types")
         string(FIND "${module}" "${line}" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "casts.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+elseif(CASE STREQUAL "struct_literal_ranges")
+    # T275: an element of a compound literal converts to the type of its
+    # field, as an initializer of C does, C11 6.7.9, and wraps at its
+    # width. The binding compiles.
+    file(WRITE "${WORK}/ranges.h" "struct S { unsigned char x; signed char y; };\n"
+         "#define BIG (struct S){ 300, 200 }\n#define NEG (struct S){ -1, -1 }\n"
+         "void take(struct S s);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/ranges.h"
+                --module bindtest.ranges -o "${WORK}/out" --runtime "${RUNTIME}")
+    compile_binding(ranges bindtest.ranges)
+    file(READ "${WORK}/out/ranges.anti" module)
+    foreach(line "pub const BIG: S = S { x: 44, y: -56 };"
+            "pub const NEG: S = S { x: 255, y: -1 };")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "ranges.anti holds no line `${line}`\n${module}")
         endif()
     endforeach()
 else()

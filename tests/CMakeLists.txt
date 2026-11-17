@@ -7810,7 +7810,8 @@ endforeach()
 # pinned clang, with no clang on PATH, and clang_of_the_tree_relative runs
 # it by a relative path from a directory below its own. enum_declared_first
 # binds an enum declared before its definition, shift_types the type of a
-# shift and cast_types the casts to a typedef.
+# shift, cast_types the casts to a typedef and struct_literal_ranges the
+# elements of a compound literal outside the range of their fields.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
@@ -7821,7 +7822,8 @@ set(anti_bind_cases header clang headers escaped_path raymath raylib
     nested_enum api_parts api_callbacks api_literals api_types
     api_words words unsigned_bitfield fixed_enum api_typedef_chain
     clang_of_the_tree clang_of_the_tree_relative api_aliases miniaudio
-    api_alias_chain_long api_docs enum_declared_first shift_types cast_types)
+    api_alias_chain_long api_docs enum_declared_first shift_types cast_types
+    struct_literal_ranges)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # The cases refusals, ast_malformed and clang_typedef_chain stand a
     # shell script in for clang.

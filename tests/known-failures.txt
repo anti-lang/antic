@@ -30,3 +30,5 @@ anti_bind_message_clang_enum_aligned T271 An aligned enum is bound with the base
 anti_bind_message_clang_enum_mode T271 An enum of another mode is bound with the base c_int.
 anti_bind_shift_types T272 A shift takes the common type of both operands in place of the promoted left one.
 anti_bind_cast_types T273 A cast to a typedef of an arithmetic type is no constant.
+anti_bind_message_clang_left_out_in_a_second_header T274 A declaration that bind_settle leaves out names the first header.
+anti_bind_struct_literal_ranges T275 An element of a compound literal keeps the type of its value and does not fit its field.
