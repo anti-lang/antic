@@ -994,6 +994,17 @@ static struct node *parse_cat(struct reader *r)
         if (atom == NULL) {
             continue;
         }
+        /* DESIGN: a quantifier after `\Q...\E` repeats the last quoted
+           character, as PCRE2 reads it, so the characters before it stand
+           in the sequence. `\Q` is the one atom that gives a sequence.
+           T291 of docs/audit/tests-findings.md. */
+        if (atom->kind == NODE_CAT && atom->count > 0) {
+            size_t i;
+            for (i = 0; i + 1 < atom->count; i++) {
+                add_child(r, cat, atom->children[i]);
+            }
+            atom = atom->children[atom->count - 1];
+        }
         for (;;) {
             struct node *repeat = parse_repeat(r, atom);
             if (repeat == atom) {
