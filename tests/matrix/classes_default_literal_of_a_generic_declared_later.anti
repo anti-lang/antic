@@ -1,0 +1,23 @@
+//! The default of a field is a literal of a copy of a generic class that the
+//! file declares after the class of the field. The literal names one field, and
+//! the copy takes the default of the other from its generic.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Holder
+{
+	pub box: Box<int> = Box<int> { x: 5 },
+}
+
+class Box<T>
+{
+	pub x: T,
+	pub y: int = 7,
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	printf("box %d %d\n".ptr, h.box.x as c_int, h.box.y as c_int);
+	return 0;
+}

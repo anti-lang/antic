@@ -1474,32 +1474,6 @@ static void declare_fields(struct checker *c, struct item *it)
                           (int)it->name.length, it->name.text);
         }
     }
-    /* A default is checked against the type of its field, so the
-       value that lowering writes is complete and typed. It is a
-       constant expression, and its value is kept for the library
-       file. It takes a length computed from `size_of`, as the type of
-       its field does, by R043 of "Rules of 2026-10-13". */
-    for (j = 0; j < it->param_count; j++) {
-        struct const_value *v;
-        struct context sized;
-        if (it->params[j].value == NULL ||
-            sema_refuse_runtime_parts(c, it->params[j].value)) {
-            continue;
-        }
-        sema_enter_sized(c, &sized);
-        if (sema_require(c, it->params[j].value,
-                         sema_check_expr(c, it->params[j].value,
-                                         fields[j].type),
-                         fields[j].type)) {
-            v = arena_alloc(c->arena, sizeof *v);
-            if (sema_eval_const(c, it->params[j].value, v) &&
-                !sema_bitfield_constant(c, it->params[j].value,
-                                        &fields[j])) {
-                fields[j].constant = v;
-            }
-        }
-        sema_leave(c, &sized);
-    }
     /* The hidden lock of a synchronized class follows the fields the
        class declares. */
     if (hidden != 0) {
@@ -1515,6 +1489,44 @@ static void declare_fields(struct checker *c, struct item *it)
         check_simd_struct(c, it);
     }
     sema_generic_ready(c, it->symbol->type);
+}
+
+/* The defaults of the fields of a struct, union or class, once every
+   type of the file has its fields. A default is checked against the
+   type of its field, so the value that lowering writes is complete and
+   typed. It is a constant expression, and its value is kept for the
+   library file. It takes a length computed from `size_of`, as the type
+   of its field does, by R043 of "Rules of 2026-10-13". The copies of a
+   generic that were filled with its fields take the values of its
+   defaults after them. */
+static void check_field_defaults(struct checker *c, struct item *it)
+{
+    struct type *t = it->symbol->type;
+    size_t base_fields = it->kind == ITEM_CLASS ? 1 : 0;
+    size_t j;
+
+    for (j = 0; j < it->param_count && base_fields + j < t->field_count;
+         j++) {
+        struct struct_field *f = &t->fields[base_fields + j];
+        struct const_value *v;
+        struct context sized;
+        if (it->params[j].value == NULL ||
+            sema_refuse_runtime_parts(c, it->params[j].value)) {
+            continue;
+        }
+        sema_enter_sized(c, &sized);
+        if (sema_require(c, it->params[j].value,
+                         sema_check_expr(c, it->params[j].value, f->type),
+                         f->type)) {
+            v = arena_alloc(c->arena, sizeof *v);
+            if (sema_eval_const(c, it->params[j].value, v) &&
+                !sema_bitfield_constant(c, it->params[j].value, f)) {
+                f->constant = v;
+            }
+        }
+        sema_leave(c, &sized);
+    }
+    sema_generic_defaults(c, t);
 }
 
 /* Refuse a struct, a union, a class or a variant t that contains
@@ -1536,61 +1548,15 @@ void sema_check_nesting(struct checker *c, struct type *t, struct pos pos)
     }
 }
 
-/* Whether the constant v holds the value of a class literal whose class
-   had fewer fields when v was made than it has now. */
-static bool holds_short_class(const struct const_value *v)
-{
-    size_t i;
-
-    if (v->kind != CONST_STRUCT && v->kind != CONST_ARRAY &&
-        v->kind != CONST_REPEAT) {
-        return false;
-    }
-    if (v->kind == CONST_STRUCT && v->type != NULL &&
-        v->type->kind == TYPE_CLASS &&
-        v->as.aggregate.count != v->type->field_count) {
-        return true;
-    }
-    for (i = 0; i < v->as.aggregate.count; i++) {
-        if (holds_short_class(&v->as.aggregate.items[i])) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/* DESIGN: the fields of the types are declared in the order of the file,
-   and a default is evaluated with the fields of its type. A class literal
-   in it holds one item per field of its class, and a class that the file
-   declares later had no fields yet, so its value was short. Such a
-   default is evaluated again once every type has its fields, and the
-   library file then carries a whole value, T149 of
-   docs/audit/tests-findings.md. */
-static void complete_defaults(struct checker *c, struct item *it)
-{
-    struct type *t = it->symbol->type;
-    size_t base_fields = it->kind == ITEM_CLASS ? 1 : 0;
-    size_t j;
-
-    for (j = 0; j < it->param_count && base_fields + j < t->field_count;
-         j++) {
-        struct struct_field *f = &t->fields[base_fields + j];
-        struct const_value *v;
-        struct context sized;
-        if (f->constant == NULL || !holds_short_class(f->constant)) {
-            continue;
-        }
-        v = arena_alloc(c->arena, sizeof *v);
-        sema_enter_sized(c, &sized);
-        if (sema_eval_const(c, it->params[j].value, v)) {
-            f->constant = v;
-        }
-        sema_leave(c, &sized);
-    }
-}
-
-/* The fields of every struct, union and class, then the refusal of a
-   type that contains itself or nests too deep. */
+/* DESIGN: the fields of every struct, union and class of the file are
+   declared first, in the order of the file, and every field default is
+   checked and evaluated after them. A default may then name a type the
+   file declares later, with the fields its literal names, T265 of
+   docs/audit/tests-findings.md. A class literal in a default holds one
+   item per field of its class, so the library file carries a whole
+   value, T149. The order of the types in a file never matters for a
+   default, by "Answers of 2026-11-17" in docs/decisions.md. The refusal
+   of a type that contains itself or nests too deep follows. */
 void sema_declare_all_fields(struct checker *c)
 {
     const struct module *module = c->module;
@@ -1614,7 +1580,7 @@ void sema_declare_all_fields(struct checker *c)
              it->kind == ITEM_CLASS)) {
             struct context outer;
             sema_enter_within(c, it, &outer);
-            complete_defaults(c, it);
+            check_field_defaults(c, it);
             sema_leave(c, &outer);
         }
     }

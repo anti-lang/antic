@@ -1513,6 +1513,42 @@ void sema_generic_ready(struct checker *c, struct type *generic)
     }
 }
 
+/* DESIGN: a copy of a generic is filled with the fields of the generic
+   once the generic has them, and the defaults of every type of the file
+   are checked after all fields, T265 of docs/audit/tests-findings.md. A
+   copy filled before the defaults of its generic were evaluated takes
+   their values here, with the arguments in place, as fill_copy gives
+   them to a copy filled later. */
+void sema_generic_defaults(struct checker *c, struct type *generic)
+{
+    struct type *copy;
+    size_t i;
+
+    if (generic == NULL || generic->type_param_count == 0 ||
+        generic->kind == TYPE_VARIANT) {
+        return;
+    }
+    for (copy = generic->copies; copy != NULL; copy = copy->next_copy) {
+        struct generic_map map;
+        if (copy->unfilled) {
+            continue;
+        }
+        map = sema_copy_map(copy);
+        for (i = 0; i < generic->field_count && i < copy->field_count; i++) {
+            struct const_value *v;
+            if (generic->fields[i].constant == NULL ||
+                copy->fields[i].constant != NULL) {
+                continue;
+            }
+            v = arena_alloc(c->arena, sizeof *v);
+            if (subst_value(c, generic->fields[i].constant, &map, v)) {
+                copy->fields[i].constant = v;
+                copy->fields[i].value = NULL;
+            }
+        }
+    }
+}
+
 /* The copy of generic with these arguments, one type for every use that
    names the same ones. A copy whose arguments are the parameters of the
    generic itself is the generic, as `List<T>` is in the body of

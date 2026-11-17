@@ -975,6 +975,9 @@ struct type *sema_copy_named(struct checker *c, struct type *generic,
                              struct type **args,
                              const struct symbolic **values);
 void sema_generic_ready(struct checker *c, struct type *generic);
+/* Give every filled copy of generic the values of the defaults of its
+   fields, once the defaults of generic are evaluated. */
+void sema_generic_defaults(struct checker *c, struct type *generic);
 struct type *sema_copy_of(struct checker *c, struct type *generic,
                           struct type_expr *const *written, size_t count,
                           struct pos pos);
