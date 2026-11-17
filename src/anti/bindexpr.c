@@ -731,6 +731,7 @@ bool bind_eval_const(struct bind_module *b, const char *name,
     c = arena_alloc(&b->arena, sizeof *c);
     c->name = bind_strdup(b, name);
     c->doc = doc;
+    c->source = b->source;
     {
         /* The names of an enum may point into the input of a reader, which
            goes before the module is written, so the constant keeps copies. */
@@ -852,6 +853,7 @@ bool bind_struct_const(struct bind_module *b, const char *name,
     c->value = bind_strdup(b, text_cstr(&literal));
     c->record = r;
     c->doc = doc;
+    c->source = b->source;
     bind_list_add(&b->consts, c);
     ok = true;
 done:

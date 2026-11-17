@@ -913,6 +913,7 @@ static struct bind_record *declare_record(struct reader *r,
         rec = arena_alloc(&r->b->arena, sizeof *rec);
         rec->name = t->name;
         rec->is_union = is_union;
+        rec->source = r->b->source;
         t->record = rec;
         bind_list_add(&r->tags, t);
         bind_list_add(&r->b->records, rec);
@@ -1203,6 +1204,7 @@ static void declare_function(struct reader *r, const struct json_value *node)
         hold_name(r, "function", name);
         type = parse(r, c);
         f->name = bind_strdup(r->b, name);
+        f->source = r->b->source;
         if (type == NULL || type->kind != BIND_FUNCTION) {
             bind_warn(r->b, "`%s` is left out: its type `%s` does not parse",
                       name, c);

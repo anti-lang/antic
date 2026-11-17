@@ -161,9 +161,20 @@ static bool record_fields_spell(const struct bind_record *r,
     return ok;
 }
 
+/* A warning of bind_settle names the file that declares what it leaves
+   out, the header of several that holds it, by T274 of
+   docs/audit/tests-findings.md. A declaration of no file keeps the source
+   of the binding. */
+static void settle_source(struct bind_module *b, const char *declared,
+                          const char *source)
+{
+    b->source = declared != NULL ? declared : source;
+}
+
 void bind_settle(struct bind_module *b)
 {
     struct text scratch = {0};
+    const char *source = b->source;
     bool changed = true;
     size_t i;
     size_t j;
@@ -191,6 +202,7 @@ void bind_settle(struct bind_module *b)
         if (!r->complete) {
             continue;
         }
+        settle_source(b, r->source, source);
         if (r->field_count == 0) {
             bind_warn(b, "`%s` has no field and is left out", r->name);
         } else if (!r->bound && !record_fields_spell(r, &why)) {
@@ -226,6 +238,7 @@ void bind_settle(struct bind_module *b)
         }
         f->bound = why == NULL;
         if (why != NULL) {
+            settle_source(b, f->source, source);
             bind_warn(b, "`%s` is left out: %s", f->name, why);
         }
     }
@@ -233,9 +246,11 @@ void bind_settle(struct bind_module *b)
         struct bind_const *c = b->consts.items[i];
         c->bound = c->record == NULL || c->record->bound;
         if (!c->bound) {
+            settle_source(b, c->source, source);
             bind_warn(b, "`%s` is left out: its struct is left out", c->name);
         }
     }
+    b->source = source;
     text_free(&scratch);
 }
 

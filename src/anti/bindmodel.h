@@ -64,6 +64,7 @@ struct bind_record {
     size_t field_count;
     const char *doc;
     bool bound;                 /* written into the module */
+    const char *source;         /* the file that declares it */
 };
 
 struct bind_value {
@@ -105,6 +106,7 @@ struct bind_function {
     /* The reader left it out and gave its warning, as for a `static`
        function without a body. */
     bool left_out;
+    const char *source;         /* the file that declares it */
 };
 
 struct bind_eval;
@@ -117,6 +119,7 @@ struct bind_const {
     const struct bind_eval *eval;       /* the value it was written from */
     const char *doc;
     bool bound;
+    const char *source;         /* the file that declares it */
 };
 
 /* A growable array of pointers, for the declarations of each kind. */
