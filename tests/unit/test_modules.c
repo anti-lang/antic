@@ -2075,6 +2075,14 @@ static void damaged_records(void)
     refuses_poke(&bytes, name_end(&bytes, "zw", false) + 4, value, 1);
     refuses_poke(&bytes, name_end(&bytes, "zw", true) + 5, value, 1);
 
+    /* The field of the aggregate of the IR with an extension past the
+       zero extension, and with an atomic mark that is neither 0 nor 1.
+       Both follow the width of its bitfield. */
+    value[0] = 3;
+    refuses_poke(&bytes, name_end(&bytes, "zw", true) + 6, value, 1);
+    value[0] = 2;
+    refuses_poke(&bytes, name_end(&bytes, "zw", true) + 7, value, 1);
+
     /* M4 of the first audit: an aggregate of the IR aligned to 3. Before its
        first field stand the count, the empty length text, the length and the
        alignment. */
@@ -2555,6 +2563,122 @@ static void damaged_relocations(void)
         refuses_poke(&bytes, marks, &unknown, 1);
     }
     text_free(&changed);
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
+/* A library whose signature records the tests below change. `zsmall`
+   gives a `bool`, so its record carries the range of the result, and
+   `labs` is a function of C. */
+static const char signature_source[] =
+    "extern fn labs(n: c_long) -> c_long;\n"
+    "pub fn zsmall(x: int) -> bool { return x > 3; }\n"
+    "pub fn zcall(n: int) -> int { return labs(n as c_long) as int; }\n";
+
+/* The byte of the flags of the signature record of the function name of
+   the module module, which is "" for a function of C. The record starts
+   with its flags and its effects, then the module and the name, each a
+   count of four bytes and the bytes. */
+static size_t signature_at(const struct text *bytes, const char *module,
+                           const char *name)
+{
+    const uint8_t *p = (const uint8_t *)bytes->data;
+    size_t m = strlen(module);
+    size_t n = strlen(name);
+    size_t i;
+
+    for (i = 2; i + 8 + m + n <= bytes->length; i++) {
+        if (p[i] == m && p[i + 1] == 0 && p[i + 2] == 0 && p[i + 3] == 0 &&
+            memcmp(p + i + 4, module, m) == 0 && p[i + 4 + m] == n &&
+            p[i + 5 + m] == 0 && p[i + 6 + m] == 0 && p[i + 7 + m] == 0 &&
+            memcmp(p + i + 8 + m, name, n) == 0) {
+            return i - 2;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no signature record of %s\n", name);
+    return SIZE_MAX;
+}
+
+/* The byte of the result of the signature record at at: after the flags,
+   the effects, the module, the name and the signature text. */
+static size_t signature_result(const struct text *bytes, size_t at)
+{
+    size_t m;
+    size_t n;
+
+    if (at == SIZE_MAX) {
+        return SIZE_MAX;
+    }
+    m = u32_at(bytes, at + 2);
+    n = u32_at(bytes, at + 6 + m);
+    return at + 10 + m + n + 4 + u32_at(bytes, at + 10 + m + n);
+}
+
+/* The signature records of a function of the IR name what a well-formed
+   file never does: a result of no IR type, a result range on a result of
+   no integer type or one its type does not hold or that holds one value,
+   an extension past the zero extension, facts of a parameter past its two
+   bits, the flag of a function that
+   allocates on a function of C that gives no pointer, a variadic function
+   of Anti and an exported function of C. Each file is read back first. */
+static void damaged_signatures(void)
+{
+    struct compilation s;
+    struct text bytes = {0};
+    uint8_t value[8];
+    size_t small;
+    size_t call;
+    size_t labs;
+    size_t result;
+
+    compilation_open(&s);
+    if (!build_library(&s, "zz", signature_source, &bytes)) {
+        compilation_close(&s);
+        return;
+    }
+    CHECK(reads_file(&bytes));
+    small = signature_at(&bytes, "zz", "zsmall");
+    call = signature_at(&bytes, "zz", "zcall");
+    labs = signature_at(&bytes, "", "labs");
+    if (small == SIZE_MAX || call == SIZE_MAX || labs == SIZE_MAX) {
+        text_free(&bytes);
+        compilation_close(&s);
+        return;
+    }
+    CHECK(((const uint8_t *)bytes.data)[small] & 128);
+    result = signature_result(&bytes, small);
+
+    /* The result, then its aggregate, its extension and its range. */
+    value[0] = 0xff;
+    refuses_poke(&bytes, result, value, 1);
+    value[0] = IR_VOID;
+    refuses_poke(&bytes, result, value, 1);
+    value[0] = IR_F32;
+    refuses_poke(&bytes, result, value, 1);
+    value[0] = 3;
+    refuses_poke(&bytes, result + 5, value, 1);
+    memset(value, 0, sizeof value);
+    value[1] = 1;
+    refuses_poke(&bytes, result + 6, value, 8);
+    refuses_poke(&bytes, result + 14, value, 8);
+    memcpy(value, (const uint8_t *)bytes.data + result + 6, 8);
+    refuses_poke(&bytes, result + 14, value, 8);
+
+    /* The facts of the `int` parameter of `zsmall`, after the range, the
+       file, the line, the count of the parameters and the type, the
+       extension and the aggregate of the parameter. Two bits name them. */
+    value[0] = 4;
+    refuses_poke(&bytes, result + 40, value, 1);
+
+    /* The flags: 64 on `labs`, 2 on `zcall` and 4 on `labs`. */
+    value[0] = (uint8_t)(((const uint8_t *)bytes.data)[labs] | 64);
+    refuses_poke(&bytes, labs, value, 1);
+    value[0] = (uint8_t)(((const uint8_t *)bytes.data)[call] | 2);
+    refuses_poke(&bytes, call, value, 1);
+    value[0] = (uint8_t)(((const uint8_t *)bytes.data)[labs] | 4);
+    refuses_poke(&bytes, labs, value, 1);
+
     text_free(&bytes);
     compilation_close(&s);
 }
@@ -5291,5 +5415,6 @@ void test_modules(void)
     damaged_simd();
     damaged_constants();
     damaged_relocations();
+    damaged_signatures();
     pattern_lines();
 }
