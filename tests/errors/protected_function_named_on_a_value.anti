@@ -1,0 +1,28 @@
+//! A protected function of a base, named on a value of a class below it and not
+//! called. A bound function takes a public function alone, and the message
+//! names the base in which the function is protected.
+
+class Base
+{
+	pub n: int = 0,
+
+	protected fn helper(self) -> int
+	{
+		return 1;
+	}
+}
+
+class Kid inherits Base
+{
+	pub fn inside(self) -> int
+	{
+		let f = self.helper;
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	let k = Kid { };
+	return k.inside();
+}

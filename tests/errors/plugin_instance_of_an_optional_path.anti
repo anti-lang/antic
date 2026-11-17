@@ -1,0 +1,12 @@
+//! `instance` of a library takes the name of an interface, and a path that
+//! reads a field through `?.` names none.
+
+import anti.log;
+import anti.plugin;
+
+fn main() -> int
+{
+	let lib = plugin.load("x") catch fatal;
+	let s = lib.instance(anti?.log.Logger);
+	return 0;
+}

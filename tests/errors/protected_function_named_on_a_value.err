@@ -1,0 +1,1 @@
+protected_function_named_on_a_value.anti:19:11: error: a bound function takes a public function, and `helper` is protected in `Base`

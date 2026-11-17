@@ -1,0 +1,10 @@
+//! A call of `anti.reflect` under `--no-reflect` whose argument had its
+//! message. The call has no type, so the option adds no second message.
+
+import anti.reflect;
+
+fn main() -> int
+{
+	let n = reflect.field_count(missing);
+	return 0;
+}
