@@ -2,9 +2,10 @@
 //! `exponential-pattern` takes apart and that no other test holds. A tab under
 //! `(?x)`, the flag `s`, a name of three letters and a verb of six with a name,
 //! a forward reference, a hex escape that a `)` ends, a POSIX name that holds
-//! `\\`, an empty branch, a counted repeat, a lookahead that may be empty, `\C`
-//! and a second branch reset before `\b`. A repeat that may take exponential
-//! time fails the check, and every other literal passes.
+//! `\\`, an empty branch, a counted repeat, a lookahead that may be empty,
+//! `\C`, a second branch reset before `\b`, and in a class a `]` first, a `[`
+//! alone, `\Q...\E` and a `-` last. A repeat that may take exponential time
+//! fails the check, and every other literal passes.
 
 import anti.regex;
 
@@ -26,5 +27,10 @@ fn main() -> int
 	let repeats = re"(?:(?:a?)*)+";
 	let single = re"(\C+)+";
 	let reset = re"(?|a)(?|b)\b(c+)+";
+	let bracket = re"([]a]+)+";
+	let open = re"([[a]+)+";
+	let quoted = re"([\Q\a\E]+)+";
+	let dash = re"([a-]+)+";
+	let run = re"(\Q\a\E)+";
 	return 0;
 }
