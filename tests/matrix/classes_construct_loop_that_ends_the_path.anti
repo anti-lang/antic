@@ -1,0 +1,60 @@
+//! A `construct` whose last statement is a loop that ends the path leaves the
+//! loop through a `return` alone: a `while true` without a `break` of its own,
+//! and a `do` whose body ends with `return`. The field set before that `return`
+//! is set on every path that succeeds.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+class Spin
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		let i = 0;
+		while true do {
+			i += 1;
+			if i > x {
+				self.a = i;
+				return;
+			}
+		}
+	}
+}
+
+class Once
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		do {
+			self.a = x * 2;
+			return;
+		} while x > 0
+	}
+}
+
+fn say(n: int)
+{
+	let s = f"{n}";
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let s = Spin(3) catch fatal;
+	say(s.a);
+	let o = Once(5) catch fatal;
+	say(o.a);
+	return 0;
+}

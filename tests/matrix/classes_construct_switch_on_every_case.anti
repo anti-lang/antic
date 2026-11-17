@@ -1,0 +1,67 @@
+//! A `construct` that sets a field in every arm of a `switch` without `else` on
+//! an enum and on a variant sets it on every path that succeeds, since such a
+//! `switch` runs an arm for every value.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+enum Two
+{
+	A,
+	B,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+class Box
+{
+	pub a: int,
+
+	fn construct(self, t: Two) may fail
+	{
+		if t == Two.B {
+			fail "b";
+		}
+		switch t {
+			Two.A => self.a = 1,
+			Two.B => self.a = 2,
+		}
+	}
+}
+
+class Cut
+{
+	pub a: int,
+
+	fn construct(self, s: Shape) may fail
+	{
+		if s is Shape.Empty {
+			fail "empty";
+		}
+		switch s {
+			Circle c => self.a = c.r,
+			Empty => self.a = 0,
+		}
+	}
+}
+
+fn say(n: int)
+{
+	let s = f"{n}";
+	io.println(s);
+	free(s.ptr);
+}
+
+fn main() -> int
+{
+	let b = Box(Two.A) catch fatal;
+	say(b.a);
+	let c = Cut(Shape.Circle { r: 6 }) catch fatal;
+	say(c.a);
+	return 0;
+}

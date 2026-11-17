@@ -1,0 +1,39 @@
+//! A `construct` that sets a field in a `try` block whose handler is `catch
+//! fatal` sets it on every path that succeeds, since a failure there ends the
+//! program.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+fn step(x: int) -> int may fail
+{
+	if x > 100 {
+		fail "too large";
+	}
+	return x + 1;
+}
+
+class Box
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		try {
+			self.a = step(x);
+		} catch fatal
+	}
+}
+
+fn main() -> int
+{
+	let b = Box(4) catch fatal;
+	let s = f"{b.a}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}
