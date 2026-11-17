@@ -805,9 +805,13 @@ static void read_fields(struct reader *r, struct bind_record *rec,
             f->bits = constant_of(item);
         }
         if (has_attribute(item, "AlignedAttr", &align)) {
-            if (count != 0 || align <= 0) {
+            if (count != 0) {
                 refuse(r, "`%s` aligns a field other than its first, which "
                        "Anti has no form for", rec->name);
+            } else if (align <= 0) {
+                /* One message per mistake, which names it, by T268. */
+                refuse(r, "`%s` aligns its first field without a value",
+                       rec->name);
             } else if (align > rec->align) {
                 /* An aligned first field raises the alignment of the
                    record and moves no field. */
