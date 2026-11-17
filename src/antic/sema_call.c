@@ -902,6 +902,20 @@ static bool private_of_library(struct checker *c, struct pos pos,
     return true;
 }
 
+/* A function m without `self` named on a value of s, called or not. It
+   is reached through its class, by T077 and T279 of
+   docs/audit/tests-findings.md. */
+static void refuse_static_on_value(struct checker *c, struct pos pos,
+                                   const struct type *s, const struct item *m)
+{
+    const struct type *owner = sema_declaring_class(m);
+    const char *in = sema_tn(owner != NULL ? owner : s);
+
+    sema_error_at(c, pos, "`%.*s` is a static function of `%s`, called as "
+                  "`%s.%.*s()`", (int)m->name.length, m->name.text, in, in,
+                  (int)m->name.length, m->name.text);
+}
+
 /* v.f(args) where the module declares no function f that takes the
    struct s of v first. A field of s that promotes f takes the call,
    and otherwise it is refused. Returns false after reporting an error. */
@@ -935,13 +949,7 @@ static bool no_method_call(struct checker *c, struct expr *call,
     /* A function without `self` is reached through its class, by T077
        of docs/audit/tests-findings.md. */
     if (hidden != NULL && hidden->kind == ITEM_FN && !hidden->has_self) {
-        const struct type *owner = sema_declaring_class(hidden);
-        const char *in = sema_tn(owner != NULL ? owner : s);
-        sema_error_at(c, field->pos, "`%.*s` is a static function of `%s`, "
-                      "called as `%s.%.*s()`", (int)field->as.field.name.length,
-                      field->as.field.name.text, in, in,
-                      (int)field->as.field.name.length,
-                      field->as.field.name.text);
+        refuse_static_on_value(c, field->pos, s, hidden);
         return false;
     }
     sema_error_at(c, field->pos, "`%s` has no function `%.*s`", sema_tn(s),
@@ -2798,6 +2806,12 @@ static struct type *check_member_name(struct checker *c, struct expr *e,
     if (through != NULL) {
         promote_base(c, e, through);
         return sema_check_field(c, e);
+    }
+    /* A function without `self` holds no object, so it is no bound
+       function, by T279 of docs/audit/tests-findings.md. */
+    if (m != NULL && m->kind == ITEM_FN && !m->has_self) {
+        refuse_static_on_value(c, e->pos, s, m);
+        return sema_builtin(c, TYPE_ERROR);
     }
     /* DESIGN: a public function named on a value and not
        called is a bound function. It holds the object and the
