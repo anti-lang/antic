@@ -1,0 +1,37 @@
+//! A library whose generic class inherits a class of the library.
+
+/// A base whose count a copy of `Box` replaces.
+pub class Base
+{
+	pub v: int = 1,
+
+	/// The count, called through the table of the class.
+	pub fn get(self) -> int
+	{
+		return self.v;
+	}
+
+	/// The count and n, called by its name.
+	pub final fn plus(self, n: int) -> int
+	{
+		return self.v + n;
+	}
+}
+
+/// A generic class that inherits `Base` and replaces its count.
+pub class Box<T> inherits Base
+{
+	pub item: T,
+
+	/// Ten times the size of an item, and the count of the base.
+	concrete fn get(self) -> int
+	{
+		return size_of(T) as int * 10 + self.v;
+	}
+}
+
+/// The count of b, through the table of `Base`.
+pub fn count(b: *Base) -> int
+{
+	return b.get();
+}

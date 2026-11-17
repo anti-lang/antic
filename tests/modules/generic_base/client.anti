@@ -1,0 +1,18 @@
+//! The client of the shapes library. A copy of the generic class `Box` of the
+//! library inherits `Base`, so its table replaces `get` and a pointer to it
+//! stands for a pointer to the base.
+
+import com.example.shapes;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = shapes.Box<i64> { item: 7 };
+	let base = shapes.Base { };
+	printf("box %d %d %d\n".ptr, b.get() as c_int, b.plus(2) as c_int,
+		shapes.count(&b) as c_int);
+	printf("base %d\n".ptr, shapes.count(&base) as c_int);
+	printf("item %d\n".ptr, b.item as c_int);
+	return 0;
+}

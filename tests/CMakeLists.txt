@@ -4157,6 +4157,15 @@ antic_modules_test(never_extern
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/never-extern-modules")
 
+# A generic class of a library that inherits a class of the library. The
+# reader of the library file takes the base into the digest of the
+# generic, and a copy of the client replaces a function of the base.
+antic_modules_test(generic_base
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_base"
+    LIBRARIES shapes
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic-base-modules")
+
 # A field `own ?fn` of a class of a library with the default `none`, which
 # a client that derives from the class and one that builds it take from
 # the library file and free at `delete`. T239 of
