@@ -1,0 +1,1 @@
+types_bound_function_compared_with_a_plain_one.anti:24:5: error: the operands of `==` have the types `bound fn() -> int` and `fn() -> int`

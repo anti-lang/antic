@@ -1,0 +1,1 @@
+generics_int_compared_with_a_type_parameter.anti:6:9: error: the operands of `==` have the types `int` and `T`

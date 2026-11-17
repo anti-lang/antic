@@ -1,0 +1,12 @@
+//! `==` between a pointer and an integer is refused, with the pointer on the
+//! left.
+
+fn main() -> int
+{
+	let n = 4;
+	let p: *int = &n;
+	if p == n {
+		return 1;
+	}
+	return 0;
+}

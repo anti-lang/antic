@@ -1,0 +1,1 @@
+types_function_values_of_two_parameter_counts_compared.anti:18:5: error: the operands of `==` have the types `fn(int) -> int` and `fn(int, int) -> int`

@@ -1,0 +1,1 @@
+types_scalar_times_a_simd_struct.anti:10:10: error: the operands of `*` have the types `f32` and `Vec4`

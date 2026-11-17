@@ -1,0 +1,22 @@
+//! `==` compares two function values of one signature. Two with other counts of
+//! parameters are refused.
+
+fn f(n: int) -> int
+{
+	return n;
+}
+
+fn g(n: int, m: int) -> int
+{
+	return n + m;
+}
+
+fn main() -> int
+{
+	let a: fn(int) -> int = f;
+	let b: fn(int, int) -> int = g;
+	if a == b {
+		return 1;
+	}
+	return 0;
+}

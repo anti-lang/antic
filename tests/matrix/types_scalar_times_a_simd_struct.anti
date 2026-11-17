@@ -1,0 +1,12 @@
+//! An operator of a simd struct takes two values of the struct. A scalar on the
+//! left of one is refused, as it is on the right.
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+fn main() -> int
+{
+	let s: f32 = 2.0;
+	let v = Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
+	let w = s * v;
+	return 0;
+}

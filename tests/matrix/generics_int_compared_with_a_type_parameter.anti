@@ -1,0 +1,15 @@
+//! `==` between an `int` on the left and a value of a type parameter on the
+//! right is refused, as a type parameter compares with itself alone.
+
+fn same<T: eq>(a: T, x: int) -> bool
+{
+	return x == a;
+}
+
+fn main() -> int
+{
+	if same(4, 4) {
+		return 1;
+	}
+	return 0;
+}

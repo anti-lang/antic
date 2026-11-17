@@ -1,0 +1,33 @@
+//! `==` compares a pointer to a derived class on the left with a pointer to its
+//! base on the right. Each line of the output names the pair and the result.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Base
+{
+	pub n: int = 1,
+}
+
+class Derived inherits Base
+{
+}
+
+fn show(label: str, hit: bool)
+{
+	printf("%.*s %d\n".ptr, label.len as c_int, label.ptr, hit as c_int);
+}
+
+fn main() -> int
+{
+	let d = alloc Derived { };
+	let b = alloc Base { };
+	let up: *Base = d;
+	show("same_object", d == up);
+	show("other_object", d == b);
+	show("same_object_not_equal", d != up);
+	delete(d);
+	delete(b);
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! An `own fn` field and a parameter of function type both hold two words, and
+//! the field owns its snapshot, so `==` between the two is refused.
+
+class Holder
+{
+	pub own f: ?fn(int) -> int,
+
+	pub fn holds(self, g: fn(int) -> int) -> bool
+	{
+		return self.f == g;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { f: none };
+	let same = h.holds(twice);
+	delete(h);
+	if same {
+		return 1;
+	}
+	return 0;
+}

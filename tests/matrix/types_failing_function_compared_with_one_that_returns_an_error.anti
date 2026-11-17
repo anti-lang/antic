@@ -1,0 +1,24 @@
+//! `==` compares two function values of one signature. A function that may fail
+//! takes its result through an out pointer and returns `?*Error`, and one that
+//! returns `?*Error` without `may fail` is ordinary. A value of each, of the
+//! same parameters and result in the ABI, are refused.
+
+import anti.lang;
+
+fn check(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let a: fn(int) -> int may fail = check;
+	let b: ?fn(int, *int) -> ?*lang.Error = none;
+	if a == b {
+		return 1;
+	}
+	return 0;
+}

@@ -1,0 +1,4 @@
+exit 0
+same_object 1
+other_object 0
+same_object_not_equal 0

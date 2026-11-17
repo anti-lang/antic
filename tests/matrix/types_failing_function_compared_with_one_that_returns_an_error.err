@@ -1,0 +1,1 @@
+types_failing_function_compared_with_one_that_returns_an_error.anti:20:5: error: the operands of `==` have the types `fn(int) -> int may fail` and `?fn(int, *int) -> ?*Error`
