@@ -1,0 +1,47 @@
+//! The element of a tuple that holds a bound function, read by its index into a
+//! `let`, through a pointer to the tuple and into the literal of another tuple.
+//! Each copy holds the object and the entry, so a call gives the area of the
+//! shape.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Shape
+{
+	pub size: int = 2,
+
+	pub fn area(self) -> int
+	{
+		return self.size * self.size;
+	}
+}
+
+fn in_a_let(s: *Shape) -> int
+{
+	let t = (s.area, 1);
+	let f = t.0;
+	return f() + t.1;
+}
+
+fn through_a_pointer(s: *Shape) -> int
+{
+	let t = (s.area, 2);
+	let p = &t;
+	let f = p.0;
+	return f() + p.1;
+}
+
+fn in_a_tuple(s: *Shape) -> int
+{
+	let t = (s.area, 3);
+	let u = (t.0, 4);
+	return u.0() + u.1;
+}
+
+fn main() -> int
+{
+	let s = Shape { size: 3 };
+	printf("let %lld\n".ptr, in_a_let(&s));
+	printf("pointer %lld\n".ptr, through_a_pointer(&s));
+	printf("tuple %lld\n".ptr, in_a_tuple(&s));
+	return 0;
+}
