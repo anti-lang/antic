@@ -1700,6 +1700,18 @@ static void meet(const struct required *r, bool *into, const bool *path,
     *any = true;
 }
 
+/* Whether a `switch` without `else` runs one of its arms for every
+   value, as `switch_ends` of sema_stmt.c reads it: one on an enum or a
+   variant, whose every value the checker makes an arm name. T288 of
+   docs/audit/tests-findings.md. */
+static bool runs_an_arm(const struct stmt *s)
+{
+    const struct type *over = s->as.switch_stmt.value->type;
+
+    return over != NULL &&
+           (over->kind == TYPE_ENUM || over->kind == TYPE_VARIANT);
+}
+
 static bool sets_stmt(struct checker *c, const struct required *r,
                       const struct stmt *s, bool *set)
 {
@@ -1754,9 +1766,13 @@ static bool sets_stmt(struct checker *c, const struct required *r,
             }
         }
         memcpy(copy, set, r->count);
-        if (s->as.switch_stmt.otherwise == NULL ||
-            (sets_stmt(c, r, s->as.switch_stmt.otherwise, copy) &&
-             sema_arm_fallthrough(s->as.switch_stmt.otherwise) == NULL)) {
+        if (s->as.switch_stmt.otherwise == NULL) {
+            if (!runs_an_arm(s)) {
+                meet(r, out, copy, &any);
+            }
+        } else if (sets_stmt(c, r, s->as.switch_stmt.otherwise, copy) &&
+                   sema_arm_fallthrough(s->as.switch_stmt.otherwise) ==
+                       NULL) {
             meet(r, out, copy, &any);
         }
         break;
