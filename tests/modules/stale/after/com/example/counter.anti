@@ -148,3 +148,25 @@ pub fn half(n: int) -> f64
 {
 	return 2.5;
 }
+
+/// Another name of `Counter`, which the search for a function of a class passes
+/// over.
+pub type Twin = Counter;
+
+/// A class whose `first` gives an `f64`, where the first file gives an `int`.
+pub class Doubler
+{
+	pub v: int = 0,
+
+	/// A count.
+	pub fn first() -> f64
+	{
+		return 6.5;
+	}
+}
+
+/// Three times n as an `f64`, where the first file gives an `int`.
+pub fn thrice<T>(n: int) -> f64
+{
+	return 3.5;
+}

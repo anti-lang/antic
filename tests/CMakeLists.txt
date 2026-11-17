@@ -4485,7 +4485,7 @@ set_tests_properties(antl_stale_counter_before PROPERTIES
 set(stale_users "")
 foreach(user item final static table bound moved reach gone pusher filler
         keeper grower copy copy_read tin pick tally jar changer turner half
-        halver)
+        halver doubler thrice)
     add_test(NAME antl_stale_${user}_user
         COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
                 --runtime "${ANTIC_RUNTIME_DIR}"
@@ -4662,6 +4662,27 @@ set_tests_properties(
     error_modules_later_file_with_another_signature_of_a_function_of_the_table
     error_modules_later_file_with_another_signature_of_a_function_of_a_base
     PROPERTIES FIXTURES_REQUIRED stale_antl)
+# A generic of the user calls a function of a class without `self`, which
+# the read finds among the functions of the classes of `counter` past the
+# alias `Twin`, or a generic function of `counter`. The later file gives
+# each an `f64` in place of an `int`.
+foreach(case
+        "modules_later_file_with_another_signature_of_a_function_of_a_class|doubler_user|counter\\.Doubler\\.first|fn\\(\\)"
+        "modules_later_file_with_another_signature_of_a_generic_function|thrice_user|counter\\.thrice|fn\\(int\\)")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 name)
+    list(GET parts 1 user)
+    list(GET parts 2 function)
+    list(GET parts 3 params)
+    add_expect_test(error_${name} STATUS 1
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+        PATTERN "${user}\\.antl needs function `com\\.example\\.${function}` as `${params} -> int`, and the library holds it as `${params} -> float`"
+        COMMAND "$<TARGET_FILE:antic>" -S -I "${LIBS}/stale"
+                --runtime "${ANTIC_RUNTIME_DIR}"
+                -o "${CMAKE_CURRENT_BINARY_DIR}/${name}.s" ${name}.anti)
+    set_tests_properties(error_${name} PROPERTIES
+        FIXTURES_REQUIRED stale_antl)
+endforeach()
 # A class that no signature of the user names stands in no type table, so
 # the read of the table finds that the later file lacks it.
 add_expect_test(error_modules_later_file_without_a_class_of_the_table STATUS 1

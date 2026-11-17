@@ -1,0 +1,10 @@
+//! A generic of a library file calls a generic function of `counter`. The later
+//! file of `counter` gives the function another result. By "Answers of
+//! 2026-11-12" the read refuses the library file.
+
+import com.example.thrice_user;
+
+fn main() -> int
+{
+	return thrice_user.used<int>(2);
+}

@@ -169,3 +169,21 @@ pub fn half(n: int) -> int
 {
 	return n / 2;
 }
+
+/// A class whose later file gives `first` another result.
+pub class Doubler
+{
+	pub v: int = 0,
+
+	/// A count without an object.
+	pub fn first() -> int
+	{
+		return 6;
+	}
+}
+
+/// Three times n, whose later file gives another result.
+pub fn thrice<T>(n: int) -> int
+{
+	return n * 3;
+}

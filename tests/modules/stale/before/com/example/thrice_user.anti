@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` whose generic calls a generic
+//! function of `counter`, whose later file gives the function another result.
+
+import com.example.counter;
+
+/// What the call of a copy gives.
+pub fn used<T>(n: int) -> int
+{
+	return counter.thrice<T>(n);
+}
