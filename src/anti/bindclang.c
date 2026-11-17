@@ -988,6 +988,17 @@ static void declare_enum(struct reader *r, const struct json_value *node)
             refuse_type_name(r, tag);
         }
     }
+    /* An attribute that sets the layout of an enum is a layout directive
+       of no record, which docs/tooling-addendum.md refuses, by T271. A
+       packed enum takes the fewest bytes its values fit, where the base
+       of an enum of Anti takes those of its type. */
+    if (has_attribute(node, "PackedAttr", NULL) ||
+        has_attribute(node, "AlignedAttr", NULL) ||
+        has_attribute(node, "ModeAttr", NULL)) {
+        refuse(r, "`%s` is an enum with a layout attribute, which Anti has "
+               "no form for", tag != NULL ? tag : "an enum without a name");
+        return;
+    }
     entry->id = id != NULL ? bind_strdup(r->b, id) : "";
     entry->tag = tag != NULL ? bind_strdup(r->b, tag) : NULL;
     entry->e = e;

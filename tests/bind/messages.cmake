@@ -324,9 +324,10 @@ anti_message(clang_wide_anonymous_enum_in_a_macro STATUS 0
     FILES api.h "enum { BIG = 0x100000000 };\n#define M BIG\n"
     OUT "bind: anti.api from api.h, 0 functions, 0 warnings"
     ARGS ${clang_bind})
-# A packed enum holds an attribute among its enumerators.
-anti_message(clang_packed_enum STATUS 0
-    FILES api.h "enum __attribute__((packed)) E { A };\nvoid take(enum E e);\n"
+# An enum marked unused holds an attribute among its enumerators. A packed one
+# is refused, by T271.
+anti_message(clang_enum_with_an_attribute STATUS 0
+    FILES api.h "enum __attribute__((unused)) E { A };\nvoid take(enum E e);\n"
     OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
     ARGS ${clang_bind})
 # A chain of typedefs deeper than the parser of a type goes has no form.
