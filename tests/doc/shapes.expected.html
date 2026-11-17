@@ -66,6 +66,12 @@ let a = shapes.area(c);
 </li>
 </ul>
 <ul class="members">
+<li><code>pub const MOST: int = 64</code>
+<p>The most shapes a canvas holds.</p>
+</li>
+<li><code>pub static atomic made: int</code>
+<p>How many canvases were made.</p>
+</li>
 <li><code>pub fn new(name: str) -&gt; *Canvas</code>
 <p>A canvas with a name.</p>
 </li>
@@ -74,12 +80,6 @@ let a = shapes.area(c);
 </li>
 <li><code>pub fn size(self) -&gt; int</code>
 <p>How many shapes stand on the canvas.</p>
-</li>
-<li><code>pub const MOST: int = 64</code>
-<p>The most shapes a canvas holds.</p>
-</li>
-<li><code>pub static atomic made: int</code>
-<p>How many canvases were made.</p>
 </li>
 </ul>
 </section>

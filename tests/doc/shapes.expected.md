@@ -77,16 +77,16 @@ A drawing that counts the shapes put on it.
 - `name: str`
   The name of the drawing.
 
+- `pub const MOST: int = 64`
+  The most shapes a canvas holds.
+- `pub static atomic made: int`
+  How many canvases were made.
 - `pub fn new(name: str) -> *Canvas`
   A canvas with a name.
 - `pub fn add(self, shape: Circle)`
   Put `shape` on the canvas.
 - `pub fn size(self) -> int`
   How many shapes stand on the canvas.
-- `pub const MOST: int = 64`
-  The most shapes a canvas holds.
-- `pub static atomic made: int`
-  How many canvases were made.
 
 ## area
 
