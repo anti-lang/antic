@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q and 3r stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r and 3s stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1078,6 +1078,26 @@ hold the probes that reached no side.
 | `refuse_tried` | A name whose type is not nullable and whose narrowed type is. | Narrowing takes `none` away and never adds it. |
 | `own_marks`, `lower_expr_value`, `build_value_into` | A callee of a bound function type that names a function, a field of that type read as a value, and one whose symbol is no function. | The checker takes `(s.area)()` for a call of the method, and gives a field of a bound function type the symbol of its function alone. A `let` and a literal build a bound function into their slot, and a parameter of a function type refuses one. The probes found no other place that reads one. |
 
+## The externs, the declarations and the trees of `src/antic/antl_tree.c`
+
+Batch 3s of the third phase sorted the sides of the conditions of the
+file, which no batch had chosen by its branches. Batch 3b sorted its
+lines in the section of `antl_tree.c` above. The sides of `io_size`,
+`io_char`, `field_owner`, `io_field`, `io_ref`, `io_sym`, `local_symbol`
+and `collect` that the suite misses are the guards of the rows of that
+section.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `io_ctype` | A type that is none, in the collecting pass. | Every record that the pass walks carries the type that the checker gave it, and the writer of the same tree takes none either. |
+| `add_extern`, `put_extern` | A symbol of another item without a type, and an owner of a function without a symbol or a type. | A tree names functions, constants and types outside it, and the checker gives each its type. The declaration gives every struct and class its symbol and its type. |
+| `generic_named` | A library that is none. | `library_symbol` passes the library that `read_extern` found, and the read stops before it for a module that it does not find. |
+| `class_has` | A struct without a type, and a function of a class without a symbol. | The reader gives every item its type from the table, and every function of a type its symbol. |
+| `same_function` | A function that the caller did not find, the record itself in place of the function of the library, and a function without a type. | Each caller passes a symbol it found in the library or in its type, which is no record of the file, and the reader gives both their types from the table. |
+| `library_symbol` | A function of another library that the record finds as a member of its owner, with another signature, and a member of the module itself that its owner lacks. | `antic -c` reads every other module from its library file, whose functions name no owner, so the record of a function of another module is written without the lookup of a member. A function of the root has an owner and no module, so its record names the module of the generic. The type table carries every function of a class of the module, the private ones as well. |
+| `antl_visit_generics` | A generic function without a body, and a function of a generic type without a symbol. | The parser gives every function at module level its body, and an `extern fn` takes no type parameters. The declaration gives every function of a body its symbol. |
+| `digest_type_entry`, `antl_read_generics` | A generic class without a base, a function of a generic type without a symbol or a type, and a declaration without a symbol or a type. | Every class has a base, `Object` at the least. The reader gives every function of a type its symbol and its type, and `read_declaration` gives a declaration both or returns none. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1167,6 +1187,14 @@ hold the probes that reached no side.
   function in `antl_read_ir.c`, whose result carries no range and whose
   code writes no table. `antl_tree.c`, which batch 3r named and did not
   test, keeps its sides.
+- The sides of a condition in `antl_tree.c` that batch 3s did not sort.
+  `io_ctype`, `io_symbolic`, `io_value`, `io_ref` and `io_sym` hold a
+  `switch` over the three modes of a walk, whose missing `default` the
+  measurement counts as a side. The others take a value of a damaged
+  library file that no case of `unit_modules` writes: an arm of a
+  `switch` whose read stops before the arms after it, the lanes of a
+  shuffle without its simd struct and a read that stops inside them, and
+  the record of a function of the root that names another module.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
