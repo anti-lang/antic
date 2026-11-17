@@ -5674,6 +5674,10 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "expression_conversions|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_conversions.anti"
         "expression_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_forms.anti"
         "call_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},call_forms.anti"
+        "generic_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},generic_forms.anti"
+        "expression_conversions|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_conversions.anti"
+        "expression_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_forms.anti"
+        "call_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},call_forms.anti"
         "expression_conversions|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_conversions.anti"
         "expression_forms|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_forms.anti"
         "escape_paths|--front-end,--runtime,${ANTIC_RUNTIME_DIR},escape_paths.anti"
@@ -7768,12 +7772,19 @@ endforeach()
 # item, and code spans that are no names. Its developer's page in Markdown holds the note of the
 # module and the note of an item. wrapped holds a link that anti fmt
 # breaks after a word of its text. operators holds two `operator fn eq`
-# that share their name, each headed by its name and its type.
+# that share their name, each headed by its name and its type. marks has
+# no doc text of its module, so the index names it alone, and its item
+# names an item of an import by the full path of the module, holds a line
+# that starts with a tab and a link with a DEL byte, and ends in an empty
+# line, which the Markdown page keeps.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
              "operators_html||operators|com.example.operators.html|operators.expected.html"
-             "operators_private|--markdown\\|--private|operators|com.example.operators.md|operators.private.expected.md")
+             "operators_private|--markdown\\|--private|operators|com.example.operators.md|operators.private.expected.md"
+             "marks_html||marks|com.example.marks.html|marks.expected.html"
+             "marks_markdown|--markdown|marks|com.example.marks.md|marks.expected.md"
+             "marks_index||marks|index.html|marks.index.expected.html")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)

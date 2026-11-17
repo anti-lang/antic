@@ -1,0 +1,14 @@
+# com.example.marks
+
+## mark
+
+```anti
+pub fn mark() -> int
+```
+
+Names `anti.text.Builder` by the full path of its module.
+
+ 	A line that starts with a tab after the indent of the comment.
+
+A link [with a DEL byte](ab) stays text.
+

@@ -74,6 +74,13 @@ anti_message(library_beside_a_source STATUS 0
     OUT "doc: 2 modules into ${WORK}/pages"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}"
          "${RUNTIME}/std/anti/simd.antl" one.anti)
+# The first mistake of the front end ends the command, so the source after
+# it gets no interface file.
+anti_message(source_after_a_mistake
+    FILES one.anti "fn one() -> int\n{\n\treturn missing;\n}\n"
+          two.anti "//! Two.\n\n/// Two.\npub fn two() -> int\n{\n\treturn 2;\n}\n"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti two.anti
+    ERR "one.anti:3:9: error: unknown name `missing`")
 anti_message(source_imports_no_module
     FILES one.anti "//! A module.\n\nimport com.example.gone;\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" one.anti
