@@ -5495,6 +5495,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "layout_constant_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/layout_constant_divide.s,layout_constant_divide.anti"
         "generic_length_divide|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_divide.s,generic_length_divide.anti"
         "generic_length_shift|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_shift.s,generic_length_shift.anti"
+        "generic_length_shift_past_its_width|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_shift_past_its_width.s,generic_length_shift_past_its_width.anti"
         "generic_length_least|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_least.s,generic_length_least.anti"
         "generic_length_overflow|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_overflow.s,generic_length_overflow.anti"
         "generic_length_minus_least|-S,--target,linux-x86_64,-o,${LISTINGS}/generic_length_minus_least.s,generic_length_minus_least.anti"
