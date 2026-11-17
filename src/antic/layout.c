@@ -373,7 +373,11 @@ static void compute(struct layouts *l, uint32_t agg)
         }
     }
     l->agg_state[agg] = DONE;
-    if (out->size <= LAYOUT_MEMBER_LIMIT) {
+    /* DESIGN: a failed layout records no members. The module is refused
+       with the first message, and an aggregate that holds itself would
+       flatten through its own field without end, T267 of
+       docs/audit/tests-findings.md. */
+    if (!l->failed && out->size <= LAYOUT_MEMBER_LIMIT) {
         members.count = 0;
         flatten(l, ir_aggregate(agg), 0, &members);
         out->members = alloc_zeroed(members.count, sizeof *out->members);

@@ -659,7 +659,7 @@ The layouts of the back end, sorted by batch 3j of the third phase.
 
 | Function | What it guards against | Why no input reaches it |
 |---|---|---|
-| `compute` | A struct whose layout depends on itself. | The checker refuses a struct that holds itself, and the reader of a library file refuses an aggregate that names itself, in `map_agg_at`. |
+| `compute` | A struct whose layout depends on itself. | The checker refuses a struct that holds itself, and the reader of a library file refuses an aggregate that names itself, in `map_agg_at`. `holds_itself` of `tests/unit/test_layout.c` builds one by hand, and the layout ends with the message of the guard since T267. |
 
 ## `src/antic/lower_simd.c`
 
