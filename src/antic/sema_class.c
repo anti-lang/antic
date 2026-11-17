@@ -1777,11 +1777,15 @@ static bool sets_stmt(struct checker *c, const struct required *r,
             meet(r, out, copy, &any);
         }
         break;
+    /* A loop that ends the path, a `while true` without a `break` of its
+       own or a `do` whose body ends it, goes on to no statement after
+       it, by R003 of "Rules of 2026-10-13". T287 of
+       docs/audit/tests-findings.md. */
     case STMT_WHILE:
     case STMT_DO_WHILE:
         memcpy(copy, set, r->count);
         sets_block(c, r, s->as.loop.body, copy);
-        return true;
+        return !sema_ends_path(s);
     case STMT_FOR:
         memcpy(copy, set, r->count);
         sets_block(c, r, s->as.for_loop.body, copy);
