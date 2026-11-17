@@ -661,6 +661,11 @@ void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
                           const struct ir_operand *values, size_t count,
                           size_t first);
 
+/* The class pointer v of e moved to the interface sub-object that
+   e->to_iface names. Where may_be_none holds, `none` stays `none`. */
+struct ir_operand lower_to_interface(struct lowerer *l, const struct expr *e,
+                                    struct ir_operand v, bool may_be_none);
+
 /* lower_error.c */
 void lower_bind_error(struct lowerer *l, struct symbol *sym, uint32_t error);
 

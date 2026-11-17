@@ -1087,6 +1087,25 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
     }
 }
 
+/* DESIGN: `alloc T(args)` writes its pointer into the slot of the `let`,
+   and its handler yields a value of the same type. Where the `let` names
+   an interface of that class, the slot then moves to the sub-object once
+   every path has left its value there. `none` stays `none`, by T285 of
+   docs/audit/tests-findings.md. */
+static void convert_in_place(struct lowerer *l, const struct expr *value,
+                             struct ir_operand slot)
+{
+    struct ir_operand held;
+    struct ir_operand moved;
+
+    if (value->to_iface == NULL || l->b == NULL) {
+        return;
+    }
+    held = lower_temp(l, ir_load(l->f, l->b, IR_PTR, slot));
+    moved = lower_to_interface(l, value, held, true);
+    ir_store(l->f, l->b, IR_PTR, moved, slot);
+}
+
 static void lower_let_value(struct lowerer *l, const struct stmt *s)
 {
     struct symbol *sym = s->as.let.symbol;
@@ -1100,10 +1119,13 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         s->as.let.value->as.alloc.value->kind == EXPR_CALL &&
         s->as.let.value->as.alloc.value->as.call.builds != NULL) {
         const struct expr *call = s->as.let.value->as.alloc.value;
+        /* The object is of the class the call builds, which the `let`
+           may name by a base or an interface, by T285 of
+           docs/audit/tests-findings.md. */
+        const struct type *built = s->as.let.value->type->element;
         struct ir_operand place = lower_temp(l, sym->ir);
-        struct ir_operand size = lower_size_operand(l, sym->type->element);
-        struct ir_operand object =
-            lower_new_memory(l, sym->type->element, size);
+        struct ir_operand size = lower_size_operand(l, built);
+        struct ir_operand object = lower_new_memory(l, built, size);
         struct ir_operand before;
         struct ir_operand err;
         ir_store(l->f, l->b, IR_PTR, object, place);
@@ -1113,6 +1135,7 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         if (err.kind != IR_NONE) {
             lower_handle_error(l, call, err, place, true, object);
         }
+        convert_in_place(l, s->as.let.value, place);
         return;
     }
     /* `let n = f(args) catch e { }`: the call writes n through the out

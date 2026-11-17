@@ -1,15 +1,37 @@
 //! `alloc T(args)` of a class below the class that the `let` names takes the
 //! memory of the class it builds. The `let` names a `*T` and a `?*T` of the
-//! base, and the call holds a handler or none. A build with the memory checks
-//! stops a write past the memory of the base.
+//! base, and the call holds a handler or none. A `let` of an interface the
+//! class implements holds the sub-object. A build with the memory checks stops
+//! a write past the memory of the base.
 
 import anti.lang;
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
+abstract class Counter
+{
+	abstract fn add(self, n: int) -> int;
+}
+
 class Base
 {
 	pub n: int = 0,
+}
+
+class Counts inherits Base
+{
+	implements counter: Counter,
+	pub a: int = 0,
+
+	fn construct(self, k: int)
+	{
+		self.a = k;
+	}
+
+	concrete fn Counter::add(self, n: int) -> int
+	{
+		return self.a + n;
+	}
 }
 
 class Kid inherits Base
@@ -64,5 +86,8 @@ fn main() -> int
 	}
 	let handled: *Base = alloc Made(3) catch fatal;
 	show("handled", handled);
+	let counter: *Counter = alloc Counts(7);
+	printf("interface %d\n".ptr, counter.add(1) as c_int);
+	delete(counter);
 	return 0;
 }

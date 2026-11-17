@@ -1979,15 +1979,41 @@ struct ir_operand lower_expr(struct lowerer *l, const struct expr *e)
    interfaces by adding the offset of the sub-object. The checker marked
    the expression, and every place a value flows into an interface slot
    passes through here. */
-static struct ir_operand lower_converted(struct lowerer *l,
-                                         const struct expr *e)
+struct ir_operand lower_to_interface(struct lowerer *l, const struct expr *e,
+                                    struct ir_operand v, bool may_be_none)
 {
-    struct ir_operand v = lower_expr_value(l, e);
-    struct ir_operand offset;
+    struct ir_operand offset =
+        lower_field_offset(l, e->to_iface->home, &e->to_iface->name);
     struct ir_operand held;
     struct ir_block *moved;
     struct ir_block *join;
     uint32_t result;
+
+    if (!may_be_none) {
+        return lower_temp(l, ir_ptradd(l->f, l->b, v, offset));
+    }
+    /* DESIGN: `none` of a `?*T` is no object and has no sub-object, so it
+       converts to `none` of the interface, and a pointer to an object
+       moves by the offset as before, by T277 of
+       docs/audit/tests-findings.md. */
+    result = ir_unary(l->f, l->b, IR_COPY, IR_PTR, v);
+    held = lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, v,
+                                   ir_int_op(IR_PTR, 0)));
+    moved = lower_new_block(l);
+    join = lower_new_block(l);
+    ir_branch(l->f, l->b, held, moved, join);
+    l->b = moved;
+    ir_assign(l->f, l->b, result,
+              lower_temp(l, ir_ptradd(l->f, l->b, v, offset)));
+    ir_jump(l->f, l->b, join);
+    l->b = join;
+    return lower_temp(l, result);
+}
+
+static struct ir_operand lower_converted(struct lowerer *l,
+                                         const struct expr *e)
+{
+    struct ir_operand v = lower_expr_value(l, e);
 
     /* A plain function where the form of two words is expected takes
        the context `none`. */
@@ -2008,26 +2034,7 @@ static struct ir_operand lower_converted(struct lowerer *l,
     if (e->to_iface == NULL) {
         return v;
     }
-    offset = lower_field_offset(l, e->to_iface->home, &e->to_iface->name);
-    if (!types_is_nullable(e->type)) {
-        return lower_temp(l, ir_ptradd(l->f, l->b, v, offset));
-    }
-    /* DESIGN: `none` of a `?*T` is no object and has no sub-object, so it
-       converts to `none` of the interface, and a pointer to an object
-       moves by the offset as before, by T277 of
-       docs/audit/tests-findings.md. */
-    result = ir_unary(l->f, l->b, IR_COPY, IR_PTR, v);
-    held = lower_temp(l, ir_binary(l->f, l->b, IR_NE, IR_I8, v,
-                                   ir_int_op(IR_PTR, 0)));
-    moved = lower_new_block(l);
-    join = lower_new_block(l);
-    ir_branch(l->f, l->b, held, moved, join);
-    l->b = moved;
-    ir_assign(l->f, l->b, result,
-              lower_temp(l, ir_ptradd(l->f, l->b, v, offset)));
-    ir_jump(l->f, l->b, join);
-    l->b = join;
-    return lower_temp(l, result);
+    return lower_to_interface(l, e, v, types_is_nullable(e->type));
 }
 
 static struct ir_operand lower_expr_value(struct lowerer *l,
