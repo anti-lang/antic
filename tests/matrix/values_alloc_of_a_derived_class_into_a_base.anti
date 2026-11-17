@@ -1,0 +1,68 @@
+//! `alloc T(args)` of a class below the class that the `let` names takes the
+//! memory of the class it builds. The `let` names a `*T` and a `?*T` of the
+//! base, and the call holds a handler or none. A build with the memory checks
+//! stops a write past the memory of the base.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Kid inherits Base
+{
+	pub a: int = 0,
+	pub b: int = 0,
+	pub c: int = 0,
+
+	fn construct(self, k: int)
+	{
+		self.a = k;
+		self.b = k + 1;
+		self.c = k + 2;
+	}
+}
+
+class Made inherits Base
+{
+	pub a: int = 0,
+	pub b: int = 0,
+
+	fn construct(self, k: int) may fail
+	{
+		if k < 0 {
+			fail "below";
+		}
+		self.a = k;
+		self.b = k * 2;
+	}
+}
+
+fn show(place: str, own b: *Base)
+{
+	if let kid = b as? *Kid {
+		printf("%.*s %d %d %d\n".ptr, place.len as c_int, place.ptr,
+			kid.a as c_int, kid.b as c_int, kid.c as c_int);
+	}
+	if let made = b as? *Made {
+		printf("%.*s %d %d\n".ptr, place.len as c_int, place.ptr,
+			made.a as c_int, made.b as c_int);
+	}
+	delete(b);
+}
+
+fn main() -> int
+{
+	let plain: *Base = alloc Kid(2);
+	show("plain", plain);
+	let maybe: ?*Base = alloc Kid(5);
+	if let held = maybe {
+		show("maybe", held);
+	}
+	let handled: *Base = alloc Made(3) catch fatal;
+	show("handled", handled);
+	return 0;
+}

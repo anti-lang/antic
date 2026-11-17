@@ -35,3 +35,5 @@ error_generic_constant_of_another_type T282 A constant argument of another type,
 error_generic_argument_none T283 `none` as an argument of a generic function says it needs a type from its context.
 anti_doc_message_source_of_another_suffix T284 `anti doc` reads a file of another suffix as a source.
 anti_check_message_source_of_another_suffix T284 `anti check` reads a file of another suffix as a source.
+matrix_values_alloc_of_a_derived_class_into_a_base_release T285 `alloc` of a class below the class a `let` names takes the memory of the class the `let` names.
+matrix_values_alloc_of_a_derived_class_into_a_base_memory_checks T285 `alloc` of a class below the class a `let` names takes the memory of the class the `let` names.
