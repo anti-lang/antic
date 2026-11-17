@@ -1,0 +1,118 @@
+//! Values that stand where their type does not convert, one mistake per line.
+//! Each gets its one message: a class pointer where an `int`, a `*int` or a
+//! `?fn()` is expected, a `?int` where a `?str` or a `str` is, a `?*H` where an
+//! `int` or a `*int` is, a `?fn()` where an `fn(int)` is, a match where an
+//! `int` is, a field of a call through `?.`, a lent pointer where an `int` is,
+//! a function a local holds where an `own fn` is, conversions that `as` and
+//! `is` do not take, `!` of a name that is not there, `&` of an element of a
+//! call, and a lent pointer read through `*` and stored. `destroy(*pp)` of the
+//! object a pointer reaches is taken.
+
+import anti.lang;
+import anti.regex;
+
+class Shape
+{
+	pub n: int = 0,
+}
+
+class Circle inherits Shape
+{
+	pub r: int = 0,
+	pub next: ?*Circle = none,
+
+	pub fn get(self) -> ?*Circle
+	{
+		return self.next;
+	}
+}
+
+class Holder
+{
+	pub own handler: fn(int) = ignore,
+	pub plain: fn(int) = ignore,
+	pub held: ?*Circle = none,
+}
+
+struct H
+{
+	h: ?*H,
+	n: int,
+}
+
+fn ignore(n: int)
+{
+}
+
+fn find() -> ?*H
+{
+	return none;
+}
+
+fn maybe_fn() -> ?fn()
+{
+	return none;
+}
+
+fn pair() -> [2]int
+{
+	return [1, 2];
+}
+
+fn lent_parts(h: *Holder, lent p: *Circle) -> int
+{
+	h.held = &(*p);
+	let x: int = p;
+	return x;
+}
+
+fn owned(h: *Holder)
+{
+	let n = 1;
+	let (a, b) = (snapshot fn(k: int) { ignore(n); }, 1);
+	h.handler = a;
+}
+
+fn ends(pp: **Shape)
+{
+	destroy(*pp);
+}
+
+fn main() -> int
+{
+	let c = Circle { r: 1 };
+	let a: int = &c;
+	let b: *int = &c;
+	let d: ?fn() = &c;
+	let o: ?int = 1;
+	let e: ?str = o;
+	let f: str = o;
+	let g: int = find();
+	let i: *int = find();
+	let j: fn(int) = maybe_fn();
+	let k: *H = find()?.h;
+	let p: ?*Circle = &c;
+	let l: *Circle = p?.get();
+	let m = regex.matches("abc", re"b") catch {
+		return 1;
+	};
+	let mi: int = m;
+	if let found = m {
+		let fi: int = found;
+	}
+	let q = !missing;
+	let r = &pair()[0];
+	let s = true as f64;
+	let u: u32 = 3;
+	let v = u as bool;
+	let n = 5;
+	let w = n as? *Circle;
+	let ip = &c.r;
+	let x = ip as? *Circle;
+	let y = &c as? int;
+	let z = &c is int;
+	let aa = &c as int;
+	let ab = ~3 as f16;
+	let ac = n as Missing;
+	return 0;
+}

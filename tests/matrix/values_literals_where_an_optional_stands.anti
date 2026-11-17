@@ -1,0 +1,31 @@
+//! A bytes literal, a slice literal, an array repeat and an interpolation where
+//! a `?T` stands. Each takes the type of the T and passes as the `?T` that
+//! holds it, as an integer literal does, and the program reads each back.
+
+import anti.lang;
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b: ?[]u8 = b"ab";
+	let s: ?[]int = []int { ptr: none, len: 0 };
+	let r: ?[2]int = [7; 2];
+	let n = 4;
+	let t: ?str = f"n {n}";
+	if let x = b {
+		printf("bytes %d\n".ptr, x.len as c_int);
+	}
+	if let x = s {
+		printf("slice %d\n".ptr, x.len as c_int);
+	}
+	if let x = r {
+		printf("repeat %d %d\n".ptr, x[0] as c_int, x[1] as c_int);
+	}
+	if let x = t {
+		printf("format %.*s\n".ptr, x.len as c_int, x.ptr);
+		free(x.ptr);
+	}
+	return 0;
+}

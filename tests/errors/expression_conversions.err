@@ -1,0 +1,26 @@
+expression_conversions.anti:64:11: error: the pointer is lent for the call and cannot be stored
+expression_conversions.anti:65:15: error: expected `int`, found `*Circle`
+expression_conversions.anti:73:14: error: `a` holds a function that is not kept and cannot be stored
+expression_conversions.anti:84:15: error: expected `int`, found `*Circle`
+expression_conversions.anti:85:16: error: expected `*int`, found `*Circle`
+expression_conversions.anti:86:17: error: expected `?fn()`, found `*Circle`
+expression_conversions.anti:88:16: error: expected `?str`, found `?int`
+expression_conversions.anti:89:15: error: expected `str`, found `?int`
+expression_conversions.anti:90:15: error: expected `int`, found `?*H`
+expression_conversions.anti:91:16: error: expected `*int`, found `?*H`
+expression_conversions.anti:92:19: error: expected `fn(int)`, found `?fn()`
+expression_conversions.anti:93:14: error: the value may be `none`, check it or use `?*T`
+expression_conversions.anti:95:19: error: the value may be `none`, check it or use `?*T`
+expression_conversions.anti:99:16: error: expected `int`, found `?Match`
+expression_conversions.anti:101:17: error: expected `int`, found `Match`
+expression_conversions.anti:103:11: error: unknown name `missing`
+expression_conversions.anti:104:11: error: unary `&` needs a place
+expression_conversions.anti:105:10: error: cannot convert `bool` to `f64`
+expression_conversions.anti:107:10: error: cannot convert `u32` to `bool`
+expression_conversions.anti:109:10: error: `as` needs a class pointer on each side, found `int` and `*Circle`
+expression_conversions.anti:111:10: error: `as` needs a class pointer on each side, found `*int` and `*Circle`
+expression_conversions.anti:112:10: error: `as` needs a class pointer on each side, found `*Circle` and `int`
+expression_conversions.anti:113:10: error: `is` needs a class pointer on each side, found `*Circle` and `int`
+expression_conversions.anti:114:11: error: cannot convert `*Circle` to `int`
+expression_conversions.anti:115:11: error: cannot convert `int` to `f16`
+expression_conversions.anti:116:16: error: unknown type `Missing`

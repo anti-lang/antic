@@ -1,0 +1,134 @@
+//! Forms of expressions that the checker refuses, one mistake per line. Each
+//! gets its one message: `to_slice` on a name that is not there, on an `int`
+//! and on a struct that is no iterator, `is` with a type that is no case, a
+//! case of another variant, of a name that is no variant and of a module that
+//! is not there, on a value and on a name that is not there, an interpolation
+//! of a pointer, formats an integer does not take, `?.` before a function that
+//! is not called, literals of a module and of a function, `dup` of a bound
+//! function, `none` where a type parameter stands, a tuple and arrays of a name
+//! that is not there, and `try` before a name that is not there. A singleton
+//! names its own literal in its body, and `as` converts between two parameters
+//! that `Float` constrains.
+
+import anti.lang;
+import anti.text;
+
+variant Shape
+{
+	Circle { r: f32 },
+	Empty,
+}
+
+variant Result<T>
+{
+	Ok { v: T },
+	Bad,
+}
+
+variant Other
+{
+	Ok { v: int },
+}
+
+struct Countdown
+{
+	left: int,
+}
+
+operator fn next(c: *Countdown) -> bool
+{
+	c.left = c.left - 1;
+	return c.left >= 0;
+}
+
+operator fn value(c: *Countdown) -> int
+{
+	return c.left;
+}
+
+struct H
+{
+	n: int,
+}
+
+class K
+{
+	pub n: int = 0,
+	pub next: ?*K = none,
+
+	pub fn get(self) -> ?*K
+	{
+		return self.next;
+	}
+}
+
+singleton class One
+{
+	pub n: int = 0,
+
+	pub fn again(self) -> int
+	{
+		let o = One { };
+		return o.n;
+	}
+}
+
+fn f()
+{
+}
+
+fn generic_none<T>(x: T)
+{
+	let y: T = none;
+}
+
+fn conv<T: Float, U: Float>(x: T) -> U
+{
+	return x as U;
+}
+
+fn main() -> int
+{
+	let a = missing.to_slice();
+	let n = 3;
+	let b = n.to_slice();
+	let h = H { n: 1 };
+	let c = h.to_slice();
+	let down = Countdown { left: 3 };
+	let p = &down;
+	let walked = p.to_slice();
+	free(walked.ptr);
+	let v = Shape.Empty;
+	let d = v is int;
+	let e = v is Nope.Circle;
+	let g = v is f.Circle;
+	let r = Result<int>.Bad;
+	let i = r is Other.Ok;
+	let j = missing is m.Shape.Circle;
+	let l = n is H.X;
+	let l2 = n is Circle;
+	let l3 = n is nope.X;
+	let l4 = n is f.X;
+	let l5 = missing is Circle;
+	let l9 = missing is int;
+	let l6 = missing is Nope.X;
+	let l7 = missing is f.X;
+	let l8 = missing is H.X;
+	let ip = &n;
+	let fp = f"{ip}";
+	let fe = f"{n:e}";
+	let ff = f"{n:f}";
+	let k = K { };
+	let kp: ?*K = &k;
+	let bound = kp?.get;
+	let lm = nope.X { };
+	let lf = f { };
+	let du = dup(k.get);
+	let tu = (missing, 1);
+	let ar = [missing; 3];
+	let at: [3]int = [missing; 3];
+	let tr = try missing;
+	try missing = 3;
+	let fl = conv<f32, f64>(1.5);
+	return 0;
+}

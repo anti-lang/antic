@@ -1,0 +1,34 @@
+expression_forms.anti:82:13: error: `none` needs a type that may be `none` from its context
+expression_forms.anti:92:10: error: unknown name `missing`
+expression_forms.anti:94:10: error: `int` has no field `to_slice`
+expression_forms.anti:96:10: error: `H` has no function `to_slice`
+expression_forms.anti:102:10: error: `is` on `Shape` names one of its cases, as `Shape.Circle`
+expression_forms.anti:103:10: error: `Nope.Circle` is not a case of `Shape`
+expression_forms.anti:104:10: error: `f.Circle` is not a case of `Shape`
+expression_forms.anti:106:10: error: `Other.Ok` is not a case of `Result<int>`
+expression_forms.anti:107:10: error: unknown name `missing`
+expression_forms.anti:108:15: error: cannot find module `H`
+expression_forms.anti:109:16: error: unknown type `Circle`
+expression_forms.anti:110:16: error: cannot find module `nope`
+expression_forms.anti:111:16: error: cannot find module `f`
+expression_forms.anti:112:11: error: unknown name `missing`
+expression_forms.anti:112:22: error: unknown type `Circle`
+expression_forms.anti:113:11: error: unknown name `missing`
+expression_forms.anti:114:11: error: unknown name `missing`
+expression_forms.anti:114:22: error: cannot find module `Nope`
+expression_forms.anti:115:11: error: unknown name `missing`
+expression_forms.anti:115:22: error: cannot find module `f`
+expression_forms.anti:116:11: error: unknown name `missing`
+expression_forms.anti:116:22: error: cannot find module `H`
+expression_forms.anti:118:14: error: `f"..."` cannot write a `*int`
+expression_forms.anti:119:13: error: unknown format `{n:e}` for `int`
+expression_forms.anti:120:13: error: unknown format `{n:f}` for `int`
+expression_forms.anti:123:14: error: `?.` on `kp.get`, which is not a pointer
+expression_forms.anti:124:11: error: cannot find module `nope`
+expression_forms.anti:125:11: error: unknown struct `f`
+expression_forms.anti:126:15: error: `dup` needs a class pointer, found `bound fn() -> ?*K`
+expression_forms.anti:127:12: error: unknown name `missing`
+expression_forms.anti:128:12: error: unknown name `missing`
+expression_forms.anti:129:20: error: unknown name `missing`
+expression_forms.anti:130:15: error: unknown name `missing`
+expression_forms.anti:131:6: error: unknown name `missing`
