@@ -582,6 +582,24 @@ struct type *sema_alias_type(struct checker *c, struct symbol *sym)
     return sym->type;
 }
 
+/* The `export type` before the item at index of the module that names
+   the copy t, or NULL. */
+static const struct item *exported_before(struct checker *c,
+                                          const struct module *module,
+                                          size_t index, const struct type *t)
+{
+    size_t i;
+
+    for (i = 0; i < index; i++) {
+        const struct item *it = module->items[i];
+        if (it->symbol != NULL && it->kind == ITEM_TYPE && it->exported &&
+            sema_alias_type(c, it->symbol) == t) {
+            return it;
+        }
+    }
+    return NULL;
+}
+
 void sema_resolve_generics(struct checker *c)
 {
     const struct module *module = c->module;
@@ -609,16 +627,32 @@ void sema_resolve_generics(struct checker *c)
     }
     for (i = 0; i < module->item_count; i++) {
         struct item *it = module->items[i];
+        const struct item *first;
         struct type *t;
         if (it->symbol == NULL || it->kind != ITEM_TYPE) {
             continue;
         }
         t = sema_alias_type(c, it->symbol);
+        if (!it->exported || sema_is_error(t) || t->generic == NULL ||
+            sema_has_params(t)) {
+            continue;
+        }
+        /* A copy has one name in C, so a second `export type` of it in
+           the module is refused, by T281 of
+           docs/audit/tests-findings.md. */
+        first = exported_before(c, module, i, t);
+        if (first != NULL) {
+            sema_error_at(c, it->name_pos.line != 0 ? it->name_pos : it->pos,
+                          "`export type %.*s` names `%s`, which `export "
+                          "type %.*s` names already", (int)it->name.length,
+                          it->name.text, sema_tn(t), (int)first->name.length,
+                          first->name.text);
+            continue;
+        }
         /* The copy an `export type` names is an export class or struct
            to C, under the name of the `type`. The checks of what crosses
            to C read that. */
-        if (it->exported && !sema_is_error(t) && t->generic != NULL &&
-            !sema_has_params(t) && t->c_name.length == 0) {
+        if (t->c_name.length == 0) {
             t->c_name = it->name;
             t->item_exported = true;
         }
