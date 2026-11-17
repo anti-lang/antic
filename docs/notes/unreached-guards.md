@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m and 3n stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n and 3o stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -999,6 +999,32 @@ phase.
 | `parent_of` | A path without a separator, or one at the root. | Its one caller passes the directory of antic itself, which stands below the root. |
 | `compile_failed`, `put` of `regex.c` | PCRE2 without memory, and a text whose map would not fit an `int64_t`. | Both need more memory than a machine holds. |
 | `anti_rt_cpu_level` | A failure of `anti_rt_getenv`. | It fails for memory alone. |
+
+## `src/anti/bindclang.c`, `src/anti/bindexpr.c`, `src/rt/regex.c` and `src/anti/doc.c`
+
+Batch 3o of the third phase sorted the reader of a header, the evaluator
+of macros, the rewriter of byte patterns and the pages of `anti doc`. It
+is the first batch chosen by the sides of the conditions
+that the suite misses.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `find_clang`, `where_to_get`, `bind_read_clang` | A host that is none of the six targets, and a directory of `anti` that the system does not give or that holds no separator. | `anti` builds for the six hosts alone, and the directory of a running program is a path below the root. |
+| `leading_int` | A text that `strtol` reads no digit of. | It reads on from a first byte that is a digit. |
+| `say_no_runtime` | No directory above the one of `anti`. | The directory of `anti` stands below the root, so `parent_of` gives one. |
+| `type_name_taken` | An enum named as the name it is asked for, under a tag other than that name. | A typedef names an enum without a tag alone, so an enum with a tag has the tag as its name. |
+| `typedef_named`, `enum_named` | An entry of an enum without its enum. | `declare_enum` gives each entry its enum. |
+| `named_anonymous` | A spelling without `(unnamed` or `(anonymous`. | Its one caller passes a spelling that holds one. |
+| `read_fields` | A record inside a record whose C name is not set yet. | `declare_record` sets the C name before it reads the fields, and clears that of an anonymous member after. |
+| `declare_enum` | A fixed base that is no scalar where the base is chosen. | The check before it leaves such an enum out. |
+| `after_group` | A group that no `)` closes. | The type of the function parsed before, and a spelling that parses closes every group. |
+| `read_macros` | A value that `bind_eval_const` does not write. | `bind_eval` gives one of the three kinds the writer names. |
+| `take` of `bindexpr.c` | An operator of one byte, `<` or `>`. | The levels of `binary` name `<<` and `>>`, and no operator of one byte of them. |
+| `member_end` | A POSIX class whose scan stops at its closing pair, but not at the end of the class. | The scan goes on past every pair that is not the closing one. |
+| `anti_rt_regex_group_number` | A name that PCRE2 names more than once and the name table lacks. | PCRE2 gives `PCRE2_ERROR_NOUNIQUESUBSTRING` for a name its table holds. |
+| `is_item`, `resolve_name`, `copy_link` | No page. | Every page and the index pass the page they write. |
+| `resolve_name` | A name that ends in `(` and a byte other than `)`. | `is_name` refuses a `(` that is not the `()` at its end. |
+| `doc_html` | A list without an item. | A list starts with its first item. |
 
 ## Not in this note
 
