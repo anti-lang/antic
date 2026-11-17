@@ -7754,7 +7754,9 @@ endforeach()
 # subset that no other page holds: an item of a list in two lines, an
 # empty code span, a bracket that starts no link, a link whose scheme
 # stands in capitals, a link to a page beside this one and a code block
-# that never closes. Its developer's page in Markdown holds the note of the
+# that never closes. It holds the links that a page writes as links or
+# leaves as text by their targets, a line that starts with `-` and is no
+# item, and code spans that are no names. Its developer's page in Markdown holds the note of the
 # module and the note of an item. wrapped holds a link that anti fmt
 # breaks after a word of its text. operators holds two `operator fn eq`
 # that share their name, each headed by its name and its type.

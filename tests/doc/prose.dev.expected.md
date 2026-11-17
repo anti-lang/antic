@@ -12,6 +12,14 @@ A link with its scheme [in capitals](HTTPS://example.com/page).
 
 A link to a page [beside](beside) this one.
 
+A link with no target stays text, [none](), and so does one of a scheme with
+a digit, [digits](h2tp:x). A link of one byte [one](a), a path from the root
+[root](/top), a path below [path](dir/page.html) and a query [query](?q=1)
+lead to pages.
+
+-x starts no item, and `f(x`, `Zeta`, `_under`, `x9`, `a.9b`, `{x}` and `a{`
+are code.
+
 ## Internals
 
 The note of the module, which the developer's page holds.
