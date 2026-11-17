@@ -1,0 +1,202 @@
+//! Members of classes that the checker refuses, one mistake per line. Each gets
+//! its one message: `index`, `set_index` and `hash` that may fail, an `index`
+//! that gives nothing and a `set_index` that gives a value, two bodies of
+//! `draw` beside a constant and another function, functions named as a field
+//! and a constant of the base, a replacement of `serialize` whose builder is no
+//! `*text.Builder`, and a field and a constant of a nested type. Two bodies
+//! that fill the table of the base and that of an interface stand.
+
+import anti.lang;
+import anti.text;
+
+class Failing
+{
+	operator fn index(self, i: int) -> int may fail
+	{
+		if i < 0 {
+			fail "negative";
+		}
+		return i;
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+	}
+}
+
+class Empty
+{
+	operator fn index(self, i: int)
+	{
+	}
+
+	operator fn set_index(self, i: int, v: int)
+	{
+	}
+}
+
+class Sets
+{
+	operator fn index(self, i: int) -> int
+	{
+		return i;
+	}
+
+	operator fn set_index(self, i: int, v: int) may fail
+	{
+		if i < 0 {
+			fail "negative";
+		}
+	}
+}
+
+class Gives
+{
+	operator fn index(self, i: int) -> int
+	{
+		return i;
+	}
+
+	operator fn set_index(self, i: int, v: int) -> int
+	{
+		return v;
+	}
+}
+
+struct Hashed
+{
+	n: int,
+}
+
+operator fn hash(h: Hashed) -> u64 may fail
+{
+	if h.n < 0 {
+		fail "negative";
+	}
+	return 1;
+}
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Measured
+{
+	abstract fn area(self) -> int;
+}
+
+abstract class Drawable
+{
+	abstract fn draw(self);
+}
+
+class Both inherits Shape
+{
+	implements me: Measured,
+
+	const SIDE: int = 2;
+
+	concrete fn Shape::area(self) -> int
+	{
+		return 1;
+	}
+
+	concrete fn Measured::area(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Own
+{
+	implements dr: Drawable,
+
+	const SIDE: int = 2;
+
+	fn other(self)
+	{
+	}
+
+	concrete fn draw(self)
+	{
+	}
+
+	concrete fn Own::draw(self)
+	{
+	}
+}
+
+class Base
+{
+	pub n: int = 0,
+	pub m: int = 0,
+
+	const LIMIT: int = 3;
+}
+
+class Kid inherits Base
+{
+	fn n(self) -> int
+	{
+		return 1;
+	}
+
+	fn m() -> int
+	{
+		return 2;
+	}
+
+	fn LIMIT(self) -> int
+	{
+		return 3;
+	}
+}
+
+class Thing
+{
+	pub n: int = 0,
+}
+
+class Writes
+{
+	pub n: int = 0,
+
+	concrete fn serialize(self, out: ?*text.Builder)
+	{
+	}
+}
+
+class WritesInt
+{
+	pub n: int = 0,
+
+	concrete fn serialize(self, out: *int)
+	{
+	}
+}
+
+class WritesThing
+{
+	pub n: int = 0,
+
+	concrete fn serialize(self, out: *Thing)
+	{
+	}
+}
+
+class Holder
+{
+	struct Node
+	{
+		v: int,
+	}
+
+	pub pair: (int, Node) = (1, Node { v: 2 }),
+	pub const N: Node = Node { v: 3 };
+}
+
+fn main() -> int
+{
+	return 0;
+}

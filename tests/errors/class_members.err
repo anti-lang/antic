@@ -1,0 +1,14 @@
+class_members.anti:125:19: error: `Own` declares `draw` twice
+class_members.anti:71:13: error: `operator fn hash` is written `operator fn hash(h: Hashed) -> u64`
+class_members.anti:14:14: error: `operator fn index` is written `operator fn index(self, i: I) -> T`
+class_members.anti:29:14: error: `operator fn index` is written `operator fn index(self, i: I) -> T`
+class_members.anti:45:14: error: `operator fn set_index` is written `operator fn set_index(self, i: int, v: int)`, as `index` reads
+class_members.anti:60:14: error: `operator fn set_index` is written `operator fn set_index(self, i: int, v: int)`, as `index` reads
+class_members.anti:140:5: error: `Base` already has `n`
+class_members.anti:145:5: error: `Base` already has `m`
+class_members.anti:150:5: error: `Base` already has `LIMIT`
+class_members.anti:165:35: error: `out` of `concrete fn serialize` has type `?*Builder`, and `Object.serialize` takes `*Builder`
+class_members.anti:174:35: error: `out` of `concrete fn serialize` has type `*int`, and `Object.serialize` takes `*Builder`
+class_members.anti:183:35: error: `out` of `concrete fn serialize` has type `*Thing`, and `Object.serialize` takes `*Builder`
+class_members.anti:195:2: error: the public field `pair` of `Holder` names `Holder.Node`, which is private to `Holder`
+class_members.anti:196:12: error: the public constant `N` of `Holder` names `Holder.Node`, which is private to `Holder`

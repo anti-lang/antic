@@ -1,0 +1,172 @@
+//! The paths of a `construct` that the check of the fields it sets follows. A
+//! field set on another object of the class sets none of `self`, a name that is
+//! not there gets its one message as a target and as a call, and a `construct`
+//! returns no value. The other forms set every field on each path that
+//! succeeds: arms of a `switch` without `else` and with an `else` that fails, a
+//! `try` whose block always fails and one whose handler fails, a loop left with
+//! `break` and `continue`, a `select` whose first arm fails and a handler that
+//! yields its value.
+
+import anti.lang;
+
+enum Two
+{
+	A,
+	B,
+}
+
+fn step(x: int) -> int may fail
+{
+	if x > 100 {
+		fail "too large";
+	}
+	return x + 1;
+}
+
+class Other
+{
+	pub a: int,
+
+	fn construct(self, x: int, o: *Other) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		o.a = x;
+	}
+}
+
+class Unknown
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		zz.a = x;
+		missing(x);
+		self.a = 1;
+	}
+}
+
+class Returns
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		self.a = 1;
+		return 3;
+	}
+}
+
+class Switches
+{
+	pub a: int,
+
+	fn construct(self, x: int, t: Two) may fail
+	{
+		switch t {
+			Two.A => {
+				self.a = 1;
+			},
+			Two.B => {
+				fail "b";
+			},
+		}
+		switch x {
+			1 => self.a = 2,
+			else => {
+				fail "else";
+			},
+		}
+	}
+}
+
+class Tries
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		try {
+			self.a = step(x);
+			fail "always";
+		} catch e {
+			self.a = 3;
+		}
+		try {
+			self.a = step(x);
+		} catch e {
+			fail e;
+		}
+	}
+}
+
+class Loops
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		while true do {
+			if x == 1 {
+				break;
+			}
+			if x == 2 {
+				continue;
+			}
+			break;
+		}
+		self.a = x;
+	}
+}
+
+class Selects
+{
+	pub a: int,
+
+	fn construct(self, x: int, c: chan int, d: chan int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		select {
+			c v => {
+				fail "first";
+			},
+			d w => {
+				self.a = 1;
+			},
+		}
+	}
+}
+
+class Yields
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		let v = step(x) catch e {
+			yield 0;
+		};
+		self.a = v;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

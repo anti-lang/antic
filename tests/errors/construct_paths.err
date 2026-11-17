@@ -1,0 +1,4 @@
+construct_paths.anti:36:2: error: `construct` of `Other` returns `none` before it sets `a`
+construct_paths.anti:48:3: error: unknown name `zz`
+construct_paths.anti:49:3: error: unknown name `missing`
+construct_paths.anti:64:10: error: `construct` returns no value
