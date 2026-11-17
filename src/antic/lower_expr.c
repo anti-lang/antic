@@ -398,8 +398,12 @@ static void build_value_into(struct lowerer *l, const struct expr *e,
         /* DESIGN: a bound function holds the object and the entry of its
            table, so a call needs no receiver and the object may move.
            A `final` function and a `final` class take the address of the
-           body, because no class below replaces it. */
-        if (t->kind == TYPE_FN && t->bound) {
+           body, because no class below replaces it. The element of a
+           tuple that holds a bound function names no function, and it
+           is copied as its two words, by T289 of
+           docs/audit/tests-findings.md. */
+        if (t->kind == TYPE_FN && t->bound && e->symbol != NULL &&
+            e->symbol->kind == SYMBOL_FN) {
             const struct type *s = lower_struct_of_expr(e->as.field.base);
             size_t index = s != NULL
                                ? lower_table_index(s, &e->as.field.name,
