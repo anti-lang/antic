@@ -824,9 +824,21 @@ bool bind_struct_const(struct bind_module *b, const char *name,
         if (f->type->kind == BIND_SCALAR && is_float_type(f->type->name)) {
             bind_float_text(v.kind == BIND_EVAL_FLOAT ? v.f : (double)v.i,
                             f->type->name, &literal);
-        } else if (v.kind == BIND_EVAL_INT &&
-                   (!bind_is_unsigned_type(v.type) || v.i >= 0)) {
-            /* An integer past a long long leaves the literal out. */
+        } else if (v.kind == BIND_EVAL_INT) {
+            /* DESIGN: an element converts to the type of its field, as
+               the initializer of C does, C11 6.7.9, and so wraps at its
+               width, as the value of a cast does. `(Color){ 300, 0, 0,
+               255 }` gives the unsigned char 44, which Anti then takes,
+               by T275 of docs/audit/tests-findings.md. */
+            /* An integer past a long long leaves the literal out, before
+               it converts, as the define did, by M339. */
+            if (bind_is_unsigned_type(v.type) && v.i < 0) {
+                goto done;
+            }
+            if (f->type->kind == BIND_SCALAR) {
+                v.type = f->type->name;
+                narrow(&v);
+            }
             text_appendf(&literal, "%lld", (long long)v.i);
         } else {
             goto done;
