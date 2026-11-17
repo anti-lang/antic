@@ -1,11 +1,12 @@
 //! The paths of a `construct` that the check of the fields it sets follows. A
-//! field set on another object of the class sets none of `self`, a name that is
-//! not there gets its one message as a target and as a call, and a `construct`
-//! returns no value. The other forms set every field on each path that
-//! succeeds: arms of a `switch` without `else` and with an `else` that fails, a
-//! `try` whose block always fails and one whose handler fails, a loop left with
-//! `break` and `continue`, a `select` whose first arm fails and a handler that
-//! yields its value.
+//! field set on another object of the class sets none of `self`, nor does a
+//! `switch` on an integer without `else` that sets it in every arm. A name that
+//! is not there gets its one message as a target and as a call, and a
+//! `construct` returns no value. The other forms set every field on each path
+//! that succeeds: arms of a `switch` on an enum without `else` and of one with
+//! an `else` that fails, a `try` whose block always fails and one whose handler
+//! fails, a loop left with `break` and `continue`, a `select` whose first arm
+//! fails and a handler that yields its value.
 
 import anti.lang;
 
@@ -84,6 +85,22 @@ class Switches
 			else => {
 				fail "else";
 			},
+		}
+	}
+}
+
+class Counts
+{
+	pub a: int,
+
+	fn construct(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "negative";
+		}
+		switch x {
+			1 => self.a = 1,
+			2 => self.a = 2,
 		}
 	}
 }
