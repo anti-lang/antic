@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r and 3s stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s and 3t stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1098,6 +1098,25 @@ section.
 | `antl_visit_generics` | A generic function without a body, and a function of a generic type without a symbol. | The parser gives every function at module level its body, and an `extern fn` takes no type parameters. The declaration gives every function of a body its symbol. |
 | `digest_type_entry`, `antl_read_generics` | A generic class without a base, a function of a generic type without a symbol or a type, and a declaration without a symbol or a type. | Every class has a base, `Object` at the least. The reader gives every function of a type its symbol and its type, and `read_declaration` gives a declaration both or returns none. |
 
+## The sides of `src/antic/pattern.c`
+
+Batch 3t of the third phase sorted the sides of the conditions of the
+reader of a pattern literal. No batch had chosen the file by its
+branches. The rows of the section of `pattern.c` above keep theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `pattern_compiles` | A room of no bytes for the message. | Each caller passes a buffer of its own. |
+| `set_range` | A byte past 255. | Every caller passes a range of bytes. |
+| `take_char` | The first byte of a character of UTF-8 at the end of the pattern. | The lexer takes a source of valid UTF-8 alone, so a literal holds every byte of each character. |
+| `read_number` | Ten digits or more. | PCRE2 refuses a count of a repeat above 65535 and a reference to a group that the pattern lacks. |
+| `class_char` | `\p` and `\c` at the end of the pattern. | PCRE2 refuses both before the reader runs. |
+| `posix_class` | An empty name, and a name of four or six letters other than `word` and `xdigit`. | PCRE2 refuses a POSIX name it does not know. |
+| `posix_end` and `parse_class` | A class that the end of the pattern stops, inside a POSIX name or `\Q` or after a `-`. | PCRE2 refuses a class without its `]`. |
+| `read_flags`, `group_body`, `verb_group`, `flag_group` and `parse_group` | A group, a verb, flags, a condition or a class of set operations that the end of the pattern stops, and `(?` or `(?-` at the end. | PCRE2 refuses a group without its `)`. |
+| `first_of`, `narrow_after` and `least` | A group without a child and an alternative without a branch. | `group_body` gives every group the one child that `parse_alt` returns, and `parse_alt` makes an alternative of two branches at the least. |
+| `pattern_least_bytes` | A group that the pattern lacks. | `patch_group` of `sema_pattern.c` refuses it before the count. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1195,6 +1214,12 @@ section.
   `switch` whose read stops before the arms after it, the lanes of a
   shuffle without its simd struct and a read that stops inside them, and
   the record of a function of the root that names another module.
+- The sides of a condition in `pattern.c` and `sema_operator.c` that
+  batch 3t did not sort. Most in `sema_operator.c` take a symbol without
+  a type, an error type after a message or an operator function that the
+  declaration refused, or are a short circuit whose other operand
+  decides. Among them is `none` on the left of `==` beside a `?T`, which
+  takes the type of the other operand, so both operands are a `?T`.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
