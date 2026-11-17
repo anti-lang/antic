@@ -170,6 +170,26 @@ anti_message(clang_enum_named_as_a_struct
     FILES api.h "struct E { int a; };\ntypedef enum { E_A } E;\nvoid take(E e);\n"
     ARGS ${clang_bind}
     ERR "anti: api.h names two types `E`")
+# An enum tag that a typedef of an anonymous record or enum names, and a
+# struct tag that a typedef of an anonymous enum names, are refused by
+# the rule of T269 as well.
+anti_message(clang_enum_tag_named_as_a_typedef
+    FILES api.h "typedef struct { int a; } E;\nenum E { E_A };\nvoid take(enum E e);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `E`")
+anti_message(clang_struct_tag_named_as_an_enum
+    FILES api.h "typedef enum { E_A } E;\nstruct E { int a; };\nvoid take(struct E *p);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `E`")
+anti_message(clang_enum_tag_named_as_an_enum
+    FILES api.h "typedef enum { E_A } E;\nenum E { E_B };\nvoid take(enum E e);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h names two types `E`")
+# An enum without a name refuses the header too.
+anti_message(clang_enum_without_a_name_packed
+    FILES api.h "enum __attribute__((packed)) { SMALL_A };\nint count(void);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: `an enum without a name` is an enum with a layout attribute, which Anti has no form for")
 # T271: an enum whose attribute sets its layout, which Anti has no form
 # for, is refused as a record with a layout directive other than packed
 # and aligned is.

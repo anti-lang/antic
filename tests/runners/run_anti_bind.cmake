@@ -865,7 +865,7 @@ elseif(CASE STREQUAL "clang_sides")
         "#define USER R(struct Fwd){ 1 }\n#define USEK K(struct Fwd){ 1 }\n"
         "#define IDX IDEA\n#define SPACED (struct Fwd) { 7 }\n"
         "#define NO_BRACE (struct Fwd) 7\n#define OPEN_ONLY (1\n"
-        "#define NOT_TYPE (Unknown){ 1 }\n#define INT_LIT (int){ 1 }\n"
+        "#define NOT_TYPE (Unknown){ 1 }\n#define INT_LIT (int){ 1 }\n#define KK K2\n"
         "struct { int a; } anon_var;\n#pragma pack(push, 2)\n#pragma pack(pop)\n")
     foreach(i RANGE 1 66)
         string(APPEND text "#pragma pack(push, 1)\n")
@@ -898,7 +898,7 @@ elseif(CASE STREQUAL "clang_sides")
                                     "`${line}`\n${module}")
             endif()
         endforeach()
-        foreach(gone "pub const USES_GONE" "pub const BIG" "pub struct ConstEnum\n"
+        foreach(gone "pub const USES_GONE" "pub const BIG" "pub struct ConstEnum\n" "pub const KK"
                 "pub const USEP" "pub const NO_BRACE" "pub const INT_LIT")
             string(FIND "${module}" "${gone}" at)
             if(NOT at EQUAL -1)
@@ -1053,7 +1053,7 @@ elseif(CASE STREQUAL "macro_sides")
     # are too long or fill a bitfield, an unnamed bitfield and a struct.
     # A description gives a tab inside an expression and after an element.
     string(REPEAT "1 + " 40 long)
-    file(WRITE "${WORK}/macros.h"
+    file(WRITE "${WORK}/macros.h" "#include <stdint.h>\n"
          "struct Pair { int a; int b; };\nstruct Bits { int x : 3; int y; };\n"
          "struct Gap { int a; int : 3; int b; };\nstruct HasPair { struct Pair p; };\n"
          "#define HEXU 0X1F\n#define EXP 1e3\n#define EXPU 1E3\n#define FSUF 1.5F\n"
@@ -1066,6 +1066,11 @@ elseif(CASE STREQUAL "macro_sides")
          "#define TOO_MANY (struct Pair){ 1, 2, 3 }\n#define BITS (struct Bits){ 1, 2 }\n"
          "#define GAP (struct Gap){ 1, 2, 3 }\n#define HAS (struct HasPair){ 1 }\n"
          "#define LONG_ELEMENT (struct Pair){ ${long}1, 2 }\n"
+         "#define UNS (struct Pair){ 3u, 4 }\n#define U32 ((uint32_t)5)\n"
+         "#define I16 ((int16_t)-2)\n#define U16 ((uint16_t)70000)\n#define I8 ((int8_t)200)\n"
+         "#define U32_SUM ((uint32_t)1 + 1)\n#define INT_FLOAT (1 + 1.5)\n#define INT_STR (1 + \"a\")\n"
+         "#define FLOAT_SHIFT (1.5 << 1)\n#define SHIFT_FLOAT (1 << 1.5)\n#define BIG_L 5L\n"
+         "#define TRUNC ((int)2.5)\n"
          "void take(struct Pair p, struct Bits b, struct Gap g, struct HasPair h);\n")
     tool_run("" "${ANTI}" bind --clang "${WORK}/macros.h"
                 --module bindtest.macros -o "${WORK}/out" --runtime "${RUNTIME}")
@@ -1077,7 +1082,11 @@ elseif(CASE STREQUAL "macro_sides")
             "pub const MIX: c_double = 2.5;" "pub const FD: c_double = 3.5;"
             "pub const MINDIV: c_longlong = -4611686018427387904;"
             "pub const USHR: c_uint = 2;" "pub const BAR: c_int = 5;"
-            "pub const NESTED: Pair = Pair { a: 3, b: 3 };")
+            "pub const NESTED: Pair = Pair { a: 3, b: 3 };"
+            "pub const UNS: Pair = Pair { a: 3, b: 4 };" "pub const U32: u32 = 5;"
+            "pub const I16: i16 = -2;" "pub const U16: u16 = 4464;" "pub const I8: i8 = -56;"
+            "pub const U32_SUM: c_uint = 2;" "pub const INT_FLOAT: c_double = 2.5;"
+            "pub const BIG_L: c_long = 5;" "pub const TRUNC: c_int = 2;")
         string(FIND "${module}" "${line}" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "macros.anti holds no line `${line}`\n${module}")
@@ -1085,7 +1094,7 @@ elseif(CASE STREQUAL "macro_sides")
     endforeach()
     string(REGEX REPLACE "[ \n]+" " " said "${tool_stderr}")
     foreach(name LT TOOBIG TOOSMALL STRADD TRAIL UNCLOSED TOO_MANY BITS GAP HAS
-            LONG_ELEMENT)
+            LONG_ELEMENT INT_STR FLOAT_SHIFT SHIFT_FLOAT)
         string(FIND "${said}" "the macro `${name}` is no constant" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "no warning on `${name}`:\n${tool_stderr}")
@@ -1109,13 +1118,18 @@ elseif(CASE STREQUAL "enum_declared_first")
     # allows with a fixed base, is the same enum. The binding holds it
     # once, with its values, and compiles.
     file(WRITE "${WORK}/first.h" "enum E : unsigned char;\n"
-         "enum E : unsigned char { E_A, E_B };\nvoid take(enum E e);\n")
+         "enum E : unsigned char { E_A, E_B };\nvoid take(enum E e);\n"
+         "enum F : int { F_A };\nenum F : int;\nvoid give(enum F f);\n")
     tool_run("" "${ANTI}" bind --clang "${WORK}/first.h"
                 --module bindtest.first -o "${WORK}/out" --runtime "${RUNTIME}")
     compile_binding(first bindtest.first)
     file(READ "${WORK}/out/first.anti" module)
     if(NOT module MATCHES "pub enum E: c_uchar\n{\n\tE_A = 0,\n\tE_B = 1,\n}")
         message(FATAL_ERROR "first.anti holds no enum E with its values\n${module}")
+    endif()
+    # A declaration after the definition adds nothing.
+    if(NOT module MATCHES "pub enum F\n{\n\tF_A = 0,\n}")
+        message(FATAL_ERROR "first.anti holds no enum F with its value\n${module}")
     endif()
 elseif(CASE STREQUAL "shift_types")
     # T272: a shift has the type of its left operand after the integer
