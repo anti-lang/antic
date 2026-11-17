@@ -1,0 +1,9 @@
+generic_forms.anti:36:17: error: `text` is no hook of the operator table, no interface and no constraint
+generic_forms.anti:40:19: error: `less` is no hook of the operator table, no interface and no constraint
+generic_forms.anti:44:17: error: `SourceLocation` is no hook of the operator table, no interface and no constraint
+generic_forms.anti:50:11: error: `walk` uses `for` on `T`, which its constraints do not give. Add `next` to them
+generic_forms.anti:59:10: error: `bool` has no `lt`, which `less` needs for `T`
+generic_forms.anti:60:16: error: `Count` takes a constant for `N`, found a type
+generic_forms.anti:61:16: error: `Count` takes a constant for `N`, found a type
+generic_forms.anti:62:16: error: `Point` must be a constant for `N`
+generic_forms.anti:54:17: error: `export type` names a copy of a generic struct or class, and `Result<int>` is none

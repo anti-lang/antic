@@ -1,0 +1,64 @@
+//! Generics that the checker refuses, one mistake per line. Each gets its one
+//! message: a constraint that names a module, a function or a struct of another
+//! module, `for` over a parameter that `value` alone constrains, a type without
+//! `lt` where `Ordered` stands, a type, a field and a struct where a constant
+//! stands, and `export type` of a copy of a variant.
+
+import anti.lang;
+import anti.text;
+
+struct Point
+{
+	x: int,
+}
+
+class Box<T>
+{
+	pub v: T,
+}
+
+class Count<N: int>
+{
+	pub n: int = N,
+}
+
+variant Result<T>
+{
+	Ok { v: T },
+	Bad,
+}
+
+fn less<T: Ordered>(a: T, b: T) -> bool
+{
+	return a < b;
+}
+
+fn by_module<T: text>(a: T)
+{
+}
+
+fn by_function<T: less>(a: T)
+{
+}
+
+fn by_struct<T: lang.SourceLocation>(a: T)
+{
+}
+
+fn walk<T: value>(x: T)
+{
+	for e in x {
+	}
+}
+
+export type V = Result<int>;
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	let d = less<bool>(true, false);
+	let a = Count<Box<int>> { };
+	let b = Count<p.x> { };
+	let c = Count<Point> { };
+	return 0;
+}
