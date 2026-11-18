@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t and 3u stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u and 3v stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1138,6 +1138,32 @@ file. The rows of the section of `antl_verify.c` above keep theirs.
 | `simd_shape` | No lanes. | Both callers refuse a struct of no fields first. |
 | `antl_verify_simd_agg` | A field of a struct of the IR without a name. | `antl_get_cstr` gives every field the reader reads a name, the empty one where the file writes none. |
 
+## The sides of batch 3v
+
+Batch 3v of the third phase sorted the sides of the conditions of
+`src/antic/parser_item.c`, `src/anti/syms.c` and `src/rt/trace.c`, which
+no batch had chosen by their branches, and some of those of
+`src/antic/lower_stmt.c`. The rows of the sections of `trace.c` and
+`lower_stmt.c` above keep theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `item_level` of `parser_item.c` | A message inside the signature of a function after which the signature reads on. | Every reader of the type parameters, the parameters and the result that gives a message returns false, so the line returns before the test. |
+| `load_deployment` of `syms.c` | A key of `module.` without a dot. | The key starts with `module.`, so `strrchr` finds its dot. |
+| `syms_map_lookup` of `syms.c` | A name of no byte that is no blank. | The name starts past the blanks, at a byte before the end of the line. |
+| `text_of` of `trace.c` | A text that is not empty. | Every caller passes NULL, for the empty text. |
+| `keep_in` of `trace.c` | A name or a path of more than `SIZE_MAX` bytes less the head of its entry. | No symbol, path or build id of an image comes near that length. |
+| `function_name` of `trace.c` | A function without the bytes of its name, and a name that `stable` keeps where it lies. | The readers of the symbol tables give the name of every function they find, and every caller passes `false` for `stable`. |
+| `notice_id` of `trace.c` | A notice that is none, one shorter than its head, and one whose `build` line the room cuts. | On macOS the platform layer reads no notice, and `macho_id` passes the notice of `anti_licenses` with `SIZE_MAX`, which every binary of Anti ends with a line. |
+| `load` of `trace.c` | The file of an ELF module. | Only the ELF paths pass `false` for `object`, and they run on Linux alone. |
+| `macho_id` of `trace.c` | An image outside the shared cache without a symbol table or without `anti_licenses`. | Every image outside the cache that a trace of the suite meets is a binary of Anti, which has both. |
+| `symbolize_macho` of `trace.c` | An image without a symbol table, an address outside every function and a line without its file. | dyld maps every image with its table, a return address lies inside the function that called, and `anti_rt_macho_object_line` gives a file with every line it finds. |
+| `module_id` and `anti_rt_trace_symbolize` of `trace.c` | A notice the platform layer read, and the arms of ELF and PE. | Those are the paths of Linux and Windows. |
+| `add` of `trace.c` | A size past `INT64_MAX`. | A trace holds a few hundred bytes per frame. |
+| `anti_rt_trace_text` of `trace.c` | A trace whose every frame lies outside every module, so that no line of a module stands first. | A capture starts inside the program, which is a module. |
+| `range_start` of `lower_stmt.c` | A range of no integer type, and a constant low bound of a type whose width follows the target. | The checker types every range with an integer type, and lowering writes `0 as c_long` as a conversion rather than as a constant. |
+| `lower_assign` of `lower_stmt.c` | A compound assignment to an aggregate that is no simd struct. | The checker refuses it with `` `+=` does not apply to `Point` ``. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1251,6 +1277,15 @@ file. The rows of the section of `antl_verify.c` above keep theirs.
   the globals, a copy without blocks, an entry of no function in the
   walk of a worker, an extern worker, an aggregate past the list and a
   plugin with the runtime bundled.
+- The sides of a condition in `parser_item.c`, `syms.c`, `trace.c` and
+  `lower_stmt.c` that batch 3v did not sort. In `syms.c` they need a
+  binary of Anti that no case of a table of messages writes: a program
+  named by a suffix alone, a present binary whose path holds a quote or a
+  line break, an archive beside a present binary, and a debug link of ELF
+  or of Mach-O without a line, without a table or whose function the map
+  gives. In `lower_stmt.c` most test the block after a
+  path that ended inside a statement, or a call with a handler that writes
+  no result, as the rows of its section above do.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
