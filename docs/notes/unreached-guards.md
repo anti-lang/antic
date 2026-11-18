@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u, 3v, 3w and 3x stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u, 3v, 3w, 3x and 3y stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1200,6 +1200,23 @@ the sections of `lower_stmt.c` and `antl_read_ir.c` above keep theirs.
 | `drop_result` of `lower_stmt.c` | A call of `hash` whose result the statement drops. | antic refuses it as `unused-result`. |
 | `read_classes` of `antl_read_ir.c` | A file that ends inside the sub-object or the `mutable` field of a class record. | The count of each list stands before it, and `antl_get_count` refuses a count whose records the rest of the file cannot hold. Each record is of a fixed size. |
 
+## The sides of batch 3y
+
+Batch 3y of the third phase sorted the sides of the conditions of
+`src/antic/ir_verify.c`, which no batch had chosen by their branches, and
+some of those of `src/antic/header.c`, `src/anti/licensing.c` and
+`src/rt/toml.c`. The rows of the sections of `header.c` and `toml.c`
+above keep theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `same_type` and `check_inst` of `ir_verify.c` | An operand of an instruction, the callee of a call or the table of a call through a table that names nothing of the function or the module. | `check_inst` runs only for an instruction whose result and operands `indices_ok` found. |
+| `use` and `entry_set` of `ir_verify.c` | A temporary past the count of the function, and a block without an instruction. | `check_definitions` runs only for a function that the checks before it passed, and such a block fails with `the block does not end with a terminator`. |
+| `arith_facts_ok` of `ir_verify.c` | A lifetime of a temporary past the count of the function. | `indices_ok` refuses the operand first. |
+| `stdint_macro` of `src/antic/header.c` | A byte below `0` in a name that is no capital. | A name holds letters, digits and `_` alone, and `_` and the small letters stand after `9`. |
+| `nested_views` of `src/antic/header.c` | A union nested in a class. | antic refuses one with `` a class body declares a struct, an enum or a class, and a union stands at module level ``. |
+| `ar_number` of `licensing.c` | A number past `SIZE_MAX`. | The fields of a size and of an offset hold 10 and 15 digits at most, which stay below it. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1345,3 +1362,12 @@ the sections of `lower_stmt.c` and `antl_read_ir.c` above keep theirs.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
+- The sides of a condition in `header.c`, `licensing.c` and `toml.c`
+  that batch 3y did not sort. In `header.c` most take a symbol, a type or
+  a name that the checker always sets, a chain of bases that ends in no
+  class or a body that names no base, and one is a slot of the length of
+  the name of a helper whose bytes differ. In `licensing.c` they stand in
+  the readers of a notice, of a record of sources and of the members of
+  an archive, and no probe of batch 3y reached them. In `toml.c` most are
+  the caps on the room of a key or a path, and the end of the text in the
+  blanks before a value.
