@@ -45,6 +45,9 @@
 #                           decision 15 of "Decisions of 2026-10-11")
 #   cache_import_layout     and its object follows the new layout of a
 #                           struct of that module (defect 10)
+#   lock_path_moved         the lock file names the new path of a
+#                           dependency whose library holds the same
+#                           digest (T298)
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -492,6 +495,36 @@ function(lacks text needle what)
         message(FATAL_ERROR "${what} holds `${needle}`:\n${text}")
     endif()
 endfunction()
+
+if(CASE STREQUAL "lock_path_moved")
+    # T298: the same library at another path holds the same digest, and
+    # the lock file names the path the manifest gives.
+    string(CONCAT dep_source
+           "//! A library of a path.\n\n"
+           "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    string(CONCAT app_source
+           "//! A program over the library of a path.\n\n"
+           "import com.example.dep;\n\n"
+           "fn main() -> int\n{\n\treturn dep.one();\n}\n")
+    foreach(where dep moved)
+        write_project("${WORK}/${where}" "com.example.dep" ""
+                      "com.example.dep" "${dep_source}")
+    endforeach()
+    write_project("${WORK}/app" "com.example.app"
+                  "\n[dependencies]\n\"com.example.dep\" = { path = \"../dep\" }\n"
+                  "com.example.app" "${app_source}")
+    anti_passes("the build over ../dep" "${WORK}/app" build ${tools})
+    file(READ "${WORK}/app/anti.lock" lock)
+    holds("${lock}" "../dep/dist/" "the first lock file")
+    write_project("${WORK}/app" "com.example.app"
+                  "\n[dependencies]\n\"com.example.dep\" = { path = \"../moved\" }\n"
+                  "com.example.app" "${app_source}")
+    anti_passes("the build over ../moved" "${WORK}/app" build ${tools})
+    file(READ "${WORK}/app/anti.lock" lock)
+    holds("${lock}" "../moved/dist/" "the lock file after the move")
+    lacks("${lock}" "../dep/" "the lock file after the move")
+    return()
+endif()
 
 # The library project tests/anti-build/shapes, built once into the cache,
 # then changed by replacing from with to in the file named, and built
