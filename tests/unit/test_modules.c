@@ -4158,6 +4158,117 @@ static void truncated_trees(void)
     compilation_close(&s);
 }
 
+/* A class of each record that a class of the IR carries: the sub-object
+   of an interface, an `inject` field, a `mutable` field of a singleton
+   and a `provides` line. */
+static const char class_records_source[] =
+    "pub abstract class Speaker\n"
+    "{\n"
+    "    pub abstract fn speak(self) -> int;\n"
+    "    pub fn default() -> *Speaker\n"
+    "    {\n"
+    "        return Dog.get();\n"
+    "    }\n"
+    "}\n"
+    "pub singleton class Dog inherits Speaker\n"
+    "{\n"
+    "    mutable barks: int = 0,\n"
+    "    concrete fn speak(self) -> int\n"
+    "    {\n"
+    "        return 1;\n"
+    "    }\n"
+    "}\n"
+    "pub abstract class Named\n"
+    "{\n"
+    "    pub abstract fn name(self) -> int;\n"
+    "}\n"
+    "pub class Cell\n"
+    "{\n"
+    "    implements named: Named,\n"
+    "    inject voice: *Speaker,\n"
+    "    score: int = 0,\n"
+    "    concrete fn name(self) -> int\n"
+    "    {\n"
+    "        return self.score;\n"
+    "    }\n"
+    "}\n"
+    "pub class Cat inherits Speaker\n"
+    "{\n"
+    "    concrete fn speak(self) -> int\n"
+    "    {\n"
+    "        return 2;\n"
+    "    }\n"
+    "}\n"
+    "provides Speaker as Cat;\n";
+
+/* Every prefix of a file whose class records hold a sub-object, an
+   `inject` field, a `mutable` field and a `provides` line is refused, so
+   a file that ends inside one of those records is. */
+static void truncated_class_records(void)
+{
+    struct compilation s;
+    struct text bytes = {0};
+    size_t n;
+
+    compilation_open(&s);
+    if (build_library(&s, "cr", class_records_source, &bytes)) {
+        CHECK(reads_file(&bytes));
+        for (n = 0; n < bytes.length; n++) {
+            uint8_t *prefix = alloc_zeroed(n, 1);
+            memcpy(prefix, bytes.data, n);
+            refuses_file(prefix, n, NULL);
+            free(prefix);
+        }
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
+/* A field of the form of a base stands first in a class. The type table
+   writes the form after the name, the type and the bits of a field, and
+   its low four bits name it. A base as the second field of a class, or
+   as the field of a struct, is refused. */
+static void damaged_field_forms(void)
+{
+    static const char source[] = "pub class Base\n"
+                                 "{\n"
+                                 "    pub n: int = 0,\n"
+                                 "}\n"
+                                 "pub class Kid inherits Base\n"
+                                 "{\n"
+                                 "    pub other: Base,\n"
+                                 "}\n"
+                                 "pub struct Holder\n"
+                                 "{\n"
+                                 "    held: Base,\n"
+                                 "}\n";
+    const char *const fields[] = {"other", "held"};
+    struct compilation s;
+    struct text bytes = {0};
+    size_t i;
+
+    compilation_open(&s);
+    if (!build_library(&s, "ff", source, &bytes)) {
+        compilation_close(&s);
+        return;
+    }
+    CHECK(reads_file(&bytes));
+    for (i = 0; i < sizeof fields / sizeof fields[0]; i++) {
+        size_t at = name_end(&bytes, fields[i], false);
+        uint8_t form;
+        if (at == SIZE_MAX || at + 5 >= bytes.length) {
+            continue;
+        }
+        at += 5;
+        CHECK((((const uint8_t *)bytes.data)[at] & 15) == FIELD_PLAIN);
+        form = (uint8_t)((((const uint8_t *)bytes.data)[at] & ~15) |
+                         FIELD_BASE);
+        refuses_poke(&bytes, at, &form, 1);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
 /* The negative step of `for j in 0..10 by -3` reads back as -3. */
 static void signed_numbers(void)
 {
@@ -6121,6 +6232,8 @@ void test_modules(void)
     tree_counts();
     signed_numbers();
     truncated_trees();
+    truncated_class_records();
+    damaged_field_forms();
     deep_tables();
     imports();
     cycles();

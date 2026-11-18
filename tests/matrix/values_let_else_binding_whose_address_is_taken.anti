@@ -1,0 +1,23 @@
+//! The name that `let ... else` binds may lend its address. A pointer to it
+//! reads the narrowed pointer, and the `else` block takes the `none`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn narrowed(p: ?*int) -> int
+{
+	let q = p else {
+		return -1;
+	};
+	let r = &q;
+	return **r;
+}
+
+fn main() -> int
+{
+	let n = 4;
+	printf("some %d\n".ptr, narrowed(&n) as c_int);
+	printf("none %d\n".ptr, narrowed(none) as c_int);
+	return 0;
+}

@@ -1,0 +1,37 @@
+//! A handler may hold a `defer` whose call never returns before its `yield`,
+//! which then ends the path. The call here does not fail, so the program goes
+//! on after it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn stop(n: int) -> never
+{
+	printf("stop %d\n".ptr, n as c_int);
+	fflush(none);
+	exit(n as c_int);
+}
+
+fn value(n: int) -> int may fail
+{
+	if n > 2 {
+		fail "too large";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let v = value(2) catch e {
+		defer stop(3);
+		printf("yield\n".ptr);
+		yield 0;
+	};
+	printf("after %d\n".ptr, v as c_int);
+	return 0;
+}

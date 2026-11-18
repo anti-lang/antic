@@ -1,0 +1,36 @@
+//! A `defer` whose call never returns runs at the `return` of a `may fail`
+//! function after the value is written, and ends the program there.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn stop(n: int) -> never
+{
+	printf("stop %d\n".ptr, n as c_int);
+	fflush(none);
+	exit(n as c_int);
+}
+
+fn value(n: int) -> int may fail
+{
+	if n > 9 {
+		fail "too large";
+	}
+	defer stop(n);
+	printf("value %d\n".ptr, n as c_int);
+	return n;
+}
+
+fn main() -> int
+{
+	let v = value(4) catch e {
+		yield 0;
+	};
+	printf("after %d\n".ptr, v as c_int);
+	return 0;
+}

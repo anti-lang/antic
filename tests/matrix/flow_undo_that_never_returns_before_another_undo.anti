@@ -1,0 +1,33 @@
+//! Of two `undo` statements on the path of a `fail`, the last runs first. A
+//! call in it that never returns ends the program, so the first never runs.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn stop(n: int) -> never
+{
+	printf("stop %d\n".ptr, n as c_int);
+	fflush(none);
+	exit(n as c_int);
+}
+
+fn refuse() may fail
+{
+	undo stop(2);
+	undo stop(1);
+	printf("fail\n".ptr);
+	fail "refused";
+}
+
+fn main() -> int
+{
+	refuse() catch e {
+		printf("caught\n".ptr);
+	};
+	return 0;
+}

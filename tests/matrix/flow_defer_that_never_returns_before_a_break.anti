@@ -1,0 +1,28 @@
+//! A `defer` whose call never returns runs at a `break` of its loop body, and
+//! ends the program there.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn stop(n: int) -> never
+{
+	printf("stop %d\n".ptr, n as c_int);
+	fflush(none);
+	exit(n as c_int);
+}
+
+fn main() -> int
+{
+	while true do {
+		defer stop(5);
+		printf("break\n".ptr);
+		break;
+	}
+	printf("after\n".ptr);
+	return 0;
+}

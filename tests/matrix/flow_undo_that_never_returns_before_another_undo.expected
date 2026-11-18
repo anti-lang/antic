@@ -1,0 +1,3 @@
+exit 1
+fail
+stop 1
