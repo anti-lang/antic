@@ -26,6 +26,55 @@ class Counter
 	}
 }
 
+abstract class Shape
+{
+	protected sides: int = 4
+	// A comment between the field and the function.
+	pub abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	pub side: int
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+class Marks
+{
+	pub a: int
+	const LIMIT: int = 3;
+	pub b: int
+	pub static atomic seen: int = 0;
+	pub c: int
+	pub final fn first(self) -> int
+	{
+		return self.a;
+	}
+	pub d: int
+	operator fn eq(self, other: *Marks) -> bool
+	{
+		return self.a == other.a;
+	}
+	pub e: int
+	pub trace fn second(self) -> int
+	{
+		return self.b;
+	}
+	pub f: int
+	protected fn third(self) -> int
+	{
+		return self.c;
+	}
+	pub g: int
+	export fn fourth(self) -> int
+	{
+		return self.d;
+	}
+}
+
 enum Mode
 {
 	Read,
@@ -46,5 +95,8 @@ fn main() -> int
 {
 	let h = Holder { x: 7 };
 	let c = Counter { step: twice, n: 3 };
-	return h.get() + c.next() + Mode.code() - 14;
+	let q = Square { side: 2 };
+	let m = Marks { a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 7 };
+	return h.get() + c.next() + Mode.code() + q.area() + m.first() + m.second() -
+		21;
 }
