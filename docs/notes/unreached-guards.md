@@ -1230,6 +1230,24 @@ theirs.
 | `lock_string` of `src/anti/deps.c` | A control byte or a DEL in a value of the lock file. | A path holds none, since the manifest reader refuses a path with a control byte by R166, and a chained project reads its manifest the same way. A name, a version, a module path, a digest and a repository URL pass the rules of their kinds before the graph takes them. |
 | `lock_write` of `src/anti/deps.c` | A name, a version or a digest of the graph that the lock file cannot hold. | The readers of the manifest, the index and the library files check each against the rules of its kind, and none of them holds a double quote or a control byte. |
 
+## The sides of batch 3aa
+
+Batch 3aa of the third phase read the readers of `src/anti/` for an entry
+that a missing key or a damaged element ends or drops, and fixed T301 to
+T303 in `src/anti/syms.c`, `src/anti/manifest.c` and `src/anti/cache.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `load_deployment` of `src/anti/syms.c` | A key of the index without a dot, at the test `field == NULL`. | The test before it holds a key that starts with `module.`, so the key holds a dot and `strrchr` finds one. |
+
+The sides left unsorted: the key of `load_deployment` whose table has a
+name of another length than the table of the last `module` line, which an
+index of `[module.a]` and `[module.bb]` reaches. Two sides of
+`src/anti/manifest.c`: a byte below 0x20 in the path of a dependency,
+which a tab in the string reaches, since the reader of TOML takes every
+byte but the quote and the line break, and a key of the manifest no
+longer than `inject.` at the test of `interface_of`.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
