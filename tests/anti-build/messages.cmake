@@ -390,6 +390,27 @@ anti_message(index_dependency_constraint
     ARGS build ${tools}
     ERR "anti: ${cached_index} names the version 1.0/x of com.example.other, which is no constraint"
         "${no_version}")
+# T300: an entry of the index that lacks a key the reader needs leaves an
+# index that anti does not read, as one that is no TOML. The entry ended
+# the list, and the reader took the entries before it alone.
+anti_message(index_dependency_without_a_name
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}version = \"1.2.0\"\nmodules = [${units_module}]\ndependencies = [{ version = \"1.0.0\" }]\n"
+    ARGS build ${tools}
+    ERR "anti: ${cached_index} is no index that anti reads"
+        "${no_version}")
+anti_message(index_module_without_a_digest
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}version = \"1.2.0\"\nmodules = [{ path = \"com.example.units\" }]\n"
+    ARGS build ${tools}
+    ERR "anti: ${cached_index} is no index that anti reads"
+        "${no_version}")
+anti_message(index_version_without_a_version
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}modules = [${units_module}]\n\n[[version]]\nversion = \"1.2.0\"\nmodules = [${units_module}]\n"
+    ARGS build ${tools}
+    ERR "anti: ${cached_index} is no index that anti reads"
+        "${no_version}")
 anti_message(index_older_alone
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           ${units_index} "${index_head}version = \"1.1.0\"\nmodules = [${units_module}]\n"

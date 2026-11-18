@@ -22,3 +22,6 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 anti_build_lock_path_moved T298 The lock file keeps the old path of a dependency whose new path holds the same library.
 anti_build_lock_package_without_a_version T299 A package of the lock file without its version ends the list, and the build keeps the lock file without the packages after it.
 anti_build_lock_module_without_a_digest T299 A module of the lock file without its digest ends the list of the package, and the build does not find the module.
+anti_build_message_index_dependency_without_a_name T300 A dependency of the index without its name ends the list, and the walk drops it without a word.
+anti_build_message_index_module_without_a_digest T300 A module of the index without its digest ends the list, and the version names no module.
+anti_build_message_index_version_without_a_version T300 A version of the index without its version ends the list, and the versions after it leave the index.
