@@ -269,10 +269,12 @@ static struct item *class_item(struct parser *p, struct item *it)
     /* DESIGN: a class body that fails to parse is left at its closing
        brace, so the rest of it never reads as items of the module. One
        mistake in a body gives one message, by T101 of
-       docs/audit/tests-findings.md. */
+       docs/audit/tests-findings.md. A body that the end of the source
+       cuts is left at the end, which closing_brace gives for it, and
+       never past it, by T297. */
     if (!ok) {
         if (close > p->pos) {
-            p->pos = close + 1;
+            p->pos = close < p->last ? close + 1 : p->last;
         }
         return NULL;
     }

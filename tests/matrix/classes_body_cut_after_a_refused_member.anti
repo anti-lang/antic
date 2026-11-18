@@ -1,0 +1,9 @@
+// A class body that the end of the file cuts after a member it refuses
+// gets one message, and the parser stays inside the tokens, T297. A doc
+// comment of the module hides the read past the end, so the file holds
+// none.
+
+class Counter
+{
+	count: int,
+	protected internal
