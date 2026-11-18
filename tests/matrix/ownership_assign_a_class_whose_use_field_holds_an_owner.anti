@@ -1,0 +1,26 @@
+//! A class whose `use` field holds a class with a `destruct`. The refusal of
+//! `=` names the `use` field as it names a plain one.
+
+class Counted
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+	}
+}
+
+class Rows
+{
+	use counted: Counted,
+}
+
+fn copy(a: *Rows, b: *Rows)
+{
+	*a = *b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

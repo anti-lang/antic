@@ -1,0 +1,41 @@
+//! A bound function of a `final` function, taken through a pointer to the base
+//! of a derived object, and one of a function the derived class may replace.
+//! The first names the body, and the second reads the table.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Shape
+{
+	pub n: int = 1,
+
+	pub final fn area(self) -> int
+	{
+		return self.n;
+	}
+
+	pub fn side(self) -> int
+	{
+		return 2;
+	}
+}
+
+class Square inherits Shape
+{
+	pub concrete fn side(self) -> int
+	{
+		return 3;
+	}
+}
+
+fn main() -> int
+{
+	let t = Square { n: 5 };
+	let p: *Shape = &t;
+	let area = p.area;
+	let side = p.side;
+	printf("area %d\n".ptr, area() as c_int);
+	printf("side %d\n".ptr, side() as c_int);
+	return 0;
+}

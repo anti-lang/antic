@@ -48,6 +48,9 @@
 #   lock_path_moved         the lock file names the new path of a
 #                           dependency whose library holds the same
 #                           digest (T298)
+#   path_chain_mixed        a project of a path whose manifest names a
+#                           dependency of a repository and one of an
+#                           absolute path
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -523,6 +526,53 @@ if(CASE STREQUAL "lock_path_moved")
     file(READ "${WORK}/app/anti.lock" lock)
     holds("${lock}" "../moved/dist/" "the lock file after the move")
     lacks("${lock}" "../dep/" "the lock file after the move")
+    return()
+endif()
+
+if(CASE STREQUAL "path_chain_mixed")
+    # A project of a path whose own manifest names a dependency of a
+    # repository and one of an absolute path. The consumer reaches both
+    # through it, and its lock file names both.
+    string(CONCAT one_source
+           "//! A library.\n\n"
+           "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+    write_project("${WORK}/leaf" "com.example.leaf" "" "com.example.leaf"
+                  "${one_source}")
+    write_project("${WORK}/far" "com.example.far" "" "com.example.far"
+                  "${one_source}")
+    anti_passes("the build of far" "${WORK}/far" build ${tools})
+    set(at "${WORK}/repo/com.example.far")
+    file(MAKE_DIRECTORY "${at}/1.0.0")
+    file(COPY_FILE "${WORK}/far/dist/${HOST}/dev/com/example/far.antl"
+         "${at}/1.0.0/com.example.far.antl")
+    file(SHA256 "${at}/1.0.0/com.example.far.antl" digest)
+    file(WRITE "${at}/index.toml"
+         "name = \"com.example.far\"\nrevision = 1\n\n"
+         "[[version]]\nversion = \"1.0.0\"\n"
+         "modules = [{ path = \"com.example.far\", sha256 = \"${digest}\" }]\n")
+    file_url("${WORK}/repo" repo_url)
+    string(CONCAT mid_source
+           "//! A library over two others.\n\n"
+           "import com.example.far;\nimport com.example.leaf;\n\n"
+           "/// Two.\npub fn two() -> int\n{\n\treturn far.one() + leaf.one();\n}\n")
+    write_project("${WORK}/mid" "com.example.mid"
+                  "\n[repositories]\nlocal = \"${repo_url}\"\n\n[dependencies]\n\"com.example.far\" = { version = \"1.0.0\", repo = \"local\" }\n\"com.example.leaf\" = { path = '${WORK}/leaf' }\n"
+                  "com.example.mid" "${mid_source}")
+    string(CONCAT app_source
+           "//! A program over the library of a path.\n\n"
+           "import com.example.mid;\n\n"
+           "fn main() -> int\n{\n\treturn mid.two();\n}\n")
+    write_project("${WORK}/app" "com.example.app"
+                  "\n[dependencies]\n\"com.example.mid\" = { path = \"../mid\" }\n"
+                  "com.example.app" "${app_source}")
+    anti_passes("the build of the consumer" "${WORK}/app" build ${tools})
+    file(READ "${WORK}/app/anti.lock" lock)
+    foreach(package far leaf mid)
+        holds("${lock}" "name = \"com.example.${package}\""
+              "the lock file of the consumer")
+    endforeach()
+    program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 2 OUT "")
     return()
 endif()
 

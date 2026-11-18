@@ -6902,11 +6902,14 @@ foreach(case
         "symbols_option_unknown|symbols|check|--conf|app.toml|--bogus"
         "symbols_inventory_without_conf|symbols|inventory"
         "symbols_inventory_with_symbols|symbols|inventory|--conf|app.toml|--symbols|symbols.zip"
+        "symbols_inventory_with_a_trace|symbols|inventory|--conf|app.toml|trace.txt"
+        "symbols_check_without_conf|symbols|check"
         "symbols_check_with_from|symbols|check|--conf|app.toml|--from|archives"
         "symbols_check_with_a_trace|symbols|check|--conf|app.toml|trace.txt"
         "symbols_resolve_with_from|symbols|resolve|trace.txt|--symbols|symbols.zip|--from|archives"
         "symbols_resolve_with_conf|symbols|resolve|trace.txt|--symbols|symbols.zip|--conf|app.toml"
         "symbols_resolve_without_symbols|symbols|resolve|trace.txt"
+        "symbols_resolve_without_a_trace|symbols|resolve|--symbols|symbols.zip"
         "symbols_resolve_two_traces|symbols|resolve|trace.txt|other.txt|--symbols|symbols.zip"
         "sdk_without_a_command|sdk"
         "sdk_command_unknown|sdk|bogus"
@@ -6914,7 +6917,12 @@ foreach(case
         "sdk_import_without_a_bundle|sdk|import"
         "sdk_import_option_unknown|sdk|import|bundle.tar.xz|--bogus"
         "license_option_unknown|license|--bogus"
-        "license_project_option_unknown|license|--project|--bogus")
+        "license_project_option_unknown|license|--project|--bogus"
+        "license_from_twice|license|--from|app|--from|other"
+        "license_from_archive_twice|license|--from-archive|a.tar.xz|--from-archive|b.tar.xz"
+        "license_runtime_twice|license|--runtime|one|--runtime|two"
+        "license_from_and_from_archive|license|--from|app|--from-archive|a.tar.xz"
+        "license_from_archive_and_runtime|license|--from-archive|a.tar.xz|--runtime|one")
     string(REPLACE "|" ";" parts "${case}")
     list(POP_FRONT parts name)
     add_usage_test(anti ${name} ARGS ${parts})
@@ -7469,7 +7477,7 @@ add_test(NAME anti_build_inputs
 set(anti_build_cases path_target path_target_cpu lock_dropped
     cache_strip_docs cache_version cache_license cache_license_text
     cache_attribution cache_dependency cache_import_checked
-    cache_import_layout lock_path_moved)
+    cache_import_layout lock_path_moved path_chain_mixed)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     list(APPEND anti_build_cases redirect_to_http redirect_followed
          redirect_to_loopback redirect_loop index_unchanged index_absent
@@ -7956,6 +7964,9 @@ add_expect_test(anti_lto_word STATUS 2
 add_expect_test(anti_lto_dev STATUS 2
     PATTERN "^anti: --lto builds a program with --release, without --lib"
     COMMAND $<TARGET_FILE:anti> run --lto none)
+add_expect_test(anti_lto_library STATUS 2
+    PATTERN "^anti: --lto builds a program with --release, without --lib"
+    COMMAND $<TARGET_FILE:anti> build --release --lto full --lib static)
 
 # The runtime archive, the pins, the packages and the release.
 
