@@ -1239,8 +1239,11 @@ static bool fetch_all(struct dep_graph *g, bool offline)
     return true;
 }
 
-/* Whether two graphs hold the same packages, versions, digests and needs,
-   which decides whether the lock file is written again. */
+/* Whether two graphs hold the same packages, versions, repositories,
+   paths, digests and needs, which decides whether the lock file is
+   written again. A library moved to another directory keeps its digest,
+   so the path is compared as well, by T298 of
+   docs/audit/tests-findings.md. */
 static bool graphs_equal(const struct dep_graph *a, const struct dep_graph *b)
 {
     size_t i;
@@ -1255,6 +1258,7 @@ static bool graphs_equal(const struct dep_graph *a, const struct dep_graph *b)
         if (strcmp(text_cstr(&x->name), text_cstr(&y->name)) != 0 ||
             strcmp(text_cstr(&x->version), text_cstr(&y->version)) != 0 ||
             strcmp(text_cstr(&x->repo), text_cstr(&y->repo)) != 0 ||
+            strcmp(text_cstr(&x->path), text_cstr(&y->path)) != 0 ||
             x->module_count != y->module_count ||
             x->need_count != y->need_count) {
             return false;
