@@ -1253,6 +1253,245 @@ static void merges_copies(void)
     close_program(&p);
 }
 
+/* DESIGN of merge_copies: two copies merge when their code is identical
+   in every part. Each way below makes the second copy of `width`, or a
+   global it names, differ from the first in one part, which a library
+   file written by hand may give the IR. The copies then stay apart. */
+enum unlike {
+    UNLIKE_SYM_KIND,
+    UNLIKE_SYM_TYPE,
+    UNLIKE_SYM_OP,
+    UNLIKE_AGG_SIMD,
+    UNLIKE_FIELD_EXT,
+    UNLIKE_VARIADIC,
+    UNLIKE_PARAM_TEMP,
+    UNLIKE_BLOCK_FAIL,
+    UNLIKE_INST_TYPE,
+    UNLIKE_INST_RESULT,
+    UNLIKE_OPERAND_TYPE,
+    UNLIKE_GLOBAL_VALUE,
+    UNLIKE_FIRST_RELOC,
+    UNLIKE_SECOND_RELOC,
+    UNLIKE_FIRST_MUTABLE,
+    UNLIKE_SECOND_MUTABLE,
+    UNLIKE_FIRST_EXPORTED,
+    UNLIKE_SECOND_EXPORTED,
+    UNLIKE_FIRST_EXTERN,
+    UNLIKE_SECOND_EXTERN,
+    UNLIKE_ALIGN,
+    /* The ways that keep the copies alike: two records of one symbolic
+       value, two globals of the same bytes and two globals of none. */
+    LIKE_SYM_RECORDS,
+    LIKE_GLOBALS,
+    LIKE_EMPTY_GLOBALS
+};
+
+/* The source of merges_copies, whose two copies of `width` merge. */
+static const char packs[] =
+    "struct Pack<T>\n"
+    "{\n"
+    "    items: [size_of(T) * 2]u8,\n"
+    "}\n"
+    "fn width<T>(p: ?*Pack<T>) -> int\n"
+    "{\n"
+    "    return size_of(Pack<T>);\n"
+    "}\n"
+    "fn main() -> int\n"
+    "{\n"
+    "    return width<*int>(none) + width<*u8>(none);\n"
+    "}\n";
+
+/* The aggregate named name. */
+static struct ir_aggtype *agg_named(struct ir_module *m, const char *name)
+{
+    size_t i;
+
+    for (i = 0; i < m->agg_count; i++) {
+        if (strcmp(m->aggs[i]->name, name) == 0) {
+            return m->aggs[i];
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no aggregate %s\n", name);
+    return m->aggs[0];
+}
+
+/* The value `size_of(Pack<*byte>)` that the second copy returns, the
+   one symbolic value it names. */
+static struct ir_sym *returned_sym(struct ir_module *m, uint32_t second)
+{
+    const struct ir_inst *ret = &m->functions[second]->blocks[0]->insts[0];
+
+    CHECK(ret->a.kind == IR_SYM && ret->a.as.index < m->sym_count);
+    return &m->syms[ret->a.as.index];
+}
+
+/* Both copies return the address of a global of their own, of size
+   bytes, in place of the size of Pack. */
+static void name_globals(struct ir_module *m, uint32_t first, uint32_t second,
+                         uint64_t size, struct ir_global **globals)
+{
+    static const uint8_t zero[8];
+
+    globals[0] = ir_global_add(m, "main", "ga", zero, size, 8);
+    globals[1] = ir_global_add(m, "main", "gb", zero, size, 8);
+    m->functions[first]->blocks[0]->insts[0].a = ir_global_op(globals[0]);
+    m->functions[second]->blocks[0]->insts[0].a = ir_global_op(globals[1]);
+}
+
+/* Make the copies of `width` differ, or stay alike, by way. */
+static void make_unlike(struct program *p, uint32_t first, uint32_t second,
+                        enum unlike way)
+{
+    struct ir_module *m = &p->ir;
+    struct ir_function *g = m->functions[second];
+    struct ir_global *globals[2] = {NULL, NULL};
+    struct ir_const *none;
+    uint32_t length;
+
+    if (way >= UNLIKE_GLOBAL_VALUE && way != LIKE_SYM_RECORDS) {
+        name_globals(m, first, second, way == LIKE_EMPTY_GLOBALS ? 0 : 8,
+                     globals);
+    }
+    switch (way) {
+    case UNLIKE_SYM_KIND:
+        returned_sym(m, second)->kind = IR_SYM_INT;
+        break;
+    case UNLIKE_SYM_TYPE:
+        returned_sym(m, second)->type = IR_I32;
+        break;
+    case UNLIKE_SYM_OP:
+        /* The length of the array of Pack<*byte> as the sum of the
+           operands of the product that the other array names. */
+        length = agg_named(m, "[size_of(T) * 2]byte")->length;
+        m->syms[length] =
+            m->syms[agg_named(m, "[size_of(*int) * 2]byte")->length];
+        m->syms[length].op = IR_ADD;
+        agg_named(m, "[size_of(*byte) * 2]byte")->length = length;
+        break;
+    case UNLIKE_AGG_SIMD:
+        agg_named(m, "main.Pack<*byte>")->simd = true;
+        break;
+    case UNLIKE_FIELD_EXT:
+        agg_named(m, "main.Pack<*byte>")->fields[0].ext = IR_EXT_SIGN;
+        break;
+    case UNLIKE_VARIADIC:
+        g->variadic = true;
+        break;
+    case UNLIKE_PARAM_TEMP:
+        g->params[0].temp++;
+        break;
+    case UNLIKE_BLOCK_FAIL:
+        g->blocks[0]->fail = IR_FAIL_CHECK;
+        break;
+    case UNLIKE_INST_TYPE:
+        g->blocks[0]->insts[0].type = IR_I32;
+        break;
+    case UNLIKE_INST_RESULT:
+        g->blocks[0]->insts[0].result = 0;
+        break;
+    case UNLIKE_OPERAND_TYPE:
+        g->blocks[0]->insts[0].a.type = IR_I32;
+        break;
+    case UNLIKE_GLOBAL_VALUE:
+        none = arena_alloc(&p->front.arena, sizeof *none);
+        memset(none, 0, sizeof *none);
+        none->kind = IR_CONST_NONE;
+        none->scalar = IR_I64;
+        globals[1]->value = none;
+        break;
+    case UNLIKE_FIRST_RELOC:
+        ir_global_reloc(m, globals[0], 0, globals[1]->index);
+        break;
+    case UNLIKE_SECOND_RELOC:
+        ir_global_reloc(m, globals[1], 0, globals[0]->index);
+        break;
+    case UNLIKE_FIRST_MUTABLE:
+        globals[0]->mutable = true;
+        break;
+    case UNLIKE_SECOND_MUTABLE:
+        globals[1]->mutable = true;
+        break;
+    case UNLIKE_FIRST_EXPORTED:
+        globals[0]->exported = true;
+        break;
+    case UNLIKE_SECOND_EXPORTED:
+        globals[1]->exported = true;
+        break;
+    case UNLIKE_FIRST_EXTERN:
+        globals[0]->is_extern = true;
+        break;
+    case UNLIKE_SECOND_EXTERN:
+        globals[1]->is_extern = true;
+        break;
+    case UNLIKE_ALIGN:
+        globals[1]->align = 16;
+        break;
+    case LIKE_SYM_RECORDS:
+        /* The length of the array of Pack<*byte> as a second record of
+           the product that the array of Pack<*int> names. The record of
+           the generic's own array becomes that copy. */
+        length = agg_named(m, "[size_of(T) * 2]byte")->length;
+        m->syms[length] =
+            m->syms[agg_named(m, "[size_of(*int) * 2]byte")->length];
+        agg_named(m, "[size_of(*byte) * 2]byte")->length = length;
+        break;
+    case LIKE_GLOBALS:
+    case LIKE_EMPTY_GLOBALS:
+        break;
+    }
+}
+
+/* Whether the copies of `width` merge once they differ by way. A data
+   address beside the function address in hook stays as it is. */
+static bool copies_merge(enum unlike way)
+{
+    static const uint8_t zero[16];
+    struct program p;
+    struct text errors = {0};
+    struct whole_options options;
+    struct ir_global *hook;
+    uint32_t first;
+    uint32_t second;
+    bool merged;
+
+    open_program(&p);
+    p.front.compile_copies = true;
+    compile(&p, "main", packs, &p.ir);
+    first = function_index(&p.ir, "width<*int>");
+    second = function_index(&p.ir, "width<*byte>");
+    hook = ir_global_add(&p.ir, "main", "hook", zero, 16, 8);
+    ir_global_reloc_fn(&p.ir, hook, 0, second);
+    ir_global_reloc(&p.ir, hook, 8, hook->index);
+    make_unlike(&p, first, second, way);
+    memset(&options, 0, sizeof options);
+    options.entry = "main";
+    options.release = true;
+    CHECK(whole_program(&p.ir, &options, &errors));
+    CHECK_STR(text_cstr(&errors), "");
+    CHECK(hook->reloc_count == 2 && hook->relocs[0].fn &&
+          !hook->relocs[1].fn && hook->relocs[1].global == hook->index);
+    merged = hook->relocs[0].global == first;
+    CHECK(merged || hook->relocs[0].global == second);
+    text_free(&errors);
+    close_program(&p);
+    return merged;
+}
+
+static void keeps_unlike_copies(void)
+{
+    int way;
+
+    for (way = UNLIKE_SYM_KIND; way <= LIKE_EMPTY_GLOBALS; way++) {
+        bool merged = copies_merge((enum unlike)way);
+        if (merged != (way >= LIKE_SYM_RECORDS)) {
+            check_failures++;
+            fprintf(stderr, "way %d of enum unlike: merged %d\n", way,
+                    (int)merged);
+        }
+    }
+}
+
 /* Rewrite the text of the global whose bytes are from, with its NUL, to
    to, which has the same length. */
 static void rewrite_text(struct ir_module *m, const char *from,
@@ -1557,6 +1796,7 @@ void test_whole(void)
     reflection_marks_the_table();
     checks_provided_interfaces();
     merges_copies();
+    keeps_unlike_copies();
     skips_signatures();
     adds_a_missing_slot();
     defaults_backtraces_for_a_provider();
