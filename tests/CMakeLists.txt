@@ -7726,8 +7726,8 @@ add_expect_test(fmt_default_struct_literal STATUS 0
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/default_struct_literal.anti")
 
 # A field of a class body without its comma before a function of the
-# body. The source is in the canonical form, and fmt_canonical passes over
-# it until `anti fmt` agrees: finding T293 of docs/audit/tests-findings.md.
+# body, in the canonical form: finding T293 of
+# docs/audit/tests-findings.md.
 add_expect_test(fmt_field_without_comma_before_function STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:anti>" fmt --check

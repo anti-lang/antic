@@ -682,6 +682,7 @@ struct statement {
     bool governed;              /* a word of it governs a block */
     size_t colons;              /* the `:` of it outside brackets */
     enum token_kind first;
+    enum token_kind body;       /* its first word of an item with a body */
 };
 
 struct frame {
@@ -1084,6 +1085,7 @@ static void reset_statement(struct emitter *e)
     e->stmt.governed = false;
     e->stmt.colons = 0;
     e->stmt.first = TOKEN_EOF;
+    e->stmt.body = TOKEN_EOF;
 }
 
 /* The words that declare an item with a body, and the ones that govern a
@@ -1134,6 +1136,9 @@ static void note_token(struct emitter *e, enum token_kind kind)
     }
     e->stmt.open = true;
     if (e->brackets == 0) {
+        if (e->stmt.body == TOKEN_EOF && item_word(kind)) {
+            e->stmt.body = kind;
+        }
         e->stmt.item = e->stmt.item || item_word(kind);
         e->stmt.governed = e->stmt.governed || governing_word(kind);
         e->stmt.colons += kind == TOKEN_COLON;
@@ -1848,6 +1853,96 @@ static void emit_token(struct emitter *e, const struct piece_list *l,
     append_piece(e, p, space);
 }
 
+/* The n-th token from index on, past the comments and the doc comments
+   between them, or NULL past the last. */
+static const struct piece *token_ahead(const struct piece_list *l,
+                                       size_t index, size_t n)
+{
+    size_t i;
+
+    for (i = index; i < l->count; i++) {
+        const struct piece *p = &l->items[i];
+        if (p->dropped || p->kind != PIECE_TOKEN || is_doc(p->token->kind)) {
+            continue;
+        }
+        if (n == 0) {
+            return p;
+        }
+        n--;
+    }
+    return NULL;
+}
+
+/* Whether the token piece p is the identifier word. */
+static bool piece_is_word(const struct emitter *e, const struct piece *p,
+                          const char *word)
+{
+    size_t n = strlen(word);
+
+    return p != NULL && p->token->kind == TOKEN_IDENT && p->length == n &&
+           memcmp(e->src + p->offset, word, n) == 0;
+}
+
+/* Whether the tokens from index open a member of a body, as
+   parser_starts_member of src/antic/parser_decl.c reads them. */
+static bool opens_member(const struct emitter *e, const struct piece_list *l,
+                         size_t index)
+{
+    const struct piece *p = token_ahead(l, index, 0);
+    size_t at = 0;
+
+    if (p == NULL) {
+        return false;
+    }
+    if (p->token->kind == TOKEN_PUB || p->token->kind == TOKEN_PROTECTED ||
+        p->token->kind == TOKEN_EXPORT) {
+        at = 1;
+        p = token_ahead(l, index, at);
+        if (p == NULL) {
+            return false;
+        }
+    }
+    switch (p->token->kind) {
+    case TOKEN_FN:
+    case TOKEN_EXPORT:
+    case TOKEN_PUB:
+    case TOKEN_ABSTRACT:
+    case TOKEN_CONCRETE:
+    case TOKEN_CONST:
+    case TOKEN_STATIC:
+        return true;
+    default: {
+        const struct piece *next = token_ahead(l, index, at + 1);
+        return (piece_is_word(e, p, "final") ||
+                piece_is_word(e, p, "operator") ||
+                piece_is_word(e, p, "trace")) &&
+               next != NULL && next->token->kind == TOKEN_FN;
+    }
+    }
+}
+
+/* DESIGN: a field of a class body or a value of an enum ends without its
+   `,` at a line that opens a member, as class_body and enum_item of
+   src/antic/parser_item.c read it, by T069 of
+   docs/audit/tests-findings.md. The line of the member then carries no
+   open statement, T293. A line that ends before a value, after the `:`
+   or the `=` of the field, still goes on with it. */
+static bool field_ends(const struct emitter *e, const struct piece_list *l,
+                       size_t index)
+{
+    const struct frame *f;
+
+    if (!e->stmt.open || e->brackets > 0 || e->frame_count == 0) {
+        return false;
+    }
+    f = &e->frames[e->frame_count - 1];
+    if (f->kind != BRACE_ITEM ||
+        (f->saved.body != TOKEN_CLASS && f->saved.body != TOKEN_ENUM)) {
+        return false;
+    }
+    return !last_opens_value(e) && opens_member(e, l, index);
+}
+
 /* Whether a line break of the source stands before the piece and the
    rules keep it. */
 static bool breaks_line(struct emitter *e, const struct piece_list *l,
@@ -1950,7 +2045,11 @@ bool fmt_source(const char *source, size_t length, struct text *out)
                value. */
             bool goes_on = e.do_tail && (e.brackets > 0 ||
                                          last_opens_value(&e));
+            bool ended = field_ends(&e, &pieces, i);
             flush(&e);
+            if (ended) {
+                reset_statement(&e);
+            }
             e.cont = e.stmt.open && (!e.do_tail || goes_on);
             if (e.do_tail && !goes_on) {
                 reset_statement(&e);

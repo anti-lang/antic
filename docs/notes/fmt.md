@@ -46,7 +46,10 @@ all makes it a block of its own, and anything else builds a value. The words are
 in the decisions. A statement ends at a `;` outside brackets and at a brace that
 opens or closes. It ends as well at a `,` outside brackets, which closes a
 field, an arm or a case. The word that governs stands over that comma, so the
-second name of `for i, x in items` opens no statement of its own.
+second name of `for i, x in items` opens no statement of its own. A field of a
+class body or a value of an enum without its `,` ends at a line that opens a
+member, as antic reads it. A line that ends before a value, after the `:` or the
+`=` of the field, goes on with it.
 
 A brace whose `}` stands on the line of its `{` keeps to that line, with no
 break inside it and no level of its own. That is the form

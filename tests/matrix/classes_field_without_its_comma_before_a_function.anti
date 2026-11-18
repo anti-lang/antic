@@ -1,5 +1,5 @@
-//! A field without its comma ends the run of fields when a function of the
-//! body follows it.
+//! A field without its comma ends the run of fields when a function of the body
+//! follows it.
 import anti.io;
 import anti.text;
 

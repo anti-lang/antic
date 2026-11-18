@@ -1,6 +1,7 @@
-//! A field of a class body without its comma, before a function of the body.
-//! The field ends there, as antic reads it, so the header of the function
-//! stands at the level of the body and carries no continuation.
+//! A field of a class body or a value of an enum without its comma, before a
+//! function of the body. The field ends there, as antic reads it, so the header
+//! of the function stands at the level of the body and carries no continuation.
+//! A field whose type stands on the next line goes on with it.
 
 class Holder
 {
@@ -12,8 +13,38 @@ class Holder
 	}
 }
 
+class Counter
+{
+	pub step:
+		fn(int) -> int,
+	pub n: int
+
+	/// The count after one step.
+	pub fn next(self) -> int
+	{
+		return self.step(self.n);
+	}
+}
+
+enum Mode
+{
+	Read,
+	Write
+
+	pub fn code() -> int
+	{
+		return 1;
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
 fn main() -> int
 {
 	let h = Holder { x: 7 };
-	return h.get() - 7;
+	let c = Counter { step: twice, n: 3 };
+	return h.get() + c.next() + Mode.code() - 14;
 }
