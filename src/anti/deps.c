@@ -529,6 +529,23 @@ static const char *value_at(const struct anti_toml *doc, const char *head,
     return value;
 }
 
+/* Whether doc holds the entry at index of the array at head, as
+   `package.2`, whatever keys it lacks. value_at gives NULL past the end
+   of the array and for a key an entry lacks alike, and this tells the
+   two apart. */
+static bool entry_at(const struct anti_toml *doc, const char *head,
+                     size_t index)
+{
+    struct text key = {0};
+    int64_t shape;
+
+    text_appendf(&key, "%s.%zu", head, index);
+    shape = anti_rt_toml_shape(doc, (const unsigned char *)text_cstr(&key),
+                               (int64_t)key.length);
+    text_free(&key);
+    return shape != ANTI_TOML_NONE;
+}
+
 /* The highest version of the index doc of the package of req, read
    from file, that is not yanked and satisfies every requirement on the
    package, as its place in best. have says whether one answers. Returns
@@ -983,7 +1000,13 @@ static bool lock_read(const char *path, struct dep_graph *out)
         const char *path_value = value_at(doc, "package", i, ".path");
         struct dep_package *p;
         size_t j;
+        /* T299 of docs/audit/tests-findings.md: an entry without its
+           name or its version ends no list. The lock reads as none, so
+           the build resolves and writes it again. */
         if (name == NULL || version == NULL) {
+            if (entry_at(doc, "package", i)) {
+                deps_free(out);
+            }
             break;
         }
         if (!lock_package_valid(path, name, version, repo)) {
@@ -1002,11 +1025,16 @@ static bool lock_read(const char *path, struct dep_graph *out)
             struct text head = {0};
             const char *module;
             const char *digest;
+            bool held;
             text_appendf(&head, "package.%zu.modules", i);
             module = value_at(doc, text_cstr(&head), j, ".path");
             digest = value_at(doc, text_cstr(&head), j, ".sha256");
+            held = entry_at(doc, text_cstr(&head), j);
             text_free(&head);
+            /* A module without its path or its digest reads the lock as
+               none as well, by T299. */
             if (module == NULL || digest == NULL) {
+                valid = !held;
                 break;
             }
             if (!lock_module_valid(path, module, digest)) {
