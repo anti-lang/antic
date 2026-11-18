@@ -26,6 +26,19 @@ static size_t closing_brace(const struct parser *p)
     return p->last;
 }
 
+/* DESIGN: a body of a struct, a union, an enum or a variant that fails to
+   parse is left past its closing brace at close, so the rest of it never
+   reads as items of the module, as a class body is. One mistake in a body
+   gives one message, by T295 of docs/audit/tests-findings.md. A body that
+   the end of the source cuts has no closing brace, and the recovery of
+   the module goes on where the body failed. */
+static void leave_body(struct parser *p, size_t close)
+{
+    if (close > p->pos && close < p->last) {
+        p->pos = close + 1;
+    }
+}
+
 /* `align(N)` after the name of a struct, a union, a class or a variant,
    when it stands there. Returns false after an error. */
 static bool align_clause(struct parser *p, struct item *it)
@@ -311,6 +324,7 @@ static bool variant_case(struct parser *p, struct variant_case *one)
 static struct item *variant_item(struct parser *p, struct item *it)
 {
     struct list cases = {NULL, 0, 0, sizeof(struct variant_case)};
+    size_t close;
 
     parser_next(p);
     it->kind = ITEM_VARIANT;
@@ -323,10 +337,12 @@ static struct item *variant_item(struct parser *p, struct item *it)
     if (!parser_expect(p, TOKEN_LBRACE)) {
         return NULL;
     }
+    close = closing_brace(p);
     while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF)) {
         struct variant_case one;
         if (!variant_case(p, &one)) {
             free(cases.data);
+            leave_body(p, close);
             return NULL;
         }
         parser_list_push(&cases, &one);
@@ -335,7 +351,11 @@ static struct item *variant_item(struct parser *p, struct item *it)
         }
     }
     it->cases = parser_list_finish(p, &cases, &it->case_count);
-    return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
+    if (!parser_expect(p, TOKEN_RBRACE)) {
+        leave_body(p, close);
+        return NULL;
+    }
+    return it;
 }
 
 /* `struct Point { x: f32, y: f32 }` and `union`, with their fields.
@@ -345,6 +365,8 @@ static struct item *variant_item(struct parser *p, struct item *it)
 static struct item *struct_item(struct parser *p, struct item *it)
 {
     struct list fields = {NULL, 0, 0, sizeof(struct param)};
+    size_t close;
+
     it->kind =
         parser_next(p)->kind == TOKEN_UNION ? ITEM_UNION : ITEM_STRUCT;
     if (!parser_expect_name(p, &it->name) ||
@@ -363,6 +385,7 @@ static struct item *struct_item(struct parser *p, struct item *it)
     if (!parser_header_clauses(p) || !parser_expect(p, TOKEN_LBRACE)) {
         return NULL;
     }
+    close = closing_brace(p);
     do {
         struct param field;
         size_t mark;
@@ -372,11 +395,13 @@ static struct item *struct_item(struct parser *p, struct item *it)
         field.pos = parser_pos_of(parser_peek(p));
         if (!parser_struct_field_only(p, it)) {
             free(fields.data);
+            leave_body(p, close);
             return NULL;
         }
         mark = p->clauses->count;
         if (!field_declaration(p, &field, false)) {
             free(fields.data);
+            leave_body(p, close);
             return NULL;
         }
         field.unchecked = parser_unchecks_guard(p, mark);
@@ -386,12 +411,17 @@ static struct item *struct_item(struct parser *p, struct item *it)
                                  "which belongs to a class",
                               it->kind == ITEM_UNION ? "union" : "struct");
             free(fields.data);
+            leave_body(p, close);
             return NULL;
         }
         parser_list_push(&fields, &field);
     } while (parser_accept(p, TOKEN_COMMA) && !parser_check(p, TOKEN_RBRACE));
     it->params = parser_list_finish(p, &fields, &it->param_count);
-    return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
+    if (!parser_expect(p, TOKEN_RBRACE)) {
+        leave_body(p, close);
+        return NULL;
+    }
+    return it;
 }
 
 /* `enum Mode: u8 { Read, Write = 2 }`, its values and then its
@@ -399,6 +429,8 @@ static struct item *struct_item(struct parser *p, struct item *it)
 static struct item *enum_item(struct parser *p, struct item *it)
 {
     struct list values = {NULL, 0, 0, sizeof(struct param)};
+    size_t close;
+
     parser_next(p);
     it->kind = ITEM_ENUM;
     if (!parser_expect_name(p, &it->name)) {
@@ -413,6 +445,7 @@ static struct item *enum_item(struct parser *p, struct item *it)
     if (!parser_expect(p, TOKEN_LBRACE)) {
         return NULL;
     }
+    close = closing_brace(p);
     while (!parser_check(p, TOKEN_RBRACE) && !parser_check(p, TOKEN_EOF) &&
            !parser_starts_member(p)) {
         struct param value;
@@ -424,6 +457,7 @@ static struct item *enum_item(struct parser *p, struct item *it)
             (parser_accept(p, TOKEN_ASSIGN) &&
              (value.value = parser_expression(p)) == NULL)) {
             free(values.data);
+            leave_body(p, close);
             return NULL;
         }
         parser_list_push(&values, &value);
@@ -432,10 +466,11 @@ static struct item *enum_item(struct parser *p, struct item *it)
         }
     }
     it->params = parser_list_finish(p, &values, &it->param_count);
-    if (!parser_members_of(p, it, NULL)) {
+    if (!parser_members_of(p, it, NULL) || !parser_expect(p, TOKEN_RBRACE)) {
+        leave_body(p, close);
         return NULL;
     }
-    return parser_expect(p, TOKEN_RBRACE) ? it : NULL;
+    return it;
 }
 
 /* Whether `class` stands at the token ahead, or `synchronized class` or

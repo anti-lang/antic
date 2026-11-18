@@ -23,9 +23,9 @@
 /* DESIGN: recursive descent, one function per grammar rule, with
    precedence climbing for the binary operators. After an error the parser
    is in panic mode and reports nothing more. It skips to the start of a
-   statement or an item, and past the closing brace of a class body that
-   failed, so one mistake produces one message, by T101 of
-   docs/audit/tests-findings.md. */
+   statement or an item, and past the closing brace of a body of a class,
+   a struct, a union, an enum or a variant that failed, so one mistake
+   produces one message, by T101 and T295 of docs/audit/tests-findings.md. */
 
 struct parser {
     const char *source;
