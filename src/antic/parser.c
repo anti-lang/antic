@@ -327,6 +327,39 @@ struct doc_text parser_doc_before(struct parser *p, enum token_kind kind)
    are skipped, so the `}` never ends the block around the statement and
    no keyword inside it starts the next statement, by T100 of
    docs/audit/tests-findings.md. */
+/* DESIGN: a `;` where an operand stands, as in `f(;);`, ends a statement
+   that failed, and the `)` and `]` after it close the brackets the
+   statement opened before it. Those closing brackets and the `;` after
+   them belong to the statement that failed, so the next statement starts
+   after them. One mistake gives one message, by T296 of
+   docs/audit/tests-findings.md. semicolon is the index of that `;`. */
+static void pass_closers(struct parser *p, size_t from, size_t semicolon)
+{
+    size_t open = 0;
+    size_t i;
+
+    for (i = from; i < semicolon; i++) {
+        enum token_kind kind = p->tokens[i].kind;
+        if (kind == TOKEN_LPAREN || kind == TOKEN_LBRACKET) {
+            open++;
+        } else if ((kind == TOKEN_RPAREN || kind == TOKEN_RBRACKET) &&
+                   open > 0) {
+            open--;
+        }
+    }
+    if (open == 0) {
+        return;
+    }
+    while (open > 0 && (parser_check(p, TOKEN_RPAREN) ||
+                        parser_check(p, TOKEN_RBRACKET))) {
+        parser_next(p);
+        open--;
+    }
+    if (open == 0) {
+        parser_accept(p, TOKEN_SEMICOLON);
+    }
+}
+
 void parser_sync_statement(struct parser *p, size_t from)
 {
     size_t open = 0;
@@ -369,10 +402,13 @@ void parser_sync_statement(struct parser *p, size_t from)
             continue;
         }
         switch (kind) {
-        case TOKEN_SEMICOLON:
+        case TOKEN_SEMICOLON: {
+            size_t semicolon = p->pos;
             parser_next(p);
+            pass_closers(p, from, semicolon);
             p->panic = false;
             return;
+        }
         case TOKEN_RBRACE:
         case TOKEN_LET:
         case TOKEN_CONST:
