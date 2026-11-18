@@ -2324,6 +2324,35 @@ static void damaged_simd(void)
     compilation_close(&s);
 }
 
+/* Two structs that no `simd struct` may be: one of bitfields and one
+   with a unit break between its fields. The flag of a simd struct on
+   either is refused, in the type table and in the IR. */
+static const char lanes_source[] =
+    "pub struct ZB { zb1: u8 : 4, zb2: u8 : 4 }\n"
+    "pub struct ZU { zu: i64, _: i64 : 0, zv: i64 }\n"
+    "pub fn zb(b: ZB, u: ZU) -> int { return 0; }\n";
+
+static void damaged_lanes(void)
+{
+    static const uint8_t type_simd = 16;
+    static const uint8_t agg_simd = 2;
+    struct compilation s;
+    struct text bytes = {0};
+
+    compilation_open(&s);
+    if (build_library(&s, "zl", lanes_source, &bytes)) {
+        CHECK(verifies_file((const uint8_t *)bytes.data, bytes.length));
+        CHECK(((const uint8_t *)bytes.data)[type_flags(&bytes, "zb1")] == 0);
+        CHECK(((const uint8_t *)bytes.data)[agg_flags(&bytes, "zb1")] == 0);
+        CHECK(((const uint8_t *)bytes.data)[type_flags(&bytes, "zu")] == 0);
+        refuses_poke(&bytes, type_flags(&bytes, "zb1"), &type_simd, 1);
+        refuses_poke(&bytes, agg_flags(&bytes, "zb1"), &agg_simd, 1);
+        refuses_poke(&bytes, type_flags(&bytes, "zu"), &type_simd, 1);
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
 /* A library of constants: a class with defaults, and a class whose
    descriptor is a global with a value. */
 static const char const_source[] =
@@ -4290,6 +4319,530 @@ static void damaged_trees(void)
     }
 }
 
+/* Batch 3u of coverage: the rules of antl_verify.c that no damage above
+   breaks. Each damage below writes the tree of a generic with one
+   relation the checker never leaves, and the reader refuses the file.
+   Where a rule lets a relation stand, the file reads. */
+
+/* The statement of kind among the top statements of the generic name,
+   the nth of that kind. */
+static struct stmt *stmt_of(struct damaged *s, const char *name,
+                            enum stmt_kind kind, size_t nth)
+{
+    const struct item *it = generic_of(s->written, name);
+    size_t i;
+
+    for (i = 0; it != NULL && i < it->body->count; i++) {
+        struct stmt *st = it->body->stmts[i];
+        if (st->kind == kind && nth-- == 0) {
+            return st;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no statement of kind %d in `%s`\n", (int)kind, name);
+    return NULL;
+}
+
+/* The statement `let name` of the generic `tree`. */
+static struct stmt *tree_let_stmt(struct damaged *s, const char *name)
+{
+    struct item *it = tree_of(s);
+    size_t i;
+
+    for (i = 0; it != NULL && i < it->body->count; i++) {
+        struct stmt *st = it->body->stmts[i];
+        if (st->kind == STMT_LET && st->as.let.name.length == strlen(name) &&
+            memcmp(st->as.let.name.text, name, strlen(name)) == 0) {
+            return st;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no `let %s`\n", name);
+    return NULL;
+}
+
+/* The target of `total = total + px + sl.len;` without a type. A target
+   goes without one where it is an index on a value of a type parameter
+   alone. */
+static void name_target_without_type(struct damaged *s)
+{
+    tree_stmt(s, STMT_ASSIGN, 0)->as.assign.target->type = NULL;
+}
+
+/* The name `Circle` of the arm of the `switch` as the base of
+   `TColor.Green` too, which names a type there. The name of a case
+   stands in its arm alone. */
+static void case_in_two_places(struct damaged *s)
+{
+    tree_let(s, "color")->as.field.base =
+        tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.arms[0].value;
+}
+
+/* A chain of `-` of length under `-n`, which the anonymous function `f`
+   then holds as well, as the right operand of `k + 1`. */
+static size_t chain_length;
+
+static void chain_in_two_places(struct damaged *s)
+{
+    struct item *fn;
+    struct stmt *ret;
+
+    unary_chain(s, chain_length);
+    fn = tree_let(s, "f")->as.fn;
+    ret = fn->body->stmts[0];
+    ret->as.return_value->as.binary.right =
+        tree_let(s, "neg")->as.unary.operand;
+}
+
+static void long_chain(struct damaged *s)
+{
+    unary_chain(s, chain_length);
+}
+
+/* `s is TShape.Circle` on a value without a type. */
+static void cast_operand_without_type(struct damaged *s)
+{
+    tree_let(s, "tested")->as.cast.operand->type = NULL;
+}
+
+/* The callee of the copy `tpair(x, n)` as the expression `-n` that names
+   the function `tpair`. The copy pass finds the arguments of a copy
+   through a callee that is a name or a field alone. */
+static void copy_callee_not_a_name(struct damaged *s)
+{
+    struct expr *call = tree_let(s, "kept");
+    struct expr *callee = arena_alloc(s->arena, sizeof *callee);
+
+    *callee = *tree_let(s, "neg");
+    callee->symbol = call->as.call.callee->symbol;
+    call->as.call.callee = callee;
+}
+
+/* The callee `thelper` of `thelper(sum)` without a type, which lowering
+   reads by its symbol. */
+static void callee_name_without_type(struct damaged *s)
+{
+    helper_call(s)->as.call.callee->type = NULL;
+}
+
+/* The callee of `thelper(sum)` as the field `pt.x` without a type and
+   without its base. */
+static void callee_field_without_base(struct damaged *s)
+{
+    struct expr *field = arena_alloc(s->arena, sizeof *field);
+
+    *field = *tree_let(s, "px");
+    field->type = NULL;
+    field->symbol = NULL;
+    field->as.field.base = NULL;
+    helper_call(s)->as.call.callee = field;
+}
+
+/* `for j in 0..10 by -3` with the name `j` twice. A range binds one
+   name. */
+static void range_with_two_names(struct damaged *s)
+{
+    struct stmt *loop = tree_stmt(s, STMT_FOR, 2);
+    struct binding *names = arena_alloc(s->arena, 2 * sizeof *names);
+
+    names[0] = loop->as.for_loop.names[0];
+    names[1] = loop->as.for_loop.names[0];
+    loop->as.for_loop.names = names;
+    loop->as.for_loop.name_count = 2;
+}
+
+/* `for v in xs` with three names. A walk binds the element and an index
+   at the most. */
+static void walk_with_three_names(struct damaged *s)
+{
+    struct stmt *loop = tree_stmt(s, STMT_FOR, 1);
+    struct binding *names = arena_alloc(s->arena, 3 * sizeof *names);
+
+    names[0] = loop->as.for_loop.names[0];
+    names[1] = loop->as.for_loop.names[0];
+    names[2] = loop->as.for_loop.names[0];
+    loop->as.for_loop.names = names;
+    loop->as.for_loop.name_count = 3;
+}
+
+/* `for j in 0..10 by -3` with no name and with `j` as its element. */
+static void range_with_element(struct damaged *s)
+{
+    struct stmt *loop = tree_stmt(s, STMT_FOR, 2);
+
+    loop->as.for_loop.element = loop->as.for_loop.names[0].symbol;
+    loop->as.for_loop.name_count = 0;
+}
+
+/* `for v in xs` over a value without a type. */
+static void walk_over_without_type(struct damaged *s)
+{
+    tree_stmt(s, STMT_FOR, 1)->as.for_loop.over->type = NULL;
+}
+
+/* The arm `Circle c =>` with no value, no case and no test. */
+static void arm_without_value(struct damaged *s)
+{
+    struct switch_arm *arm =
+        &tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.arms[0];
+
+    arm->variant_case = 0;
+    arm->bound = NULL;
+    arm->value = NULL;
+}
+
+/* The arm `Circle c =>` with the expression `-n` in place of the name of
+   its case. */
+static void arm_case_not_a_name(struct damaged *s)
+{
+    tree_stmt(s, STMT_SWITCH, 0)->as.switch_stmt.arms[0].value =
+        tree_let(s, "neg");
+}
+
+/* The local `sum` without a type. */
+static void local_without_type(struct damaged *s)
+{
+    tree_let_stmt(s, "sum")->as.let.symbol->type = NULL;
+}
+
+/* The shuffle of `flip` without its first argument. */
+static void simd_without_argument(struct damaged *s)
+{
+    generic_of(s->written, "flip")
+        ->body->stmts[0]
+        ->as.return_value->as.simd.args[0] = NULL;
+}
+
+/* The shuffle of `flip` without its lanes. */
+static void shuffle_without_lanes(struct damaged *s)
+{
+    generic_of(s->written, "flip")
+        ->body->stmts[0]
+        ->as.return_value->as.simd.lanes = NULL;
+}
+
+/* A generic of the forms that tree_source lacks: the repeat form of an
+   array, `in`, `take`, an index as a target, a destructuring, `==` that
+   calls an `operator fn eq` of a part, a hash that calls an `operator fn
+   hash` of a part, `sync` and the two walks of an iterator, which lend
+   each element and copy it. */
+static const char forms_source[] =
+    "pub class FB { pub own p: ?*int = none }\n"
+    "pub struct FE { a: int }\n"
+    "operator fn eq(x: FE, y: FE) -> bool {\n"
+    "    return x.a == y.a;\n"
+    "}\n"
+    "pub struct FW { q: FE }\n"
+    "pub struct FH { a: int }\n"
+    "operator fn hash(x: FH) -> u64 {\n"
+    "    return 1;\n"
+    "}\n"
+    "pub class FBag {\n"
+    "    pub items: [3]int = [1, 2, 3],\n"
+    "    operator fn iter(self) -> FIter {\n"
+    "        return FIter { bag: self, at: -1 };\n"
+    "    }\n"
+    "}\n"
+    "pub class FIter {\n"
+    "    pub bag: *FBag,\n"
+    "    pub at: int,\n"
+    "    operator fn next(self) -> bool {\n"
+    "        self.at += 1;\n"
+    "        return self.at < 3;\n"
+    "    }\n"
+    "    operator fn value(self) -> lent *int {\n"
+    "        return &self.bag.items[self.at];\n"
+    "    }\n"
+    "}\n"
+    "pub fn forms<T>(x: T, n: int, b: *FB, xs: []int, pair: (int, int),"
+    " w: FW, v: FW, h: (FH, int), m: *Mutex, bag: *FBag) -> int {\n"
+    "    let arr = [n; 4];\n"
+    "    let inside = n in 0..10;\n"
+    "    let held = take(b.p);\n"
+    "    xs[0] = 1;\n"
+    "    let (l, r) = pair;\n"
+    "    let same = w == v;\n"
+    "    let hashed = h.hash();\n"
+    "    sync m {\n"
+    "        xs[1] = 2;\n"
+    "    }\n"
+    "    for e in &bag {\n"
+    "        *e += 1;\n"
+    "    }\n"
+    "    for k in bag {\n"
+    "        xs[2] = k;\n"
+    "    }\n"
+    "    free(held);\n"
+    "    return l + r;\n"
+    "}\n";
+
+/* The value of `let name` in the body of `forms`, which is of kind. */
+static struct expr *forms_let(struct damaged *s, const char *name,
+                              enum expr_kind kind)
+{
+    const struct item *it = generic_of(s->written, "forms");
+    size_t i;
+
+    for (i = 0; it != NULL && i < it->body->count; i++) {
+        struct stmt *st = it->body->stmts[i];
+        if (st->kind == STMT_LET && st->as.let.name.length == strlen(name) &&
+            memcmp(st->as.let.name.text, name, strlen(name)) == 0 &&
+            st->as.let.value->kind == kind) {
+            return st->as.let.value;
+        }
+    }
+    check_failures++;
+    fprintf(stderr, "no `let %s` of kind %d\n", name, (int)kind);
+    return NULL;
+}
+
+static void repeat_without_value(struct damaged *s)
+{
+    forms_let(s, "arr", EXPR_ARRAY_REPEAT)->as.array_repeat.value = NULL;
+}
+
+static void repeat_without_count(struct damaged *s)
+{
+    forms_let(s, "arr", EXPR_ARRAY_REPEAT)->as.array_repeat.count = NULL;
+}
+
+static void in_without_value(struct damaged *s)
+{
+    forms_let(s, "inside", EXPR_IN)->as.in.value = NULL;
+}
+
+static void in_without_low(struct damaged *s)
+{
+    forms_let(s, "inside", EXPR_IN)->as.in.low = NULL;
+}
+
+static void in_without_high(struct damaged *s)
+{
+    forms_let(s, "inside", EXPR_IN)->as.in.high = NULL;
+}
+
+static void take_without_place(struct damaged *s)
+{
+    forms_let(s, "held", EXPR_TAKE)->as.take = NULL;
+}
+
+/* `take(b)`, of a name in place of a field. */
+static void take_of_a_name(struct damaged *s)
+{
+    struct expr *take = forms_let(s, "held", EXPR_TAKE);
+
+    take->as.take = take->as.take->as.field.base;
+}
+
+/* The target `xs[0]` without a type, on a slice. */
+static void index_target_without_type(struct damaged *s)
+{
+    stmt_of(s, "forms", STMT_ASSIGN, 0)->as.assign.target->type = NULL;
+}
+
+/* The target `xs[0]` without a type and without its base. */
+static void index_target_without_base(struct damaged *s)
+{
+    struct expr *target =
+        stmt_of(s, "forms", STMT_ASSIGN, 0)->as.assign.target;
+
+    target->type = NULL;
+    target->as.index.base = NULL;
+}
+
+/* The target `xs[0]` without a type, on a base without a type. */
+static void index_target_on_base_without_type(struct damaged *s)
+{
+    struct expr *target =
+        stmt_of(s, "forms", STMT_ASSIGN, 0)->as.assign.target;
+
+    target->type = NULL;
+    target->as.index.base->type = NULL;
+}
+
+/* `let (l, r) = pair;` with the name `l` without its symbol. */
+static void destructuring_name_without_symbol(struct damaged *s)
+{
+    struct stmt *let = stmt_of(s, "forms", STMT_LET, 3);
+
+    CHECK(let->as.let.name_count == 2);
+    let->as.let.names[0].symbol = NULL;
+}
+
+/* `w == v` without the call of `operator fn eq` of `FE`. */
+static void eq_call_missing(struct damaged *s)
+{
+    struct expr *same = forms_let(s, "same", EXPR_BINARY);
+
+    CHECK(same->as.binary.eq_count == 1);
+    same->as.binary.eq_calls[0] = NULL;
+}
+
+/* `h.hash()` without the call of `operator fn hash` of `FH`. */
+static void hash_call_missing(struct damaged *s)
+{
+    struct expr *hashed = forms_let(s, "hashed", EXPR_CALL);
+
+    CHECK(hashed->as.call.hash_count == 1);
+    hashed->as.call.hash_calls[0] = NULL;
+}
+
+/* `for e in &bag` without the place of the element it lends. */
+static void lent_walk_without_place(struct damaged *s)
+{
+    stmt_of(s, "forms", STMT_FOR, 0)->as.for_loop.hooks.place = NULL;
+}
+
+/* `for k in bag` without the value of the element it copies. */
+static void copy_walk_without_value(struct damaged *s)
+{
+    stmt_of(s, "forms", STMT_FOR, 1)->as.for_loop.hooks.current = NULL;
+}
+
+static void sync_without_mutex(struct damaged *s)
+{
+    stmt_of(s, "forms", STMT_SYNC, 0)->as.sync.mutex = NULL;
+}
+
+static void sync_without_body(struct damaged *s)
+{
+    stmt_of(s, "forms", STMT_SYNC, 0)->as.sync.body = NULL;
+}
+
+/* Read the library of source written with damage, or refuse it. */
+static void source_file(const char *source, void (*damage)(struct damaged *),
+                        bool reads)
+{
+    struct compilation s;
+    struct text bytes = {0};
+
+    compilation_open(&s);
+    if (build_damaged(&s, "tf", source, damage, &bytes)) {
+        if (reads) {
+            CHECK(reads_file(&bytes));
+        } else {
+            refuses_file((const uint8_t *)bytes.data, bytes.length, NULL);
+        }
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
+/* The longest chain of `-` under `-n` that the anonymous function `f`
+   may hold as well, found by trying each length from the deepest. */
+static size_t longest_shared_chain(void)
+{
+    size_t length;
+
+    for (length = ANTL_TREE_DEPTH_MAX; length > 0; length--) {
+        struct compilation s;
+        struct text bytes = {0};
+        bool read = false;
+        chain_length = length;
+        compilation_open(&s);
+        if (build_damaged(&s, "tt", tree_source, chain_in_two_places,
+                          &bytes)) {
+            struct compilation r;
+            struct ir_module program;
+            char error[160] = "";
+            compilation_open(&r);
+            ir_module_init(&program, &r.arena, "main");
+            read = compilation_read(&r, (const uint8_t *)bytes.data,
+                                    bytes.length, &program, error,
+                                    sizeof error) != NULL;
+            ir_module_free(&program);
+            compilation_close(&r);
+        }
+        text_free(&bytes);
+        compilation_close(&s);
+        if (read) {
+            return length;
+        }
+    }
+    return 0;
+}
+
+/* An expression may stand in more than one place, and it nests as deep
+   as the deepest of them. The chain that the deeper place cannot hold
+   any longer still reads in the one place of `-n`. */
+static void shared_chains(void)
+{
+    size_t longest = longest_shared_chain();
+
+    CHECK(longest > 0);
+    chain_length = longest + 1;
+    tree_file(long_chain, true);
+    tree_file(chain_in_two_places, false);
+}
+
+/* The record of the private function `thelper` with the kind of a
+   parameter, and of a local. The writer keeps both kinds in the table of
+   the tree, so the kind past the last that extern_past_kinds writes finds
+   the byte of the kind. */
+static void extern_kind_bytes(void)
+{
+    static const uint8_t param = SYMBOL_PARAM;
+    static const uint8_t local = SYMBOL_LOCAL;
+    struct compilation s;
+    struct text plain = {0};
+    size_t at;
+
+    compilation_open(&s);
+    if (build_library(&s, "tt", tree_source, &plain)) {
+        at = tree_difference(&plain, extern_past_kinds);
+        CHECK(at != SIZE_MAX && (uint8_t)plain.data[at] == SYMBOL_FN);
+        if (at != SIZE_MAX) {
+            refuses_poke(&plain, at, &param, 1);
+            refuses_poke(&plain, at, &local, 1);
+        }
+    }
+    text_free(&plain);
+    compilation_close(&s);
+}
+
+static void damaged_forms(void)
+{
+    void (*const trees[])(struct damaged *) = {
+        name_target_without_type, case_in_two_places,
+        cast_operand_without_type, copy_callee_not_a_name,
+        callee_field_without_base, range_with_two_names,
+        walk_with_three_names,     range_with_element,
+        walk_over_without_type,    arm_without_value,
+        arm_case_not_a_name,       local_without_type};
+    void (*const forms[])(struct damaged *) = {
+        repeat_without_value,
+        repeat_without_count,
+        in_without_value,
+        in_without_low,
+        in_without_high,
+        take_without_place,
+        take_of_a_name,
+        index_target_without_type,
+        index_target_without_base,
+        index_target_on_base_without_type,
+        destructuring_name_without_symbol,
+        eq_call_missing,
+        hash_call_missing,
+        lent_walk_without_place,
+        copy_walk_without_value,
+        sync_without_mutex,
+        sync_without_body};
+    size_t i;
+
+    for (i = 0; i < sizeof trees / sizeof trees[0]; i++) {
+        tree_file(trees[i], false);
+    }
+    tree_file(callee_name_without_type, true);
+    shared_chains();
+    source_file(forms_source, NULL, true);
+    for (i = 0; i < sizeof forms / sizeof forms[0]; i++) {
+        source_file(forms_source, forms[i], false);
+    }
+    source_file(shuffle_source, simd_without_argument, false);
+    source_file(shuffle_source, shuffle_without_lanes, false);
+    extern_kind_bytes();
+}
+
 /* A generic that calls a function of the root, whose C symbol the file
    carries beside its name. */
 static const char root_source[] =
@@ -5551,6 +6104,7 @@ void test_modules(void)
     wide_addresses();
     declared_types();
     damaged_trees();
+    damaged_forms();
     damaged_declarations();
     damaged_bytes();
     tree_counts();
@@ -5589,6 +6143,7 @@ void test_modules(void)
     lock_edge_to_itself();
     damaged_records();
     damaged_simd();
+    damaged_lanes();
     damaged_constants();
     damaged_relocations();
     damaged_signatures();
