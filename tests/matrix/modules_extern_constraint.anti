@@ -1,0 +1,9 @@
+//! An `extern` item is a function. A constraint declared after `extern` gets
+//! one message, at `constraint`.
+
+extern constraint Sized;
+
+fn main() -> int
+{
+	return 0;
+}

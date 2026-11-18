@@ -1,0 +1,9 @@
+//! A worker is a function of Anti. An `extern fn` with `worker` after `extern`
+//! gets one message, at `worker`.
+
+extern worker fn abs(n: c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

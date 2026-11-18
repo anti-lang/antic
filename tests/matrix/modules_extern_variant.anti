@@ -1,0 +1,9 @@
+//! An `extern` item is a function. A variant declared after `extern` gets one
+//! message, at `variant`.
+
+extern variant Shape;
+
+fn main() -> int
+{
+	return 0;
+}

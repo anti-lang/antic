@@ -1,0 +1,9 @@
+//! `pub` stands before `extern`. An `extern fn` with `pub` after `extern` gets
+//! one message, at `pub`.
+
+extern pub fn abs(n: c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

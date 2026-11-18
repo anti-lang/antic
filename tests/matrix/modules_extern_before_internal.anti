@@ -1,0 +1,9 @@
+//! `internal` stands before `extern`. An `extern fn` with `internal` after
+//! `extern` gets one message, at `internal`.
+
+extern internal fn abs(n: c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

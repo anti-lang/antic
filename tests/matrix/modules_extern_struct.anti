@@ -1,0 +1,9 @@
+//! An `extern` item is a function. A C struct declared after `extern` gets one
+//! message, at `struct`.
+
+extern struct Handle;
+
+fn main() -> int
+{
+	return 0;
+}

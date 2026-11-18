@@ -1,0 +1,9 @@
+//! An `extern fn` is not exported. One with `export` after `extern` gets one
+//! message, at `export`.
+
+extern export fn abs(n: c_int) -> c_int;
+
+fn main() -> int
+{
+	return 0;
+}

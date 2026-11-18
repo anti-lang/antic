@@ -1,0 +1,9 @@
+//! An `extern` item is a function. A C constant declared after `extern` gets
+//! one message, at `const`.
+
+extern const LIMIT: c_int;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,9 @@
+//! An `extern` item is a function. A C type declared after `extern` gets one
+//! message, at `type`.
+
+extern type Size;
+
+fn main() -> int
+{
+	return 0;
+}

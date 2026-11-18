@@ -1,0 +1,9 @@
+//! An `extern` item is a function. A C union declared after `extern` gets one
+//! message, at `union`.
+
+extern union Word;
+
+fn main() -> int
+{
+	return 0;
+}
