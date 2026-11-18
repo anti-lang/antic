@@ -281,21 +281,22 @@ static bool read_configuration(struct configuration *c, const char *path,
         size_t k;
         /* The array of `plugins` stands as plugins.0 and further, and a
            file that sets it replaces what an include gave. A text holds
-           the directories as `--anti.plugins` writes them. */
+           the directories as `--anti.plugins` writes them. An empty text
+           names no directory, and an empty directory before, between or
+           after the separators stays, as the runtime reads it. T306 of
+           docs/audit/tests-findings.md. */
         if (strcmp(key, "runtime.plugins") == 0 ||
             strcmp(key, "runtime.plugins.0") == 0) {
             texts_free(&c->plugins);
         }
         if (strcmp(key, "runtime.plugins") == 0) {
             const char *at = value;
-            while (*at != '\0') {
-                const char *stop = strchr(at, ':');
-                size_t length = stop != NULL ? (size_t)(stop - at)
-                                             : strlen(at);
-                if (length > 0) {
-                    texts_add(&c->plugins, at, length);
-                }
-                at += length + (stop != NULL ? 1 : 0);
+            bool more = *at != '\0';
+            while (more) {
+                size_t length = strcspn(at, ":");
+                texts_add(&c->plugins, at, length);
+                more = at[length] != '\0';
+                at += length + (more ? 1 : 0);
             }
         } else if (strncmp(key, "runtime.plugins.", 16) == 0) {
             texts_add(&c->plugins, value, strlen(value));
@@ -364,7 +365,13 @@ static bool find_binaries(const char *conf, struct binaries *out)
         struct text index = {0};
         struct text bytes = {0};
         struct anti_toml *doc = NULL;
-        resolved(text_cstr(&c.dir), text_cstr(&c.plugins.items[i]), &dir);
+        /* An empty directory is the one the program runs in, which is
+           the directory of the configuration. */
+        if (c.plugins.items[i].length == 0) {
+            text_append(&dir, text_cstr(&c.dir));
+        } else {
+            resolved(text_cstr(&c.dir), text_cstr(&c.plugins.items[i]), &dir);
+        }
         text_appendf(&index, "%s/%s", text_cstr(&dir), ANTI_PLUGIN_INDEX);
         if (files_read_file(text_cstr(&index), &bytes)) {
             doc = anti_rt_toml_read((const unsigned char *)bytes.data,
