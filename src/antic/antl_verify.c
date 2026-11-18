@@ -31,8 +31,8 @@
      stand in several, since the checker shares some, and the copy pass
      keeps it shared through its map.
    - A reference stands where the checker always sets one: the symbol of
-     a name, the operands of an operator, the body of a loop, the type of
-     an expression that lowering evaluates.
+     a name and of a `let`, the operands of an operator, the body of a
+     loop, the type of an expression that lowering evaluates.
    - A number that indexes a type stays inside it: the case of a variant,
      the value of an enum, the lanes of a shuffle and the place of `else`
      among the arms of a `switch`.
@@ -534,7 +534,10 @@ static void check_stmt(struct verify *v, const struct stmt *s)
     switch (s->kind) {
     case STMT_LET:
     case STMT_CONST:
-        need(v, (s->as.let.symbol != NULL || s->as.let.name_count > 0) &&
+        /* A destructuring has the symbol of the value its names take
+           apart, which lowering reads, by T292 of
+           docs/audit/tests-findings.md. */
+        need(v, s->as.let.symbol != NULL &&
                     bindings_set(s->as.let.names, s->as.let.name_count));
         break;
     case STMT_EXPR:
