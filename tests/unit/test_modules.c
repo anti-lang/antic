@@ -4669,6 +4669,16 @@ static void destructuring_name_without_symbol(struct damaged *s)
     let->as.let.names[0].symbol = NULL;
 }
 
+/* T292: `let (l, r) = pair;` without the symbol of the value the names
+   take apart. Lowering reads the symbol of every `let`. */
+static void destructuring_without_value(struct damaged *s)
+{
+    struct stmt *let = stmt_of(s, "forms", STMT_LET, 3);
+
+    CHECK(let->as.let.name_count == 2);
+    let->as.let.symbol = NULL;
+}
+
 /* `w == v` without the call of `operator fn eq` of `FE`. */
 static void eq_call_missing(struct damaged *s)
 {
@@ -4821,6 +4831,7 @@ static void damaged_forms(void)
         index_target_without_base,
         index_target_on_base_without_type,
         destructuring_name_without_symbol,
+        destructuring_without_value,
         eq_call_missing,
         hash_call_missing,
         lent_walk_without_place,
