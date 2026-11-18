@@ -1,0 +1,6 @@
+exit 0
+inject 1
+transient 2
+own 3
+mutable 4
+compatible 5

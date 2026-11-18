@@ -1,0 +1,1 @@
+types_struct_align_without_its_parenthesis.anti:3:16: error: expected `(`

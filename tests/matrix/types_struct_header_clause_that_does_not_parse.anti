@@ -1,0 +1,11 @@
+//! A clause of a struct header names a warning and its reason.
+
+struct S allow(unused, 3)
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

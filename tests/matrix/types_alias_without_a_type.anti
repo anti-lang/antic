@@ -1,0 +1,8 @@
+//! A type alias names a type after `=`.
+
+type People =;
+
+fn main() -> int
+{
+	return 0;
+}

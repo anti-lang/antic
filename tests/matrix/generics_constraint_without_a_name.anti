@@ -1,0 +1,8 @@
+//! A `constraint` names itself after the word.
+
+constraint = eq;
+
+fn main() -> int
+{
+	return 0;
+}

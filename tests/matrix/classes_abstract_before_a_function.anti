@@ -1,0 +1,10 @@
+//! `abstract` stands before `class`, and a module function takes none.
+
+abstract fn f()
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

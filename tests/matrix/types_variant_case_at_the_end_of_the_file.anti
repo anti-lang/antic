@@ -1,0 +1,6 @@
+//! The fields of a case of a variant close with `}` before the end of the file.
+
+variant V
+{
+	A {
+		x: int,

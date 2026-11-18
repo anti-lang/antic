@@ -1,0 +1,11 @@
+//! `simd` stands before `struct`, and no class takes it.
+
+simd class S
+{
+	x: f32,
+}
+
+fn main() -> int
+{
+	return 0;
+}

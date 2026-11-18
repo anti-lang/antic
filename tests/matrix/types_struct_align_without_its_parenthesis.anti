@@ -1,0 +1,11 @@
+//! `align` takes its alignment in parentheses, `align(8)`.
+
+struct S align 8
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

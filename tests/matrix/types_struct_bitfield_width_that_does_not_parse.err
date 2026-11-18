@@ -1,0 +1,1 @@
+types_struct_bitfield_width_that_does_not_parse.anti:5:9: error: expected an expression

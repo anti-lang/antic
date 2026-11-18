@@ -1,0 +1,10 @@
+//! A clause of a class header names a warning and its reason.
+
+class A allow(unused, 3)
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

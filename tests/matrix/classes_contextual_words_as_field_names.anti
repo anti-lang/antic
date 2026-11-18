@@ -1,0 +1,39 @@
+//! A field of a class may carry a contextual word of a field as its name:
+//! `inject`, `transient`, `own`, `mutable` and `compatible`. After `inject`,
+//! the word `final` is the name of a field that a provider fills.
+import anti.io;
+import anti.log;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Holder
+{
+	inject final: *log.Logger,
+	pub inject: int,
+	pub transient: int,
+	pub own: int,
+	pub mutable: int,
+	pub compatible: int,
+}
+
+fn main() -> int
+{
+	let h = Holder {
+		inject: 1,
+		transient: 2,
+		own: 3,
+		mutable: 4,
+		compatible: 5,
+	};
+	say(f"inject {h.inject}");
+	say(f"transient {h.transient}");
+	say(f"own {h.own}");
+	say(f"mutable {h.mutable}");
+	say(f"compatible {h.compatible}");
+	return 0;
+}

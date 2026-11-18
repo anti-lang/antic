@@ -1,0 +1,5 @@
+//! A variant closes with `}` before the end of the file.
+
+variant V
+{
+	A,

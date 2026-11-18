@@ -1,0 +1,18 @@
+//! A class names its one base after one `inherits`.
+
+class B
+{
+}
+
+class C
+{
+}
+
+class A inherits B inherits C
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

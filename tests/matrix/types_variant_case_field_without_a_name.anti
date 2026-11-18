@@ -1,0 +1,11 @@
+//! A field of a case of a variant starts with its name.
+
+variant V
+{
+	A { 3: int },
+}
+
+fn main() -> int
+{
+	return 0;
+}

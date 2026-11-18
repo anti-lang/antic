@@ -1,0 +1,8 @@
+//! A type follows the arrow of an `extern fn`.
+
+extern fn f() ->;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! The width of a bitfield after its second colon is an expression.
+
+struct Bits
+{
+	x: u8 :,
+}
+
+fn main() -> int
+{
+	return 0;
+}

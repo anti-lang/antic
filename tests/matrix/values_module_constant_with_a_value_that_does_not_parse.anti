@@ -1,0 +1,8 @@
+//! The value of a constant of the module is an expression.
+
+const LIMIT: int =;
+
+fn main() -> int
+{
+	return 0;
+}

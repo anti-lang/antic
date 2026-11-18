@@ -1,0 +1,1 @@
+types_struct_header_clause_that_does_not_parse.anti:3:24: error: `allow` takes a name and a reason, `allow(name, "reason")`

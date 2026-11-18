@@ -1,0 +1,14 @@
+//! A type nested in a class is private to the class, and takes no `internal`.
+
+class Holder
+{
+	internal struct Inner
+	{
+		x: int,
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! `operator` stands before `fn`, and no struct takes it.
+
+operator struct S
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

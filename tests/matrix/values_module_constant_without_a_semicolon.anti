@@ -1,0 +1,8 @@
+//! A constant of the module ends with a semicolon.
+
+fn main() -> int
+{
+	return 0;
+}
+
+const LIMIT: int = 1

@@ -1,0 +1,8 @@
+//! A `constraint` gives its set after `=`.
+
+constraint Same eq;
+
+fn main() -> int
+{
+	return 0;
+}

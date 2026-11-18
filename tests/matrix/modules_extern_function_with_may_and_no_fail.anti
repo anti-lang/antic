@@ -1,0 +1,9 @@
+//! An `extern fn` ends with `;` after its signature, and `may` alone is no part
+//! of it.
+
+extern fn f() may;
+
+fn main() -> int
+{
+	return 0;
+}

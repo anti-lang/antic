@@ -1,0 +1,11 @@
+//! A field of a case of a variant names its type after a colon.
+
+variant V
+{
+	A { x int },
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! `synchronized` stands before `class`, and a module function takes none.
+
+synchronized fn f()
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

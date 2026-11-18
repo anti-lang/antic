@@ -1,0 +1,5 @@
+//! An enum closes with `}` before the end of the file.
+
+enum E
+{
+	A,

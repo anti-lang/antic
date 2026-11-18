@@ -1,0 +1,12 @@
+//! `allow` stands before a statement, and no clause of a field takes it after
+//! the default.
+
+class Holder
+{
+	x: int = 1 allow(x, "y"),
+}
+
+fn main() -> int
+{
+	return 0;
+}

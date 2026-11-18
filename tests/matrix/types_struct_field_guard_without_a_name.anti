@@ -1,0 +1,11 @@
+//! `guarded by` names the Mutex of a field.
+
+struct S
+{
+	x: int guarded by 3,
+}
+
+fn main() -> int
+{
+	return 0;
+}

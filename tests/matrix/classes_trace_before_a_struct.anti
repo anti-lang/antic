@@ -1,0 +1,11 @@
+//! `trace` marks a class or a function of one, and no struct.
+
+trace struct S
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

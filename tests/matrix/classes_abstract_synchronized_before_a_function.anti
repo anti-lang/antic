@@ -1,0 +1,10 @@
+//! `abstract synchronized` stands before `class`, and no function takes it.
+
+abstract synchronized fn f()
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

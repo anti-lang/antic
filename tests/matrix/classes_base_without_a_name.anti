@@ -1,0 +1,10 @@
+//! `inherits` names the base of a class.
+
+class A inherits
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

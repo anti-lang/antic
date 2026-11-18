@@ -1,0 +1,10 @@
+//! `singleton` stands before `class`, and a module function takes none.
+
+singleton fn f()
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

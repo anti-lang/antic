@@ -1,0 +1,11 @@
+//! The type parameters of a variant are names.
+
+variant V < T U >
+{
+	A,
+}
+
+fn main() -> int
+{
+	return 0;
+}

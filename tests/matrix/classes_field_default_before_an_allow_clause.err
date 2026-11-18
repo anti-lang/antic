@@ -1,0 +1,1 @@
+classes_field_default_before_an_allow_clause.anti:6:13: error: `allow` stands before a statement, last in a declaration's header or at the top of the file

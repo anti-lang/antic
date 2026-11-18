@@ -1,0 +1,10 @@
+//! `concurrent` stands before `class`, and a module function takes none.
+
+concurrent fn f()
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

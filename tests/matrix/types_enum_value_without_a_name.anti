@@ -1,0 +1,11 @@
+//! A value of an enum starts with its name.
+
+enum E
+{
+	3,
+}
+
+fn main() -> int
+{
+	return 0;
+}

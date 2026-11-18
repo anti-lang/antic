@@ -1,0 +1,11 @@
+//! `atomic` marks a field before its name, and is no name of a field itself.
+
+class Holder
+{
+	atomic: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

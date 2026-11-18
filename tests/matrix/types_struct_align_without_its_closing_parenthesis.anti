@@ -1,0 +1,11 @@
+//! The alignment of `align(8)` closes with `)`.
+
+struct S align(8 16)
+{
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,29 @@
+//! `compatible` takes a whole number as the floor of the versions a plugin may
+//! carry, as it takes `1.1`.
+import anti.io;
+
+abstract class Shape
+{
+	compatible 1;
+
+	pub abstract fn area(self) -> int;
+}
+
+class Square inherits Shape
+{
+	pub side: int,
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn main() -> int
+{
+	let s = Square { side: 3 };
+	if s.area() == 9 {
+		io.println("area 9");
+	}
+	return 0;
+}
