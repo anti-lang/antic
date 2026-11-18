@@ -560,7 +560,14 @@ static bool best_version(const struct resolver *r,
     for (i = 0;; i++) {
         const char *version = value_at(doc, "version", i, ".version");
         const char *yanked = value_at(doc, "version", i, ".yanked");
+        /* T300 of docs/audit/tests-findings.md: an entry that lacks a key
+           the reader needs ends no list. It leaves an index that anti
+           does not read, as one that is no TOML. */
         if (version == NULL) {
+            if (entry_at(doc, "version", i)) {
+                say_anti("%s is no index that anti reads\n", file);
+                return false;
+            }
             break;
         }
         /* S40, S45 and M13: a version reaches the comparison, a path of
@@ -601,11 +608,17 @@ static bool index_modules(const struct anti_toml *doc, const char *file,
         const char *module;
         const char *digest;
         struct dep_module *m;
+        bool held;
         text_appendf(&head, "version.%zu.modules", best);
         module = value_at(doc, text_cstr(&head), i, ".path");
         digest = value_at(doc, text_cstr(&head), i, ".sha256");
+        held = entry_at(doc, text_cstr(&head), i);
         text_free(&head);
         if (module == NULL || digest == NULL) {
+            if (held) {
+                say_anti("%s is no index that anti reads\n", file);
+                return false;
+            }
             break;
         }
         if (!manifest_name_valid(module)) {
@@ -640,12 +653,18 @@ static bool index_dependencies(struct resolver *r,
         const char *name;
         const char *constraint;
         const char *url;
+        bool held;
         text_appendf(&head, "version.%zu.dependencies", best);
         name = value_at(doc, text_cstr(&head), i, ".name");
         constraint = value_at(doc, text_cstr(&head), i, ".version");
         url = value_at(doc, text_cstr(&head), i, ".repo");
+        held = entry_at(doc, text_cstr(&head), i);
         text_free(&head);
         if (name == NULL) {
+            if (held) {
+                say_anti("%s is no index that anti reads\n", file);
+                return false;
+            }
             break;
         }
         if (!manifest_name_valid(name)) {
