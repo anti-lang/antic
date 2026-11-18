@@ -1,0 +1,27 @@
+//! A class body declares a struct, an enum or a class, and `singleton` before a
+//! nested class is read with it.
+import anti.io;
+
+class Outer
+{
+	pub x: int,
+
+	singleton class Inner
+	{
+		pub level: int = 3,
+	}
+
+	pub fn level(self) -> int
+	{
+		return Inner.get().level;
+	}
+}
+
+fn main() -> int
+{
+	let o = Outer { x: 1 };
+	if o.level() == 3 {
+		io.println("level 3");
+	}
+	return 0;
+}

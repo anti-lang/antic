@@ -1,0 +1,28 @@
+//! A class body declares a struct, an enum or a class, and `concurrent` before
+//! a nested class is read with it.
+import anti.io;
+
+class Outer
+{
+	pub x: int,
+
+	concurrent class Inner
+	{
+		pub atomic hits: int = 2,
+	}
+
+	pub fn hits(self) -> int
+	{
+		let c = Inner { };
+		return c.hits.load();
+	}
+}
+
+fn main() -> int
+{
+	let o = Outer { x: 1 };
+	if o.hits() == 2 {
+		io.println("hits 2");
+	}
+	return 0;
+}

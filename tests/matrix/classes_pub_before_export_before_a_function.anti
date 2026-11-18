@@ -1,0 +1,16 @@
+//! `export` stands first before a member.
+
+class C
+{
+	x: int,
+
+	pub export fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! `guarded` after the type of a field stands before `by`.
+
+class C
+{
+	lock: Mutex,
+	n: int guarded lock,
+}
+
+fn main() -> int
+{
+	return 0;
+}

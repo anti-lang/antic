@@ -1,0 +1,17 @@
+//! `lent` before the name of a type after `->` marks the result, and the mark
+//! stands before the result of `operator fn value` alone.
+
+struct Box
+{
+	n: int,
+}
+
+fn get() -> lent Box
+{
+	return Box { n: 1 };
+}
+
+fn main() -> int
+{
+	return 0;
+}

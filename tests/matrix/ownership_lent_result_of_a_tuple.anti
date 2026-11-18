@@ -1,0 +1,12 @@
+//! `lent` before a tuple after `->` marks the result, and the mark stands
+//! before the result of `operator fn value` alone.
+
+fn get() -> lent (int, int)
+{
+	return (1, 2);
+}
+
+fn main() -> int
+{
+	return 0;
+}

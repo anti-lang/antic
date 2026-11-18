@@ -1,0 +1,11 @@
+//! `lent` before `may` and no `fail` marks a result named `may`, which names no
+//! type.
+
+fn get() -> lent may
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

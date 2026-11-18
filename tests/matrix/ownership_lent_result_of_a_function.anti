@@ -1,0 +1,14 @@
+//! `lent` before a function type after `->` marks the result, and the mark
+//! stands before the result of `operator fn value` alone.
+
+fn one() { }
+
+fn get() -> lent fn()
+{
+	return one;
+}
+
+fn main() -> int
+{
+	return 0;
+}

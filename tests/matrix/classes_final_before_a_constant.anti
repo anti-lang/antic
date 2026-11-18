@@ -1,0 +1,13 @@
+//! `final` stands before `fn` in a class body, so before `const` it is the name
+//! of a field without its `:`.
+
+class C
+{
+	x: int,
+	final const N: int = 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

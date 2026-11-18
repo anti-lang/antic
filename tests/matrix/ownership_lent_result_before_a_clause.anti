@@ -1,0 +1,11 @@
+//! `lent` before a clause after `->` is the type of the result, so a type named
+//! `lent` is unknown.
+
+fn get() -> lent allow(unused-allow, "a clause")
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

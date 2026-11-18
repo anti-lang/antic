@@ -1,0 +1,26 @@
+//! A class header overrules a safety check other than `unguarded-field` for the
+//! whole declaration, and its fields stay guarded as before.
+import anti.io;
+import anti.regex;
+
+class Matcher unchecked(exponential-pattern, "the input is short")
+{
+	pub n: int,
+
+	pub fn matches(self, s: str) -> bool
+	{
+		if s.matches(re"(a+)+b") {
+			return true;
+		}
+		return false;
+	}
+}
+
+fn main() -> int
+{
+	let m = Matcher { n: 1 };
+	if m.matches("aab") {
+		io.println("matches");
+	}
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_export_before_a_nested_type.anti:7:2: error: a type declared in a class is private to the class, and takes no `pub`, `export`, `internal` or `protected`

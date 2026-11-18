@@ -1,0 +1,12 @@
+//! `lent` before an array after `->` marks the result, and the mark stands
+//! before the result of `operator fn value` alone.
+
+fn get() -> lent [2]int
+{
+	return [1, 2];
+}
+
+fn main() -> int
+{
+	return 0;
+}

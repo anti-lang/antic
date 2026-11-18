@@ -1,0 +1,21 @@
+//! `own` after `keep` names the parameter where a `:` follows it, so a
+//! parameter that a function keeps may carry the name `own`.
+import anti.io;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn apply(keep own: fn(int) -> int) -> int
+{
+	return own(4);
+}
+
+fn main() -> int
+{
+	if apply(twice) == 8 {
+		io.println("kept 8");
+	}
+	return 0;
+}

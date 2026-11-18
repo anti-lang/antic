@@ -1,0 +1,13 @@
+//! `inherits` belongs in the class header, and the message names the module the
+//! body names where no class follows its `.`.
+
+class C
+{
+	inherits shapes.;
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

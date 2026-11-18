@@ -1,0 +1,11 @@
+//! `keep` before `?` marks a parameter of function type alone, so `keep ?int`
+//! is a parameter named `keep` without its `:`.
+
+fn f(keep ?int)
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

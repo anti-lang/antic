@@ -1,0 +1,20 @@
+//! `never` after `->` is a type named `never` where type arguments follow it.
+import anti.io;
+
+struct never<T>
+{
+	value: T,
+}
+
+fn wrap(n: int) -> never<int>
+{
+	return never<int> { value: n };
+}
+
+fn main() -> int
+{
+	if wrap(3).value == 3 {
+		io.println("never 3");
+	}
+	return 0;
+}

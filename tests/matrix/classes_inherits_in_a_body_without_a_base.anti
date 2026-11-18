@@ -1,0 +1,13 @@
+//! `inherits` belongs in the class header, and the message names the header
+//! without a base where the body names none.
+
+class C
+{
+	inherits;
+	x: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

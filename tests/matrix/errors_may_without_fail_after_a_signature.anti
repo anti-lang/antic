@@ -1,0 +1,11 @@
+//! `may` after a signature stands before `fail`.
+
+fn f() -> int may
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}

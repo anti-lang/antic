@@ -1,0 +1,12 @@
+//! `lent` before a channel after `->` marks the result, and the mark stands
+//! before the result of `operator fn value` alone.
+
+fn get(c: chan int) -> lent chan int
+{
+	return c;
+}
+
+fn main() -> int
+{
+	return 0;
+}

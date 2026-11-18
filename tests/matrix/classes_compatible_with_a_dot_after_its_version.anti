@@ -1,0 +1,13 @@
+//! The version of `compatible` ends with its last number.
+
+abstract class Shape
+{
+	compatible 1.1.x;
+
+	pub abstract fn area(self) -> int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

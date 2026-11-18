@@ -1,0 +1,20 @@
+//! `keep` written twice before a parameter marks it once.
+import anti.io;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn apply(keep keep f: fn(int) -> int) -> int
+{
+	return f(4);
+}
+
+fn main() -> int
+{
+	if apply(twice) == 8 {
+		io.println("kept 8");
+	}
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! `never` after `->` with a `.` after it names a module, and no module of that
+//! name is imported.
+
+fn f() -> never.Thing
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

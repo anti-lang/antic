@@ -1,0 +1,16 @@
+//! A member takes one `pub`.
+
+class C
+{
+	x: int,
+
+	pub pub fn get(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
