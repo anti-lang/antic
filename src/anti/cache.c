@@ -221,15 +221,21 @@ static void known_read(struct known_digests *k)
     }
     for (line = text_cstr(&bytes); *line != '\0';) {
         const char *end = strchr(line, '\n');
+        size_t line_length = end != NULL ? (size_t)(end - line) : strlen(line);
+        struct text one = {0};
         struct platform_identity id;
         char hex[65];
         char *at;
         size_t length;
-        id.size = strtoull(line, &at, 10);
+        /* T303 of docs/audit/tests-findings.md: strtoull passes over a
+           line break, so the numbers are read from a copy of the line
+           alone and never from the line after it. */
+        text_append_bytes(&one, line, line_length);
+        id.size = strtoull(text_cstr(&one), &at, 10);
         id.changed = strtoll(at, &at, 10);
         id.device = strtoull(at, &at, 10);
         id.file = strtoull(at, &at, 10);
-        length = end != NULL ? (size_t)(end - at) : strlen(at);
+        length = strlen(at);
         if (length > 66 && at[0] == ' ' && at[65] == ' ' &&
             strspn(at + 1, "0123456789abcdef") == 64) {
             struct text path = {0};
@@ -242,7 +248,8 @@ static void known_read(struct known_digests *k)
             memcpy(d->hex, hex, sizeof hex);
             text_free(&path);
         }
-        line = end != NULL ? end + 1 : line + strlen(line);
+        text_free(&one);
+        line = end != NULL ? end + 1 : line + line_length;
     }
     text_free(&bytes);
 }
