@@ -1143,7 +1143,8 @@ file. The rows of the section of `antl_verify.c` above keep theirs.
 Batch 3v of the third phase sorted the sides of the conditions of
 `src/antic/parser_item.c`, `src/anti/syms.c` and `src/rt/trace.c`, which
 no batch had chosen by their branches, and some of those of
-`src/antic/lower_stmt.c`. The rows of the sections of `trace.c` and
+`src/antic/lower_stmt.c`, and those of the code that the fix of T293 added
+to `src/anti/fmt.c`. The rows of the sections of `trace.c` and
 `lower_stmt.c` above keep theirs.
 
 | Function | What it guards against | Why no input reaches it |
@@ -1163,6 +1164,8 @@ no batch had chosen by their branches, and some of those of
 | `anti_rt_trace_text` of `trace.c` | A trace whose every frame lies outside every module, so that no line of a module stands first. | A capture starts inside the program, which is a module. |
 | `range_start` of `lower_stmt.c` | A range of no integer type, and a constant low bound of a type whose width follows the target. | The checker types every range with an integer type, and lowering writes `0 as c_long` as a conversion rather than as a constant. |
 | `lower_assign` of `lower_stmt.c` | A compound assignment to an aggregate that is no simd struct. | The checker refuses it with `` `+=` does not apply to `Point` ``. |
+| `token_ahead` and `piece_is_word` of `src/anti/fmt.c` | No token after a line break in the body of a class or an enum, a dropped piece, and a piece that is none. | The body closes with `}` after the line, the dropped pieces are the parentheses of a condition, which no line of a body opens with, and each caller passes a piece it found. |
+| `opens_member` of `src/anti/fmt.c` | `pub` or `export` after a marker, and `final`, `operator` or `trace` before a token that is no `fn`. | It reads the tokens as `parser_starts_member` does, and antic refuses each after a field without its comma, with `` expected `fn` `` or `` expected `,` ``. |
 
 ## Not in this note
 
