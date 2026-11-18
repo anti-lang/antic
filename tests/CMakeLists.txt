@@ -7477,7 +7477,8 @@ add_test(NAME anti_build_inputs
 set(anti_build_cases path_target path_target_cpu lock_dropped
     cache_strip_docs cache_version cache_license cache_license_text
     cache_attribution cache_dependency cache_import_checked
-    cache_import_layout lock_path_moved path_chain_mixed)
+    cache_import_layout lock_path_moved path_chain_mixed
+    lock_package_without_a_version lock_module_without_a_digest)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     list(APPEND anti_build_cases redirect_to_http redirect_followed
          redirect_to_loopback redirect_loop index_unchanged index_absent

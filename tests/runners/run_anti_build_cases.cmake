@@ -48,6 +48,11 @@
 #   lock_path_moved         the lock file names the new path of a
 #                           dependency whose library holds the same
 #                           digest (T298)
+#   lock_package_without_a_version  a package of the lock file without
+#                           its version reads the lock as none, and the
+#                           build writes it again (T299)
+#   lock_module_without_a_digest    and a module without its digest
+#                           (T299)
 #   path_chain_mixed        a project of a path whose manifest names a
 #                           dependency of a repository and one of an
 #                           absolute path
@@ -526,6 +531,83 @@ if(CASE STREQUAL "lock_path_moved")
     file(READ "${WORK}/app/anti.lock" lock)
     holds("${lock}" "../moved/dist/" "the lock file after the move")
     lacks("${lock}" "../dep/" "the lock file after the move")
+    return()
+endif()
+
+if(CASE STREQUAL "lock_package_without_a_version" OR
+   CASE STREQUAL "lock_module_without_a_digest")
+    # T299: an entry of the lock file that lacks a key. Three packages of
+    # a repository, where a needs c, and a program over a and b. The
+    # lock file written by the first build loses one key, and the next
+    # build reads it as none, resolves again and writes it again.
+    set(repo "${WORK}/repo")
+    foreach(package a b c)
+        string(CONCAT source
+               "//! A package of a repository.\n\n"
+               "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
+        write_project("${WORK}/${package}" "com.example.${package}" ""
+                      "com.example.${package}" "${source}")
+        anti_passes("the build of ${package}" "${WORK}/${package}" build
+                    ${tools})
+        set(at "${repo}/com.example.${package}")
+        file(MAKE_DIRECTORY "${at}/1.0.0")
+        file(COPY_FILE
+             "${WORK}/${package}/dist/${HOST}/dev/com/example/${package}.antl"
+             "${at}/1.0.0/com.example.${package}.antl")
+        file(SHA256 "${at}/1.0.0/com.example.${package}.antl" digest)
+        set(needs "")
+        if(package STREQUAL "a")
+            set(needs "{ name = \"com.example.c\", version = \"1.0.0\" }")
+        endif()
+        file(WRITE "${at}/index.toml"
+             "name = \"com.example.${package}\"\nrevision = 1\n\n"
+             "[[version]]\nversion = \"1.0.0\"\n"
+             "modules = [{ path = \"com.example.${package}\", sha256 = \"${digest}\" }]\n"
+             "dependencies = [${needs}]\n")
+    endforeach()
+    file_url("${repo}" repo_url)
+    string(CONCAT manifest
+           "\n[repositories]\nlocal = \"${repo_url}\"\n\n[dependencies]\n"
+           "\"com.example.a\" = { version = \"1.0.0\", repo = \"local\" }\n"
+           "\"com.example.b\" = { version = \"1.0.0\", repo = \"local\" }\n")
+    string(CONCAT both
+           "//! A program over a and b.\n\n"
+           "import com.example.a;\nimport com.example.b;\n\n"
+           "fn main() -> int\n{\n\treturn a.one() + b.one();\n}\n")
+    write_project("${WORK}/app" "com.example.app" "${manifest}"
+                  "com.example.app" "${both}")
+    anti_passes("the first build" "${WORK}/app" build ${tools})
+    file(READ "${WORK}/app/anti.lock" written)
+    if(CASE STREQUAL "lock_package_without_a_version")
+        # The package c, which the manifest reaches through a, loses its
+        # version.
+        string(REGEX REPLACE
+               "(name = \"com.example.c\"\n)version = \"1.0.0\"\n" "\\1"
+               damaged "${written}")
+    else()
+        # The module of a loses its digest.
+        string(REGEX REPLACE
+               "(path = \"com.example.a\"), sha256 = \"[0-9a-f]+\"" "\\1"
+               damaged "${written}")
+    endif()
+    if(damaged STREQUAL written)
+        message(FATAL_ERROR "the case found no key to drop in:\n${written}")
+    endif()
+    file(WRITE "${WORK}/app/anti.lock" "${damaged}")
+    file(REMOVE_RECURSE "${WORK}/cache")
+    anti_passes("the build over the damaged lock file" "${WORK}/app" build
+                ${tools})
+    file(READ "${WORK}/app/anti.lock" lock)
+    if(NOT lock STREQUAL written)
+        message(FATAL_ERROR "the build left the lock file as\n${lock}\n"
+                            "and not as\n${written}")
+    endif()
+    file(READ "${WORK}/app/dist/${HOST}/dev/NOTICE.txt" notice)
+    foreach(package a b c)
+        holds("${notice}" "package com.example.${package} 1.0.0" "the notice")
+    endforeach()
+    program_expect("the program" COMMAND "${WORK}/app/dist/${HOST}/dev/app${exe}"
+                   STATUS 2 OUT "")
     return()
 endif()
 
