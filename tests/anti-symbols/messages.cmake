@@ -287,3 +287,183 @@ anti_message(fault_resolve_trace_read_partway
     FAULT read:3:EIO
     ARGS ${resolve}
     ERR "anti: cannot read trace.txt")
+
+# The cases of batch 3v of coverage. A line of a trace that is no frame
+# stays as it came in: a module number without its `+`, a frame with more
+# after its offset, and a frame of a module that no `module` line names,
+# resolve_frame_line of syms.c.
+anti_message(trace_frames_of_other_forms
+    STATUS 0
+    FILES trace.txt "${module}\n0x0000000000001001 0 0x1001\n0x0000000000001001 0+0x1001 more\n0x0000000000001001 1+0x1001\n"
+          archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "0x0000000000001001 0 0x1001"
+        "0x0000000000001001 0+0x1001 more" "0x0000000000001001 1+0x1001")
+# An empty line of a trace stays an empty line.
+anti_message(trace_empty_line
+    STATUS 0
+    FILES trace.txt "first\n\nlast\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT_FILE symbols_message_trace_empty_line.out)
+# A `module` line names its module with its number, its build id and its
+# base. A line that lacks one of them, or whose number is not the next,
+# names no module, so the frame after them stays as it came in.
+anti_message(trace_module_lines_of_other_forms
+    STATUS 0
+    FILES trace.txt "module 0\nmodule 0 \nmodule 0 ${id}\nmodule 0 ${id} \nmodule 1 ${id} 0x0000000000000000 prog\n${frame}\n"
+          archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "module 0" "module 0 " "module 0 ${id}" "module 0 ${id} "
+        "module 1 ${id} 0x0000000000000000 prog" "${frame}")
+# By R184 a key of `[module]` itself stands outside every module table.
+anti_message(archive_index_key_of_the_module_table
+    FILES trace.txt "" archive/index.toml "[module]\nx = 1\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    ERR "anti: symbols.zip holds the key module.x in index.toml outside a module table")
+# A key of a module table that the index does not know names nothing, and
+# the unit answers through its map.
+anti_message(archive_index_other_key_of_a_module
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "[module.a]\nmodule = \"prog\"\nid = \"${id}\"\nother = \"x\"\n"
+          archive/${id}/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# An entry under a directory that the id starts with belongs to no unit.
+anti_message(archive_index_entry_under_a_part_of_the_id
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "[module.a]\nmodule = \"prog\"\nid = \"${id}\"\n"
+          archive/0123/prog.map "# The map of a symbols archive of Anti.\n# build ${id}\n0000000000001000-0000000000002000 bad src/bad.anti:1\n"
+          archive/${id}/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# A unit of the index with neither a debug link nor a map answers no
+# frame.
+anti_message(archive_index_unit_without_a_map
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "[module.a]\nmodule = \"prog\"\nid = \"${id}\"\n"
+          archive/${id}/notes.txt "No twin and no map.\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame}")
+# The `# build` line of a map holds a whole id.
+anti_message(archive_map_build_line_cut_short
+    FILES trace.txt "" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build 0123\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    ERR "anti: symbols.zip holds no build id")
+# The map writes the address of the text in small letters, so a capital
+# letter, like a line cut short, names no text, and the offset of a frame
+# counts from address 0.
+anti_message(archive_map_text_of_a_capital_letter
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n# target macos-arm64\n# text 00000001000A0000\n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+anti_message(archive_map_text_cut_short
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n# target macos-arm64\n# text 0001\n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# A line of a map without the `-` of its range, without the blank after
+# it or without a name names no function, and the line after them
+# answers.
+anti_message(archive_map_lines_without_a_range
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n0000000000001000 bad\n0000000000001000-0000000000002000bad\n0000000000001000-0000000000002000 \n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
+# A frame below every line of the map stays as it came in, and an empty
+# range answers for its own address alone.
+anti_message(archive_map_frame_below_every_line
+    STATUS 0
+    FILES trace.txt "${module}\n0x0000000000000501 0+0x501\n" archive/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "0x0000000000000501 0+0x501")
+anti_message(archive_map_empty_range_at_the_frame
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map
+          "# The map of a symbols archive of Anti.\n# build ${id}\n0000000000001000-0000000000001000 empty\n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} empty")
+# A location is `<file>:<line>`, so a last word of another form stays a
+# part of the name.
+anti_message(archive_map_names_without_a_location
+    STATUS 0
+    FILES trace.txt "${module}\n0x0000000000001011 0+0x1011\n0x0000000000001111 0+0x1111\n0x0000000000001211 0+0x1211\n0x0000000000001311 0+0x1311\n0x0000000000001411 0+0x1411\n0x0000000000001511 0+0x1511\n"
+          archive/prog.map "# The map of a symbols archive of Anti.\n# build ${id}\n0000000000001000-0000000000001100 Pair<int, str>.swap\n0000000000001100-0000000000001200 f 123\n0000000000001200-0000000000001300 g src/a.anti:7)\n0000000000001300-0000000000001400 h :7\n0000000000001400-0000000000001500 i a7\n0000000000001500-0000000000001600 j ab7\n"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "0x0000000000001011 0+0x1011 Pair<int, str>.swap"
+        "0x0000000000001111 0+0x1111 f 123"
+        "0x0000000000001211 0+0x1211 g src/a.anti:7)"
+        "0x0000000000001311 0+0x1311 h :7" "0x0000000000001411 0+0x1411 i a7"
+        "0x0000000000001511 0+0x1511 j ab7")
+# A debug link shorter than any header is no program and answers no
+# frame.
+anti_message(archive_debug_link_shorter_than_a_header
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n" archive/prog.map "${map}"
+          archive/prog.debug "ab"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame}")
+# Files too short for the header of an executable, and files whose first
+# bytes start the header of Mach-O and stop, are no program, is_program
+# of syms.c.
+function(write_short_files)
+    file(WRITE "${PROJECT}/one" "a")
+    file(WRITE "${PROJECT}/two" "MA")
+    file(WRITE "${PROJECT}/three" "abc")
+endfunction()
+anti_message(check_files_too_short_for_a_header
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    SETUP write_short_files
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti")
+function(write_cut_headers)
+    string(ASCII 207 cf)
+    string(ASCII 250 fa)
+    string(ASCII 237 ed)
+    string(ASCII 254 fe)
+    file(WRITE "${PROJECT}/four" "${cf}${fa}${ed}${fe}")
+    file(WRITE "${PROJECT}/five" "${cf}abcdefghijklmnopq")
+    file(WRITE "${PROJECT}/six" "${cf}${fa}abcdefghijklmnop")
+    file(WRITE "${PROJECT}/seven" "${cf}${fa}${ed}abcdefghijklmno")
+endfunction()
+anti_message(check_files_with_a_header_of_mach_o_cut_short
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    SETUP write_cut_headers
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti")
+# A key of an index of plugins outside its `[library.<name>]` tables
+# names no library.
+anti_message(check_plugins_index_key_outside_the_libraries
+    FILES conf.toml "[runtime]\nplugins = \"p\"\n"
+          p/anti-plugins.toml "version = 1\n[library.a]\npath = \"a.plugin\"\n"
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "missing ./p/a.plugin: no such file")
+# An injection with an empty value is `discover`, whose library one of
+# the `plugins` directories holds, so it names no file of its own.
+anti_message(check_injection_of_an_empty_value
+    FILES conf.toml "[injections]\n\"app.Logger\" = \"\"\n"
+    ARGS symbols check --conf conf.toml
+    OUT "missing the program: . holds no program of Anti")

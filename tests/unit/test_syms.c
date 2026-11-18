@@ -405,9 +405,9 @@ static void write_broken(struct zip_entry *entries, size_t count)
     text_free(&bytes);
 }
 
-/* An entry whose data no longer matches its CRC refuses the archive, in
-   the directory of an id of a deployment archive and at the top of the
-   archive of one build. */
+/* An entry whose data no longer matches its CRC refuses the archive: the
+   index of a deployment archive, an entry in the directory of one of its
+   ids and an entry at the top of the archive of one build. */
 static void broken_entries(void)
 {
     static const char index[] =
@@ -426,6 +426,8 @@ static void broken_entries(void)
     entries[1].name = "0123456789abcdef/prog.map";
     entries[1].bytes = map;
     entries[1].size = sizeof map - 1;
+    write_broken(entries, 1);
+    CHECK(syms_resolve(TRACE, symbols, 1) == 1);
     write_broken(entries, 2);
     CHECK(syms_resolve(TRACE, symbols, 1) == 1);
     entries[1].name = "prog.map";
