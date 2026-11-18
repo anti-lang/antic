@@ -715,6 +715,15 @@ not re-open a settled decision without asking Eddie.
   fix. It ran each sanitizer suite in the six parts of `asan`, the last
   up to test 7621: `asan` 265 s, 185 s, 266 s, 175 s, 109 s and 587 s,
   `ubsan` 247 s, 188 s, 264 s, 182 s, 112 s and 607 s.
+  Batch 3v of the third phase of coverage measured `host` in the same
+  three parts, up to test 7694: 368 s, 272 s and 315 s before the
+  commits of the tests of three files and of T293, where the two new
+  programs leaked their texts under `--memory-checks`, and 252 s, 252 s
+  and 308 s once they freed them, 374 s, 273 s and 315 s before the fix
+  of T293, and 358 s, 269 s and 309 s before the commit of its fixture.
+  It ran each sanitizer suite in the six parts of `asan`, the last up to
+  test 7692: `asan` 263 s, 185 s, 264 s, 173 s, 110 s and 586 s, `ubsan`
+  234 s, 189 s, 267 s, 181 s, 114 s and 610 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
