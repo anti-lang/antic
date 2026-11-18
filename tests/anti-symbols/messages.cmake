@@ -54,7 +54,9 @@ anti_message(check_build_id_with_another_letter
     ARGS symbols check --conf conf.toml
     OUT "missing the program: . holds no program of Anti")
 # A text of `plugins` holds its directories as `--anti.plugins` takes
-# them, with `:` between two, and an empty one names nothing.
+# them, with `:` between two. An empty one is the directory the program
+# runs in, which is the directory of the configuration, as the runtime
+# reads it.
 anti_message(inventory_plugins_as_a_text
     STATUS 0
     FILES conf.toml "[runtime]\nplugins = \"one:two::three\"\n"
@@ -62,8 +64,25 @@ anti_message(inventory_plugins_as_a_text
     OUT "missing the program: . holds no program of Anti"
         "missing ./one/anti-plugins.toml: no index of plugins"
         "missing ./two/anti-plugins.toml: no index of plugins"
+        "missing ./anti-plugins.toml: no index of plugins"
         "missing ./three/anti-plugins.toml: no index of plugins"
-        "wrote symbols.zip with 0 of 4 modules")
+        "wrote symbols.zip with 0 of 5 modules")
+anti_message(inventory_plugins_text_ending_with_a_separator
+    STATUS 0
+    FILES conf.toml "[runtime]\nplugins = \"one:\"\n"
+    ARGS symbols inventory --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "missing ./one/anti-plugins.toml: no index of plugins"
+        "missing ./anti-plugins.toml: no index of plugins"
+        "wrote symbols.zip with 0 of 3 modules")
+anti_message(inventory_plugins_empty_element
+    STATUS 0
+    FILES conf.toml "[runtime]\nplugins = ['', 'one']\n"
+    ARGS symbols inventory --conf conf.toml
+    OUT "missing the program: . holds no program of Anti"
+        "missing ./anti-plugins.toml: no index of plugins"
+        "missing ./one/anti-plugins.toml: no index of plugins"
+        "wrote symbols.zip with 0 of 3 modules")
 # The file that includes wins per interface, so `app.Logger` names one
 # library, and the line of the include alone names the other.
 anti_message(inventory_injection_of_an_include

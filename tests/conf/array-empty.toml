@@ -1,0 +1,4 @@
+# An empty element of an array of directories is the working directory
+# wherever it stands, the first as well, so the joined value keeps it.
+[runtime]
+plugins = ['', 'a']

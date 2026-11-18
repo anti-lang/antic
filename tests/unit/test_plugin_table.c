@@ -811,6 +811,10 @@ static void damaged_indexes(void)
     append(interfaces, sizeof interfaces, "'host.Service']");
     DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest, interfaces),
               NULL);
+    /* An empty interface is an element of the list, which ends at the end
+       of its array alone, so the interface after it is listed. */
+    DISCOVERS(entry_of_index(plugin_name, "0.0.0", plugin_digest,
+                             "['', 'host.Service']"), NULL);
 }
 
 /* Make dir the working directory. Gives 0 when it cannot be. */

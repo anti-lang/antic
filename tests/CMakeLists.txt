@@ -2553,6 +2553,7 @@ foreach(case
         "include|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"
         "array|report||--anti.conf=${CONF}/array.toml,--anti.inspect|inspect.array.pattern||0"
         "array_key|report||--anti.conf=${CONF}/array-key.toml,--anti.inspect|inspect.array-key.pattern||0"
+        "array_empty|report||--anti.conf=${CONF}/array-empty.toml,--anti.inspect|inspect.array-empty.pattern||0"
         "conf_no_value|report||--anti.conf|empty.pattern|conf-no-value.pattern|70"
         "environment|report||--anti.inspect|inspect.file.pattern||0"
         "environment_option|report||--anti.conf=${CONF}/outer.toml,--anti.inspect|inspect.include.pattern||0"

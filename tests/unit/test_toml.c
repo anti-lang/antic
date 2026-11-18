@@ -317,6 +317,32 @@ static void value_shapes(void)
     anti_rt_toml_free(doc);
 }
 
+/* T308 of docs/audit/tests-findings.md: a table of an array that holds no
+   key, or empty arrays and tables alone, is an element of its own, so the
+   table after it takes the next number. */
+static void table_repeat_empty(void)
+{
+    struct anti_toml *doc = read_toml("[[t]]\n[[t]]\nx = 2\n");
+
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, "t.1.x"), "2");
+        CHECK(!has_key(doc, "t.0.x"));
+        CHECK(shape_of(doc, "t") == ANTI_TOML_ARRAY);
+    }
+    anti_rt_toml_free(doc);
+    doc = read_toml("[[t]]\nx = []\ny = {}\n[[t]]\nz = 3\n[[u]]\n[[t]]\nw = 4\n");
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, "t.1.z"), "3");
+        CHECK_STR(value_of(doc, "t.2.w"), "4");
+        CHECK(shape_of(doc, "t.0.x") == ANTI_TOML_ARRAY);
+        CHECK(shape_of(doc, "t.0.y") == ANTI_TOML_TABLE);
+        CHECK(!has_key(doc, "t.0.z"));
+    }
+    anti_rt_toml_free(doc);
+}
+
 void test_toml(void)
 {
     inline_table();
@@ -324,6 +350,7 @@ void test_toml(void)
     inline_table_nested();
     inline_table_unclosed();
     table_repeat_limit();
+    table_repeat_empty();
     table_repeat_cost();
     key_length();
     string_forms();

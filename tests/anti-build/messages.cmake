@@ -215,6 +215,13 @@ anti_message(run_takes_the_injections_of_the_manifest STATUS 0
           ${app_source} "${inject_text}"
     ARGS run ${tools}
     OUT "hello")
+# An empty provider of `[inject]` is the text the manifest writes, so the
+# link refuses it as a provider that names no function.
+anti_message(build_empty_provider_of_the_manifest
+    FILES anti.toml "${manifest_package}\n[inject]\n\"com.example.app.Greeter\" = \"\"\n"
+          ${app_source} "${inject_text}"
+    ARGS build ${tools}
+    ERR "./src/com/example/app.anti: error: the provider `` of `com.example.app.Greeter` names no function of the program, and no singleton with a `get`")
 # The dev build of run writes an object per module with -g, and the debug
 # map of the program names each. A trace through two modules reads the
 # line of each frame from the object of its own module.
@@ -422,6 +429,22 @@ anti_message(index_module_without_a_digest
 anti_message(index_version_without_a_version
     FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
           ${units_index} "${index_head}modules = [${units_module}]\n\n[[version]]\nversion = \"1.2.0\"\nmodules = [${units_module}]\n"
+    ARGS build ${tools}
+    ERR "anti: ${cached_index} is no index that anti reads"
+        "${no_version}")
+# A `[[version]]` that holds no key, or empty arrays alone, is an entry of
+# its own, which lacks its version as the entry above does. T308 of
+# docs/audit/tests-findings.md: the reader of TOML gave the entry after it
+# the same number.
+anti_message(index_version_without_a_key
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}\n[[version]]\nversion = \"1.2.0\"\nmodules = [${units_module}]\n"
+    ARGS build ${tools}
+    ERR "anti: ${cached_index} is no index that anti reads"
+        "${no_version}")
+anti_message(index_version_of_empty_arrays
+    FILES anti.toml "${consumer_manifest}" ${app_source} "${app_text}"
+          ${units_index} "${index_head}modules = []\n\n[[version]]\nversion = \"1.2.0\"\nmodules = [${units_module}]\n"
     ARGS build ${tools}
     ERR "anti: ${cached_index} is no index that anti reads"
         "${no_version}")

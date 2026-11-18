@@ -114,6 +114,15 @@ anti_message(runtime_of_the_data_directory
     ENV "XDG_DATA_HOME=${PROJECT}/data" "LOCALAPPDATA=${PROJECT}/data"
     ARGS test --work ../test -I src src/com/example/one.anti
     ERR "src/com/example/one.anti:6:9: error: expected `int`, found `bool`")
+# An empty provider of `[inject.test]` lies over the one of `[inject]`, so
+# the link refuses it as a provider that names no function.
+set(greeter_text "//! A field whose provider the manifest names.\n\n/// What greets.\npub abstract class Greeter\n{\n\t/// The word of the greeting.\n\tpub abstract fn word(self) -> str;\n}\n\n/// The greeter of the program.\npub singleton class Hello\n{\n\timplements g: Greeter,\n\n\t/// Hello.\n\tpub concrete fn word(self) -> str\n\t{\n\t\treturn \"hello\";\n\t}\n}\n\nclass App\n{\n\tinject greeter: *Greeter,\n}\n\ntests\n{\n\tfn greets()\n\t{\n\t\tlet a = alloc App { };\n\t\tlet n = a.greeter.word().len;\n\t\tassert(n == 5);\n\t\tdelete(a);\n\t}\n}\n")
+anti_message(manifest_empty_provider_of_the_tests
+    FILES anti.toml "[inject]\n\"com.example.app.Greeter\" = \"com.example.app.Hello.get\"\n\n[inject.test]\n\"com.example.app.Greeter\" = \"\"\n"
+          src/com/example/app.anti "${greeter_text}"
+    ARGS test --work ../test --runtime "${RUNTIME}" -I src src/com/example/app.anti
+    ERR "../test/anti/test/com_example_app.anti: error: the provider `` of `com.example.app.Greeter` names no function of the program, and no singleton with a `get`"
+    OUT "anti test: 1 tests in 1 modules, 1 module failed")
 # A module the parser refuses, read_unit of test.c, fails the run before
 # it compiles anything.
 anti_message(source_not_parsed
