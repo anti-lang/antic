@@ -1,0 +1,14 @@
+//! A call at the start of a statement goes on as an expression, and a pattern
+//! literal after it is refused where `;` stands.
+import anti.regex;
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	twice(1) re"x";
+	return 0;
+}

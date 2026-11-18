@@ -1,0 +1,19 @@
+//! `final` stands before `fn` among the functions of an enum, so before `const`
+//! it is refused where `fn` stands.
+
+enum Mode
+{
+	Read,
+
+	pub fn one(self) -> int
+	{
+		return 1;
+	}
+
+	final const N: int = 1;
+}
+
+fn main() -> int
+{
+	return 0;
+}
