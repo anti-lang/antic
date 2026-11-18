@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u and 3v stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u, 3v and 3w stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1167,6 +1167,24 @@ to `src/anti/fmt.c`. The rows of the sections of `trace.c` and
 | `token_ahead` and `piece_is_word` of `src/anti/fmt.c` | No token after a line break in the body of a class or an enum, a dropped piece, and a piece that is none. | The body closes with `}` after the line, the dropped pieces are the parentheses of a condition, which no line of a body opens with, and each caller passes a piece it found. |
 | `opens_member` of `src/anti/fmt.c` | `pub` or `export` after a marker, and `final`, `operator` or `trace` before a token that is no `fn`. | It reads the tokens as `parser_starts_member` does, and antic refuses each after a field without its comma, with `` expected `fn` `` or `` expected `,` ``. |
 
+## The sides of batch 3w
+
+Batch 3w of the third phase sorted the sides of the conditions of the
+files of the parser besides `src/antic/parser_item.c`. No batch had chosen
+them by their branches. The rows of the sections of `parser_stmt.c`
+and `parser_decl.c` above keep theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `primary` of `parser_expr.c` | No `(` after `alloc` in the raw form. | The form is read only where the test before it found the `(`. |
+| `element_name` of `parser_expr.c` | A byte below `0` in the number of a tuple element. | The lexer builds the token of the number from digits, letters and `_` alone. |
+| `ends_at_line` of `parser_expr.c` | A condition at the first token of the source. | The condition of `do ... while` follows its `while`. |
+| `for_statement` of `parser_stmt.c` | A walked value whose text ends before it starts, and a loop without a value and without a range that gave no message. | A value takes one token at the least. A reader of the range or of the value that returns none has given its message. |
+| `statement_level` of `parser_stmt.c` | An assertion at the first token, and a condition whose text ends before it starts. | `assert` and its `(` stand before the condition, which takes one token at the least. |
+| `scan_list` of `parser_type.c` | A `>>` that closed the list before the next argument. | The loop goes on only after a `,`, and it reads the `,` only where no `>>` set the half. |
+| `type_level` of `parser_type.c` | A `?` before a token that is no `fn` in the test of a function type. | The first test of the function returns the optional type for such a `?`. |
+| `import_names` of `parser.c` | A `.` after the path of an import that no `{` follows. | `module_path` reads every `.` that no `{` follows as part of the path. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1289,6 +1307,18 @@ to `src/anti/fmt.c`. The rows of the sections of `trace.c` and
   gives. In `lower_stmt.c` most test the block after a
   path that ended inside a statement, or a call with a handler that writes
   no result, as the rows of its section above do.
+- The sides of a condition in the files of the parser that batch 3w
+  did not sort. In `parser.c` they are an `import` after an item that
+  failed, which is a second mistake with a message of its own, a `}`
+  without its `{` and a first token at the end in the recovery of a
+  statement, a marker of three bytes and the depth limit in panic. In
+  `parser_expr.c` they are a `.` after type arguments before a token that
+  is no name, `as ?fn`, a `.` after the type of `is` before no name,
+  `try` before the raw `alloc`, the depth of `??` and a NUL byte in a
+  format. In `parser_type.c` they are the scans of a type named `lent`, of
+  the marks of a parameter, of `??`, of `fn` without `(`, of `may fail`
+  and of a `>>` in a list of parameters, and in `parser_stmt.c` a `try`
+  whose block fails at the depth limit.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
