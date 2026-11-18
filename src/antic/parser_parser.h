@@ -107,6 +107,8 @@ size_t parser_keep_tokens(const struct token *all, size_t count,
 void parser_drop_untaken(struct parser *p, size_t count);
 struct doc_text parser_doc_before(struct parser *p, enum token_kind kind);
 void parser_sync_statement(struct parser *p, size_t from);
+/* Pass the rest of a declaration refused in its header. */
+void parser_skip_declaration(struct parser *p);
 bool parser_is_word(const struct parser *p, const struct token *t,
                     const char *word);
 

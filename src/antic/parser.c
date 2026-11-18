@@ -433,6 +433,45 @@ static void sync_item(struct parser *p)
     }
 }
 
+/* DESIGN: a declaration whose header the parser refused at a word that
+   starts an item, as `extern struct Handle;` is at `struct`, passes the
+   rest of itself up to its `;`, or up to the `}` of a body it opened, so
+   the recovery of the module does not read that word as the next item.
+   One mistake gives one message, by T294 of docs/audit/tests-findings.md.
+   A `}` of a block around the declaration and the end stop it. */
+void parser_skip_declaration(struct parser *p)
+{
+    size_t depth = 0;
+
+    for (;;) {
+        switch (parser_peek(p)->kind) {
+        case TOKEN_EOF:
+            return;
+        case TOKEN_LBRACE:
+            depth++;
+            break;
+        case TOKEN_RBRACE:
+            if (depth == 0) {
+                return;
+            }
+            if (--depth == 0) {
+                parser_next(p);
+                return;
+            }
+            break;
+        case TOKEN_SEMICOLON:
+            if (depth == 0) {
+                parser_next(p);
+                return;
+            }
+            break;
+        default:
+            break;
+        }
+        parser_next(p);
+    }
+}
+
 /* Recover from a line at module level that failed after it started at
    the token before: step over one token when the line took none, so the
    loop moves on, and skip to the next item. */

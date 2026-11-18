@@ -585,7 +585,14 @@ static struct item *item_level(struct parser *p)
     case TOKEN_EXTERN:
         parser_next(p);
         it->kind = ITEM_EXTERN_FN;
-        if (!parser_expect(p, TOKEN_FN) || !parser_expect_name(p, &it->name)) {
+        /* Another word after `extern` declares a thing of C that Anti has
+           no form for, and the rest of the declaration goes with the
+           message. */
+        if (!parser_expect(p, TOKEN_FN)) {
+            parser_skip_declaration(p);
+            return NULL;
+        }
+        if (!parser_expect_name(p, &it->name)) {
             return NULL;
         }
         if (!parser_params(p, true, &it->variadic, NULL, &it->params,
