@@ -724,6 +724,23 @@ not re-open a settled decision without asking Eddie.
   It ran each sanitizer suite in the six parts of `asan`, the last up to
   test 7692: `asan` 263 s, 185 s, 264 s, 173 s, 110 s and 586 s, `ubsan`
   234 s, 189 s, 267 s, 181 s, 114 s and 610 s.
+  Batch 3w of the third phase of coverage measured `host` in the same
+  three parts: 375 s, 270 s and 322 s before the commit of T294, up to
+  test 7704, 374 s, 273 s and 322 s before its fix, where
+  `header_sections` refused a declaration under the section of another
+  file, and 372 s, 271 s and 317 s once it stood under `parser.c`, 372 s,
+  271 s and 322 s with a unit test of a cut class body, up to test 7802,
+  which `header_sections` refused as well, 318 s, 261 s and 320 s before
+  the commits of the tests of six files of the parser and of T295 and
+  T296, up to test 7814, 376 s, 273 s and 306 s before the fix of T295,
+  378 s, 269 s and 323 s before that of T296, 356 s, 270 s and 309 s
+  before the commit of five refusals, up to test 7819, and 373 s, 269 s
+  and 324 s before the commit of four more, up to test 7823. It ran each
+  sanitizer suite in the six parts of `asan` twice, the last part up to
+  test 7817 and then up to test 7821: `asan` 259 s, 160 s, 211 s, 133 s,
+  88 s and 369 s, then 261 s, 160 s, 212 s, 128 s, 87 s and 372 s,
+  `ubsan` 244 s, 159 s, 210 s, 138 s, 90 s and 397 s, then 230 s, 161 s,
+  213 s, 135 s, 89 s and 400 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
