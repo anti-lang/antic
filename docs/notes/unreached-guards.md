@@ -1217,6 +1217,19 @@ above keep theirs.
 | `nested_views` of `src/antic/header.c` | A union nested in a class. | antic refuses one with `` a class body declares a struct, an enum or a class, and a union stands at module level ``. |
 | `ar_number` of `licensing.c` | A number past `SIZE_MAX`. | The fields of a size and of an offset hold 10 and 15 digits at most, which stay below it. |
 
+## The sides of batch 3z
+
+Batch 3z of the third phase sorted some of the sides of the conditions of
+`src/anti/deps.c` and `src/anti/main.c`, which batch 3y named and no
+batch had probed. The rows of the section of `src/anti/main.c` above keep
+theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `symbols_command`, `build_options`, `license_command`, `check_command`, `doc_command`, `test_command`, `bind_command` and `sdk_command` of `src/anti/main.c` | An option that takes a value and stands last, at the test `i + 1 < argc` of each parser. | `lacks_value` reads the command line first, by R155, and ends the run with `` anti: --lto needs a value `` and 2 before a parser runs. |
+| `lock_string` of `src/anti/deps.c` | A control byte or a DEL in a value of the lock file. | A path holds none, since the manifest reader refuses a path with a control byte by R166, and a chained project reads its manifest the same way. A name, a version, a module path, a digest and a repository URL pass the rules of their kinds before the graph takes them. |
+| `lock_write` of `src/anti/deps.c` | A name, a version or a digest of the graph that the lock file cannot hold. | The readers of the manifest, the index and the library files check each against the rules of its kind, and none of them holds a double quote or a control byte. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1371,3 +1384,5 @@ above keep theirs.
   an archive, and no probe of batch 3y reached them. In `toml.c` most are
   the caps on the room of a key or a path, and the end of the text in the
   blanks before a value.
+- The sides of a condition in `src/anti/deps.c` and `src/anti/main.c`
+  that the report of batch 3z did not sort.
