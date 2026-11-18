@@ -1,0 +1,17 @@
+//! An `extern` item is a function. A C struct with a body declared after
+//! `extern` gets one message, at `struct`, and its body goes with it, the `;`
+//! of its fields and the braces of a union inside it included.
+
+extern struct Handle
+{
+	fd: c_int;
+	union
+	{
+		flags: c_int;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

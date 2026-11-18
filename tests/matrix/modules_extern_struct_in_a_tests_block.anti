@@ -1,0 +1,13 @@
+//! An `extern` item is a function. A C struct declared after `extern` in a
+//! `tests` block without its `;` gets one message, at `struct`, and the block
+//! closes at its `}`.
+
+fn main() -> int
+{
+	return 0;
+}
+
+tests
+{
+	extern struct Handle
+}

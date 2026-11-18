@@ -1,0 +1,1 @@
+modules_struct_without_its_brace_before_a_constant.anti:4:13: error: expected `{`

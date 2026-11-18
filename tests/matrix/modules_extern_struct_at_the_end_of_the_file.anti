@@ -1,0 +1,4 @@
+//! An `extern` item is a function. A C struct declared after `extern` that the
+//! end of the file cuts gets one message, at `struct`.
+
+extern struct Handle
