@@ -213,13 +213,15 @@ static void inject_of(const struct anti_toml *doc, bool tests,
     out->entries = files_array((size_t)count + 1, sizeof *out->entries);
     /* The plain table first, so an entry of `[inject.test]` replaces the
        one `[inject]` holds for that interface, in whichever order the
-       document writes the two tables. */
+       document writes the two tables. An empty provider is the text the
+       document writes, which the link refuses as it refuses any provider
+       that names no function. T307 of docs/audit/tests-findings.md. */
     for (i = 0; i < count; i++) {
         struct anti_text key = anti_rt_toml_key(doc, i);
         struct anti_text value = anti_rt_toml_value(doc, i);
         const char *interface =
             interface_of((const char *)key.ptr, (size_t)key.len, false);
-        if (interface != NULL && value.len > 0) {
+        if (interface != NULL) {
             add_entry(out, interface, (const char *)value.ptr);
         }
     }
@@ -228,7 +230,7 @@ static void inject_of(const struct anti_toml *doc, bool tests,
         struct anti_text value = anti_rt_toml_value(doc, i);
         const char *interface =
             interface_of((const char *)key.ptr, (size_t)key.len, true);
-        if (interface != NULL && value.len > 0) {
+        if (interface != NULL) {
             add_entry(out, interface, (const char *)value.ptr);
         }
     }
