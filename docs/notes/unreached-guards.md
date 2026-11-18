@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u, 3v and 3w stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t, 3u, 3v, 3w and 3x stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -1185,6 +1185,21 @@ and `parser_decl.c` above keep theirs.
 | `type_level` of `parser_type.c` | A `?` before a token that is no `fn` in the test of a function type. | The first test of the function returns the optional type for such a `?`. |
 | `import_names` of `parser.c` | A `.` after the path of an import that no `{` follows. | `module_path` reads every `.` that no `{` follows as part of the path. |
 
+## The sides of batch 3x
+
+Batch 3x of the third phase sorted the sides of the conditions of
+`src/antic/lower_stmt.c` that batches 3f and 3v left, and some of those
+of `src/antic/antl_read_ir.c` and `src/antic/antl_read.c`. The rows of
+the sections of `lower_stmt.c` and `antl_read_ir.c` above keep theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `drop_result`, `lower_move_argument`, `lower_clear_moved`, `convert_in_place`, `lower_let`, `lower_keep_temp`, `lower_forget_received`, `lower_switch` and `lower_stmt` of `lower_stmt.c` | A block that a value, the test of an arm or the call of a base ended before the code after it. | No expression ends its path. A call of a function that returns `never` gives no value, and antic refuses it as an operand with `` `die` returns no value ``. A `defer` or an `undo` whose call never returns ends the path at an exit of its block alone, which the programs of batch 3x take at a `return`, a `break`, a `continue`, a `yield` and a `fail`. |
+| `lower_stmt_kind` of `lower_stmt.c` | A block that the value of a `yield` or a call with a handler ended, and a `may fail` function with a result that returns no value. | The value runs before any exit, and the call that did not fail reaches the join after its handler. A `return` without a value in a function with a result is refused. |
+| `lower_let_value` and `lower_assign` of `lower_stmt.c` | A call with a handler that writes no result, in a `let` or an `=`, and `alloc` of a call that builds no class. | antic refuses the first with `` `quiet` returns no value `` and the second with `` `alloc` of one object takes a literal or a class with arguments ``. |
+| `drop_result` of `lower_stmt.c` | A call of `hash` whose result the statement drops. | antic refuses it as `unused-result`. |
+| `read_classes` of `antl_read_ir.c` | A file that ends inside the sub-object or the `mutable` field of a class record. | The count of each list stands before it, and `antl_get_count` refuses a count whose records the rest of the file cannot hold. Each record is of a fixed size. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1319,6 +1334,14 @@ and `parser_decl.c` above keep theirs.
   the marks of a parameter, of `??`, of `fn` without `(`, of `may fail`
   and of a `>>` in a list of parameters, and in `parser_stmt.c` a `try`
   whose block fails at the depth limit.
+- The sides of a condition in `lower_stmt.c`, `antl_read_ir.c` and
+  `antl_read.c` that batch 3x did not sort. In `lower_stmt.c` most take a
+  symbol, a callee or a type that the checker always sets, and the call
+  of a `never` function as a statement whose block ended reaches one
+  side that no probe of batch 3x isolated. In `antl_read_ir.c` an index
+  of an aggregate past the table in the sub-object of a class record
+  reaches the failure of `read_classes`, which no case of `unit_modules`
+  writes, and most of the others are the checks of a later file above.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
