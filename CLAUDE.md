@@ -741,6 +741,14 @@ not re-open a settled decision without asking Eddie.
   88 s and 369 s, then 261 s, 160 s, 212 s, 128 s, 87 s and 372 s,
   `ubsan` 244 s, 159 s, 210 s, 138 s, 90 s and 397 s, then 230 s, 161 s,
   213 s, 135 s, 89 s and 400 s.
+  Batch 3x of the third phase of coverage measured `host` in the same
+  three parts: 378 s, 269 s and 339 s before the fix of T297, up to test
+  7824, where `fmt_canonical` failed on the new refusal, and 373 s, 258 s
+  and 308 s once it stood in its canonical form, and 290 s, 261 s and
+  330 s before the commit of the tests of three files, up to test 7842.
+  It ran each sanitizer suite in the six parts of `asan`, the last up to
+  test 7840: `asan` 268 s, 187 s, 267 s, 174 s, 121 s and 602 s, `ubsan`
+  253 s, 187 s, 269 s, 178 s, 124 s and 619 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
