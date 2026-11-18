@@ -334,11 +334,21 @@ static void array_of_key(const struct anti_toml *doc, const char *key,
     for (;;) {
         struct text path = {0};
         const char *value;
+        int64_t shape;
         text_appendf(&path, "%s.%zu", key, *count);
-        value = value_of(doc, text_cstr(&path));
+        shape = anti_rt_toml_shape(doc, (const unsigned char *)text_cstr(&path),
+                                   (int64_t)path.length);
+        value = manifest_value(doc, text_cstr(&path));
         text_free(&path);
-        if (value == NULL) {
+        /* T302 of docs/audit/tests-findings.md: an empty string or an
+           inline table ends no list. Only the end of the array does, and
+           an element without a value of its own stands as an empty
+           text. */
+        if (shape == ANTI_TOML_NONE) {
             return;
+        }
+        if (value == NULL) {
+            value = "";
         }
         if (*count == capacity) {
             *items = files_grow(*items, &capacity, sizeof **items);
