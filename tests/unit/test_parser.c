@@ -1034,9 +1034,8 @@ void test_parser(void)
     {
         static const struct expected_error e[] = {
             {3, 5, "a struct holds fields alone, and a function belongs to "
-                   "a class"},
-            {3, 14, "expected identifier"}};
-        errors("struct P\n{\n    pub fn f(self) {}\n}\n", e, 2);
+                   "a class"}};
+        errors("struct P\n{\n    pub fn f(self) {}\n}\n", e, 1);
     }
     {
         static const struct expected_error e[] = {
@@ -1053,9 +1052,8 @@ void test_parser(void)
     {
         static const struct expected_error e[] = {
             {1, 12, "a struct holds fields alone, and a constant belongs to "
-                    "a class"},
-            {1, 30, "expected an item"}};
-        errors("struct P { const N: int = 1; }\n", e, 2);
+                    "a class"}};
+        errors("struct P { const N: int = 1; }\n", e, 1);
     }
 
     /* `?*T` is a pointer that may hold `none`, and it nests like `*T`. */

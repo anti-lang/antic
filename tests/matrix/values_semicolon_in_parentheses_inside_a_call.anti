@@ -1,0 +1,13 @@
+//! A `;` inside parentheses inside a call gets one message, and the two `)`
+//! after it close what the statement opened.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let n = twice((;));
+	return n;
+}

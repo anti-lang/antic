@@ -1,0 +1,8 @@
+//! A `;` where the index stands gets one message.
+
+fn main() -> int
+{
+	let a = [1, 2];
+	let n = a[;];
+	return n;
+}

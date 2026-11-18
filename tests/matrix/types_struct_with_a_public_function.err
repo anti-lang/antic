@@ -1,0 +1,1 @@
+types_struct_with_a_public_function.anti:8:2: error: a struct holds fields alone, and a function belongs to a class

@@ -1,0 +1,1 @@
+types_struct_with_a_constant.anti:6:2: error: a struct holds fields alone, and a constant belongs to a class

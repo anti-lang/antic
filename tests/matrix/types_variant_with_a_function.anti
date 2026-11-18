@@ -1,0 +1,16 @@
+//! A variant holds its cases alone, and a function belongs to a class.
+
+variant Shape
+{
+	Circle { r: f32 },
+
+	fn area(self) -> f32
+	{
+		return 0.0;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

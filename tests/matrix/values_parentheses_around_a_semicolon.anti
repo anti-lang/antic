@@ -1,0 +1,7 @@
+//! A `;` inside parentheses where an expression stands gets one message.
+
+fn main() -> int
+{
+	let n = (;);
+	return n;
+}

@@ -1,0 +1,12 @@
+//! An enum holds values and functions, and a field is neither.
+
+enum Mode
+{
+	Read,
+	pub size: int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

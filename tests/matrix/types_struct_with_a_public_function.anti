@@ -1,0 +1,17 @@
+//! A struct holds fields alone, and a function belongs to a class. The body
+//! after the function gets no second message.
+
+struct Pair
+{
+	a: int,
+
+	pub fn get() -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

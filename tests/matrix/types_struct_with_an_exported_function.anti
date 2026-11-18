@@ -1,0 +1,16 @@
+//! A struct holds fields alone, and an exported function belongs to a class.
+
+struct Pair
+{
+	a: int,
+
+	export fn get() -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,9 @@
+//! A `;` where the value of `send` stands gets one message.
+
+fn main() -> int
+{
+	let c = chan int(1);
+	send(c,;);
+	delete(c);
+	return 0;
+}

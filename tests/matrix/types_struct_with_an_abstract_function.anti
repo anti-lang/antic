@@ -1,0 +1,13 @@
+//! A struct holds fields alone, and an abstract function belongs to a class.
+
+struct Pair
+{
+	a: int,
+
+	abstract fn get(self) -> int;
+}
+
+fn main() -> int
+{
+	return 0;
+}
