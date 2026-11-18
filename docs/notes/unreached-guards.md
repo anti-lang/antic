@@ -17,7 +17,7 @@ reaches, and the guards of `sema_const.c`, `sema_expr.c`,
 `parser_decl.c`, `lexer.c`, `antl_read_ir.c`, `sema_free.c`,
 `sema_hash.c`, `pattern.c`, `optimize.c`, `bindwrite.c`,
 `sema_safety.c`, `layout.c`, `lower_simd.c`, `lower_hash.c`, `check.c`,
-`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s and 3t stay by them. A guard stays in the code as it is. A later
+`cache.c`, `sema_thread.c` and the files of batches 3l, 3m, 3n, 3o, 3p, 3q, 3r, 3s, 3t and 3u stay by them. A guard stays in the code as it is. A later
 coverage step that finds one unreached reads its row here before it asks
 again.
 
@@ -295,7 +295,7 @@ It reads the IR that lowering and the reader of a library file give it.
 | `whole_class_of` | A global past the globals of the program. | Every caller passes the descriptor or the base of a class record, or the interface of a subtable, which lowering and the reader set to a global of the program. |
 | `whole_free` | No pass to free. | `whole_build` never gives NULL, and its one caller frees what it built. |
 | `entry_at` | A table that holds no list of functions, a slot past its end and an entry that is no function. | Lowering writes every table as a list of the functions of its class, a stub in every abstract slot, and a call names a slot of the class it calls through. |
-| `same_sym` | A symbolic value past the list, or none, two values of different kinds or types, and a kind outside the four. | The values of two copies whose instructions match come from the same expression of the generic, so they are of one kind and one type, and lowering names a value of the list. |
+| `same_sym` | A symbolic value past the list, or none, and a kind outside the four. | Lowering names a value of the list, and the reader of the IR refuses a symbolic value of another kind. |
 | `same_agg` | An aggregate that is none. | `same_vtype` asks only where the type is an aggregate, and lowering then names one. |
 | `names_field` | A symbolic value past the list, a value that is no offset, an operation over offsets and a chain of more than 64 of them. | Lowering adds each offset of an address as a `ptradd` of one `offset_of`, and the offset of an element as a `mul` instruction, so a `ptradd` by a symbolic value names one field of the list. |
 
@@ -1117,6 +1117,27 @@ branches. The rows of the section of `pattern.c` above keep theirs.
 | `first_of`, `narrow_after` and `least` | A group without a child and an alternative without a branch. | `group_body` gives every group the one child that `parse_alt` returns, and `parse_alt` makes an alternative of two branches at the least. |
 | `pattern_least_bytes` | A group that the pattern lacks. | `patch_group` of `sema_pattern.c` refuses it before the count. |
 
+## The sides of `src/antic/antl_verify.c`
+
+Batch 3u of the third phase sorted the sides of the conditions of the
+verifier of library files. No batch had chosen the file by its branches.
+`unit_modules` damages the trees, the type table and the IR of a library
+file. The rows of the section of `antl_verify.c` above keep theirs.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `enter` | A record that is none of the records of its table. | `mark_in` gives the mark of every record the reader built, as its row above says. |
+| `case_of` | A variant without its union, and a case past the cases the union gives. | The reader builds the cases of every variant from the fields of its union with `types_cases_from_fields`. |
+| `field_found`, `walks_param` | A pointer without the type it points at. | `read_pointer` makes a pointer of an element it found alone. |
+| `bindings_set`, `check_for` | A name that the tree binds to a local without a type. | `antl_verify_tree` refuses a local or a parameter without a type before the walk starts. |
+| `check_expr` | The value of an enum without a type. | `stands_as` refuses it where it stands as a value, and `callee_read` where it is the callee of a call, before the walk reaches it. |
+| `check_for` | A tuple of fewer fields than elements. | `read_tuple` gives a tuple one field per element. |
+| `walks_param` | A `for` over a `?*T` of a type parameter, and over a value without a type. | The checker refuses a `for` over a pointer that may be `none`, and `check_for` asks for the type of the value before it. |
+| `walk_case` | The name of a case at the deepest place of a tree. | The value of the `switch` stands one level below the `switch` as the case does, so `enter` refuses it first. |
+| `antl_verify_extern` | The record of a function without a type. | `read_extern` gives every record an entry of the type table, and every entry holds a type. |
+| `simd_shape` | No lanes. | Both callers refuse a struct of no fields first. |
+| `antl_verify_simd_agg` | A field of a struct of the IR without a name. | `antl_get_cstr` gives every field the reader reads a name, the empty one where the file writes none. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
@@ -1220,6 +1241,16 @@ branches. The rows of the section of `pattern.c` above keep theirs.
   declaration refused, or are a short circuit whose other operand
   decides. Among them is `none` on the left of `==` beside a `?T`, which
   takes the type of the other operand, so both operands are a `?T`.
+- The sides of a condition in `antl_verify.c` and `whole.c` that batch
+  3u did not sort. In `antl_verify.c` they are a field that names an
+  extern function, a `dispatch` in a generic and the flag of a simd
+  struct on a class or on a struct of no fields, which no case of
+  `unit_modules` writes, and the `switch` over every kind of statement,
+  whose missing `default` the measurement counts. In `whole.c` they are
+  the caps on a chain of bases, a module of no name, a descriptor past
+  the globals, a copy without blocks, an entry of no function in the
+  walk of a worker, an extern worker, an aggregate past the list and a
+  plugin with the runtime bundled.
 - The lines of `src/rt/f16.h`. Each file that includes it holds a copy
   of its two functions. The summary counts as missed the lines that some
   copies do not reach, and one copy or more reaches every line.
