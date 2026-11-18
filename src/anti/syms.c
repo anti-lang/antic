@@ -516,6 +516,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
 {
     struct anti_toml *doc = anti_rt_toml_read(
         (const unsigned char *)index->data, (int64_t)index->length);
+    struct text table = {0};
     size_t first = out->count;
     int64_t n;
     size_t i;
@@ -528,6 +529,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
         const char *key = (const char *)anti_rt_toml_key(doc, n).ptr;
         const char *value = (const char *)anti_rt_toml_value(doc, n).ptr;
         const char *field = strrchr(key, '.');
+        const char *name = key + 7;
         struct symbol_unit *u;
         /* R184 of "Rules of 2026-10-13": every key stands in a module
            table, and one outside them names nothing an index knows. */
@@ -536,14 +538,22 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
             say_anti("%s holds the key %s in %s outside a module "
                      "table\n", path, key, INDEX_NAME);
             anti_rt_toml_free(doc);
+            text_free(&table);
             return false;
         }
         if (files_ends_with(key, ".module")) {
             u = symbol_units_add(out);
             text_append(&u->module, value);
+            table.length = 0;
+            text_append_bytes(&table, name, (size_t)(field - name));
             continue;
         }
-        if (out->count == first) {
+        /* T301 of docs/audit/tests-findings.md: a key names the unit of
+           its own table alone. One of a table whose `module` line has not
+           come names nothing, by the entry of R184 in docs/decisions.md,
+           and leaves the unit of the table before it as it was. */
+        if (out->count == first || table.length != (size_t)(field - name) ||
+            memcmp(text_cstr(&table), name, table.length) != 0) {
             continue;
         }
         u = &out->items[out->count - 1];
@@ -556,6 +566,7 @@ static bool load_deployment(const struct zip_archive *z, const char *path,
         }
     }
     anti_rt_toml_free(doc);
+    text_free(&table);
     for (i = 0; i < z->count; i++) {
         const char *name = text_cstr(&z->items[i].name);
         const char *slash = strchr(name, '/');
