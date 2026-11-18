@@ -1,0 +1,19 @@
+//! A field of a class body without its comma, before a function of the body.
+//! The field ends there, as antic reads it, so the header of the function
+//! stands at the level of the body and carries no continuation.
+
+class Holder
+{
+	pub x: int
+
+	pub fn get(self) -> int
+	{
+		return self.x;
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { x: 7 };
+	return h.get() - 7;
+}

@@ -1,0 +1,27 @@
+//! A field without its comma ends the run of fields when a function of the
+//! body follows it.
+import anti.io;
+import anti.text;
+
+fn say(s: str)
+{
+	io.println(s);
+	free(s.ptr);
+}
+
+class Holder
+{
+	pub x: int
+
+	pub fn get(self) -> int
+	{
+		return self.x;
+	}
+}
+
+fn main() -> int
+{
+	let h = Holder { x: 7 };
+	say(f"get {h.get()}");
+	return 0;
+}
