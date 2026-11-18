@@ -1,0 +1,8 @@
+exit 0
+allow 1
+allow 2
+box 1
+cell 7
+allow 2
+caught
+local 5

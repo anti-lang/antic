@@ -1,0 +1,13 @@
+//! The name an arm of `select` binds stands before `=>`.
+
+fn main() -> int
+{
+	let c = chan int(1);
+	send(c, 1);
+	select {
+		recv(c) got {
+		}
+	}
+	delete(c);
+	return 0;
+}

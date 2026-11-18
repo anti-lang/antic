@@ -1,0 +1,9 @@
+//! The parts of the name of a warning stand together. A blank after a dash ends
+//! the name.
+
+fn main() -> int
+{
+	allow(unused- allow, "a blank")
+	let n = 1;
+	return n;
+}

@@ -1,0 +1,1 @@
+flow_allow_clause_of_a_statement_at_the_end_of_the_file.anti:6:1: error: a clause of a statement stands before the statement

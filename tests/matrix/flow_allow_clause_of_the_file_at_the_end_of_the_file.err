@@ -1,0 +1,1 @@
+flow_allow_clause_of_the_file_at_the_end_of_the_file.anti:4:1: error: `allow` takes a name and a reason, `allow(name, "reason")`

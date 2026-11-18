@@ -1,0 +1,13 @@
+//! A constant without its `;` before a variant gets one message, and the
+//! variant after it is read.
+
+const N: int = 1
+	variant Shape
+{
+	Empty,
+}
+
+fn main() -> int
+{
+	return 0;
+}

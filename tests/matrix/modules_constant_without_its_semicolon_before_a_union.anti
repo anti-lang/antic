@@ -1,0 +1,14 @@
+//! A constant without its `;` before a union gets one message, and the union
+//! after it is read.
+
+const N: int = 1
+	union Bits
+{
+	a: int,
+	b: f32,
+}
+
+fn main() -> int
+{
+	return 0;
+}

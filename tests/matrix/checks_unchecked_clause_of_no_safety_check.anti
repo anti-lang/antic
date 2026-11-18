@@ -1,0 +1,9 @@
+//! `unchecked` takes the name of a safety check, and a name that names nothing
+//! is refused.
+
+fn main() -> int
+{
+	unchecked(no-such-check, "nothing")
+	let n = 1;
+	return n;
+}

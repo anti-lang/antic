@@ -1,0 +1,94 @@
+//! `allow` and `unchecked` are contextual words, so a function and a local may
+//! carry either name. A call of one at the start of a statement is a call
+//! wherever the token after its `)` goes on as an expression.
+import anti.io;
+import anti.lang;
+
+class Box
+{
+	pub n: int,
+
+	pub fn show(self)
+	{
+		if self.n == 1 {
+			io.println("box 1");
+		}
+	}
+}
+
+fn allow(n: int)
+{
+	if n == 1 {
+		io.println("allow 1");
+	} else {
+		io.println("allow 2");
+	}
+}
+
+fn make(n: int) -> Box
+{
+	return Box { n: n };
+}
+
+fn cells(s: []int) -> []int
+{
+	return s;
+}
+
+fn twice(n: int) -> fn(int)
+{
+	return allow;
+}
+
+fn risky(n: int) may fail
+{
+	if n > 0 {
+		fail "too big";
+	}
+}
+
+fn after_a_catch()
+{
+	let unchecked = risky;
+	unchecked(1) catch e {
+		io.println("caught");
+	};
+}
+
+fn after_a_dot()
+{
+	let unchecked = make;
+	unchecked(1).show();
+}
+
+fn after_a_bracket()
+{
+	let a = [1, 2];
+	let unchecked = cells;
+	unchecked(a[0..2])[0] = 7;
+	if a[0] == 7 {
+		io.println("cell 7");
+	}
+}
+
+fn after_a_parenthesis()
+{
+	let unchecked = twice;
+	unchecked(1)(2);
+}
+
+fn main() -> int
+{
+	allow(1);
+	allow((2));
+	after_a_dot();
+	after_a_bracket();
+	after_a_parenthesis();
+	after_a_catch();
+	let unchecked = 4;
+	unchecked = unchecked + 1;
+	if unchecked == 5 {
+		io.println("local 5");
+	}
+	return 0;
+}

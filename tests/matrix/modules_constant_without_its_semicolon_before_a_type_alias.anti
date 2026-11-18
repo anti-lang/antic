@@ -1,0 +1,10 @@
+//! A constant without its `;` before a `type` alias gets one message, and the
+//! alias after it is read.
+
+const N: int = 1
+	type Count = int;
+
+fn main() -> int
+{
+	return 0;
+}

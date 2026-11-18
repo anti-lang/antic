@@ -1,0 +1,1 @@
+flow_call_of_a_function_named_allow_before_a_compound_assignment.anti:12:2: error: cannot assign to this expression

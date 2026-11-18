@@ -1,0 +1,12 @@
+//! A `tests` block that the end of the file cuts gets one message.
+
+fn main() -> int
+{
+	return 0;
+}
+
+tests
+{
+	fn one()
+	{
+	}

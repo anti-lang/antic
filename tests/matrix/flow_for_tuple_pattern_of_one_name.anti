@@ -1,0 +1,10 @@
+//! A tuple pattern of `for` names two elements or more, so `(a)` is the range
+//! the loop walks.
+
+fn main() -> int
+{
+	let items = [1, 2];
+	for (a) in items {
+	}
+	return 0;
+}

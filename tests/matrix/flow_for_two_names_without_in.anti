@@ -1,0 +1,9 @@
+//! The index and the element of `for` stand before `in`.
+
+fn main() -> int
+{
+	let items = [1, 2];
+	for i, x of items {
+	}
+	return 0;
+}

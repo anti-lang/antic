@@ -1,0 +1,1 @@
+checks_unchecked_clause_of_no_safety_check.anti:6:12: error: `no-such-check` is no safety check, and `unchecked` overrules a safety check alone

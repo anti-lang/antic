@@ -1,0 +1,8 @@
+//! `as` after the path of an `import` takes a name.
+
+import anti.io as;
+
+fn main() -> int
+{
+	return 0;
+}

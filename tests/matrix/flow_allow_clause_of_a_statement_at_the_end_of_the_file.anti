@@ -1,0 +1,5 @@
+//! A clause before a statement that the end of the file cuts gets one message.
+
+fn main() -> int
+{
+	allow(unused-allow, "no statement")

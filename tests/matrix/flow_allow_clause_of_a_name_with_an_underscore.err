@@ -1,0 +1,1 @@
+flow_allow_clause_of_a_name_with_an_underscore.anti:6:8: error: `unused_allow` is no warning, and `allow` silences a warning alone

@@ -1,0 +1,13 @@
+//! `provides` names the class after `as`.
+
+abstract class Greeter
+{
+	pub abstract fn greet(self);
+}
+
+provides Greeter as;
+
+fn main() -> int
+{
+	return 0;
+}

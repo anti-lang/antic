@@ -1,0 +1,14 @@
+//! A call of a function named `allow` at the start of a statement goes on as an
+//! expression where `+=` follows its `)`, and the statement is refused as that
+//! expression.
+
+fn allow(n: int) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	allow(1) += 1;
+	return 0;
+}

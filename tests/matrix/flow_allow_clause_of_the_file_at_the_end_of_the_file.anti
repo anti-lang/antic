@@ -1,0 +1,3 @@
+//! A clause of the whole file that the end of the file cuts gets one message.
+
+allow(

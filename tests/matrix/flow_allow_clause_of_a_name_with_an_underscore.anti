@@ -1,0 +1,9 @@
+//! The name of a warning is written with dashes, and a name with `_` names no
+//! warning.
+
+fn main() -> int
+{
+	allow(unused_allow, "an underscore")
+	let n = 1;
+	return n;
+}

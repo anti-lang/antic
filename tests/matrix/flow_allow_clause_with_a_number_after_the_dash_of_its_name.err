@@ -1,0 +1,1 @@
+flow_allow_clause_with_a_number_after_the_dash_of_its_name.anti:5:14: error: `allow` takes a name and a reason, `allow(name, "reason")`

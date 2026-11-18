@@ -1,0 +1,8 @@
+//! Each part of the name of a warning starts with a letter.
+
+fn main() -> int
+{
+	allow(unused-1, "a number")
+	let n = 1;
+	return n;
+}

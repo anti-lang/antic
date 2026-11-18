@@ -1,0 +1,9 @@
+//! A tuple pattern of `for` stands before `in`.
+
+fn main() -> int
+{
+	let pairs = [(1, 2), (3, 4)];
+	for (a, b) of pairs {
+	}
+	return 0;
+}
