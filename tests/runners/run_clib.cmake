@@ -11,7 +11,7 @@
 #             simd, classes, failing, tuples, flags, ledger, variants,
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
-#             tight, tight_aligned, callbacks or forged_notice
+#             tight, tight_aligned, wide, callbacks or forged_notice
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -398,6 +398,17 @@ elseif(CASE STREQUAL "tight_aligned")
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/tight_aligned${EXE}"
                   "${SOURCES}/tight_aligned.expected")
+elseif(CASE STREQUAL "wide")
+    # The struct the header writes for a class with align(32) that is not
+    # packed has the size and the alignment Anti gives the class, and a
+    # field of a function crosses as one C function pointer.
+    library(wide static "${dir}")
+    string(STRIP "${tool_stdout}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/wide${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/wide.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/wide${EXE}" "${SOURCES}/wide.expected")
 elseif(CASE STREQUAL "ledger")
     # A synchronized class crosses with the bytes of its hidden lock, and
     # two threads of C call it without losing an addition.

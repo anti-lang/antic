@@ -1,7 +1,8 @@
 /* The C header antic writes for a library: the structs, unions,
    constants and functions it exports, the tuples, Flags and f16 fields
-   of an exported signature, a bundled archive, owning structs and the
-   lanes of a simd struct of bools. */
+   of an exported signature, a bundled archive, owning structs, the
+   lanes of a simd struct of bools, the functions of a class and the
+   include guard. */
 
 #include "../binary_stdio.h"
 #include "check.h"
@@ -102,6 +103,86 @@ static void simd_bool_lanes(void)
                      "typedef __m128i Mask16;\n"
                      "#endif\n") != NULL);
     }
+    text_free(&out);
+}
+
+/* A tuple and a `?T` of an exported signature are named by their
+   elements, and an enum, a variant and a class among them by their C
+   names. */
+static void element_names(void)
+{
+    struct text out = {0};
+
+    if (header_text("com.example.geo",
+                    "export enum Color { Red, Blue }\n"
+                    "export variant Shape { Dot, Square { side: i32 } }\n"
+                    "export class Box { pub n: i64 }\n"
+                    "export fn pair(c: (Color, i64), s: ?Shape,"
+                    " b: (*Box, i64)) -> i64 { return c.1 + b.1; }\n",
+                    false, &out)) {
+        CHECK(strstr(text_cstr(&out),
+                     "int64_t pair(struct anti_tuple_Color_int c, "
+                     "struct anti_opt_Shape s, "
+                     "struct anti_tuple_ptr_Box_int b);\n") != NULL);
+    }
+    text_free(&out);
+}
+
+/* The header says of every public function of a synchronized class that
+   it runs under the lock, whatever the length of its name. An abstract
+   class has no complete value, so its construct with arguments gets no
+   function of C, which a class that is not abstract gets. */
+static void class_functions(void)
+{
+    struct text out = {0};
+
+    if (header_text("com.example.geo",
+                    "export synchronized class Account { pub total: i64,"
+                    " pub fn deposits(self, n: i64) { self.total += n; }"
+                    " pub fn withdraws(self, n: i64) { self.total -= n; } }\n"
+                    "export abstract class Base { pub n: i64,"
+                    " fn construct(self, n: i64) { self.n = n; }"
+                    " pub abstract fn area(self) -> i64; }\n"
+                    "export class Box { pub n: i64,"
+                    " fn construct(self, n: i64) { self.n = n; } }\n",
+                    false, &out)) {
+        CHECK(strstr(text_cstr(&out),
+                     "/* Runs under the lock of its object. */\n"
+                     "void Account_deposits(Account *self, int64_t n);\n") !=
+              NULL);
+        CHECK(strstr(text_cstr(&out),
+                     "/* Runs under the lock of its object. */\n"
+                     "void Account_withdraws(Account *self, int64_t n);\n") !=
+              NULL);
+        CHECK(strstr(text_cstr(&out), "anti_Base_construct") == NULL);
+        CHECK(strstr(text_cstr(&out),
+                     "void anti_Box_construct(Box *self, int64_t n);\n") !=
+              NULL);
+    }
+    text_free(&out);
+}
+
+/* The include guard of a header is its name in capitals, with its digits
+   and capitals as they are and `_` for any other byte. The name of a
+   header comes from `-o`, so `-o libGeo-3.a` names the header `Geo-3`. */
+static void guard_names(void)
+{
+    struct checked c;
+    struct interface iface;
+    const struct interface *ifaces[1];
+    struct text out = {0};
+
+    checked_run_as(&c, "com.example.geo",
+                   "export fn one() -> int { return 1; }\n");
+    CHECK(c.ok);
+    if (c.ok) {
+        sema_interface(c.module, "com.example.geo", &c.arena, &iface);
+        ifaces[0] = &iface;
+        header_write(&out, "Geo-3", ifaces, 1, false);
+        CHECK(strstr(text_cstr(&out), "#ifndef GEO_3_H\n#define GEO_3_H\n") !=
+              NULL);
+    }
+    checked_release(&c);
     text_free(&out);
 }
 
@@ -374,4 +455,7 @@ void test_header(void)
               "#endif\n");
     owning_structs();
     simd_bool_lanes();
+    element_names();
+    class_functions();
+    guard_names();
 }

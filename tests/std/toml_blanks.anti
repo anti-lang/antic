@@ -1,0 +1,21 @@
+//! The blanks the TOML reader passes: tabs before a key, around `=` and after a
+//! bare value, the line breaks of Windows and keys and a table with capitals.
+//! Each line prints a key and its value.
+import anti.io;
+import anti.toml;
+
+fn main() -> int
+{
+	let doc = toml.Document.read("\tName\t=\t7\t# seven\r\nFlag = true\r\n[Table]\r\nCount = 3\r\n") catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let i = 0;
+	while i < doc.len() do {
+		io.print(doc.key(i));
+		io.print(" = ");
+		io.println(doc.value(i));
+		i += 1;
+	}
+	return 0;
+}

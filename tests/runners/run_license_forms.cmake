@@ -436,9 +436,11 @@ if(FORM STREQUAL "archive")
     # A malformed archive is refused and read no further than its bytes
     # go: a size past the end of the file, a size that is no number, a
     # long name without its table and one past the end of the table, a
-    # name of the BSD form longer than its member, a member of the package
-    # header that holds the first bytes of a library file alone, and one
-    # that repeats those bytes 4000 times and never holds a header.
+    # name of the BSD form longer than its member, a length of a name of
+    # the BSD form and an offset of a long name that are no numbers, a
+    # member of the package header that holds the first bytes of a
+    # library file alone, and one that repeats those bytes 4000 times and
+    # never holds a header.
     # The header of a member is its name in 16 bytes, 32 bytes of date,
     # owner and mode, the size in 10 and the two bytes that end it.
     function(ar_member out name size data)
@@ -461,6 +463,8 @@ if(FORM STREQUAL "archive")
     ar_member(table "//" 18 "shapes.package.o/\n")
     ar_member(past_table "/9999" 4 "ANTL")
     ar_member(long_bsd "#1/9999" 4 "ANTL")
+    ar_member(bsd_no_number "#1/x" 4 "ANTL")
+    ar_member(long_no_number "/1x" 4 "ANTL")
     ar_member(start_alone "s.package.o/" 4 "ANTL")
     ar_member(start_named "/0" 4 "ANTL")
     set(malformed_1 "${past}")
@@ -474,10 +478,12 @@ if(FORM STREQUAL "archive")
     string(REPEAT "ANTL" 4000 starts)
     ar_member(many_starts "s.package.o/" 16000 "${starts}")
     set(malformed_9 "${many_starts}")
+    set(malformed_10 "${bsd_no_number}")
+    set(malformed_11 "${table}${long_no_number}")
     # file(WRITE) ends a line with CR and LF on Windows, which would
     # break the eight bytes an archive starts with, so the bytes are
     # written with line feeds on every host.
-    foreach(case RANGE 1 9)
+    foreach(case RANGE 1 11)
         file(CONFIGURE OUTPUT "${WORK}/malformed-${case}.a"
              CONTENT "!<arch>\n${malformed_${case}}" @ONLY NEWLINE_STYLE UNIX)
         run_anti("${WORK}" status out err license --from-archive

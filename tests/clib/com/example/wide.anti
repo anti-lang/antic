@@ -1,0 +1,22 @@
+//! A library for C that exports a class with `align(N)` and a field that holds
+//! a function. The header writes the struct of the class with the alignment of
+//! Anti, and the field as one C function pointer.
+
+/// A word aligned to 32 and a step to take on it.
+export class Wide align(32)
+{
+	pub n: i64,
+	pub step: fn(i64) -> i64,
+}
+
+/// The size of `Wide` in Anti.
+export fn wide_size() -> int
+{
+	return size_of(Wide);
+}
+
+/// The step of `w` taken on its word.
+export fn wide_step(w: *Wide) -> i64
+{
+	return w.step(w.n);
+}

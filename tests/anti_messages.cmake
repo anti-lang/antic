@@ -101,6 +101,10 @@ anti_message(license_from_archive_no_archive
     FILES library.a "A text where the archive belongs.\n"
     ARGS license --from-archive library.a
     ERR "anti: library.a is no archive")
+anti_message(license_from_archive_shorter_than_its_start
+    FILES library.a "!<arch"
+    ARGS license --from-archive library.a
+    ERR "anti: library.a is no archive")
 anti_message(license_from_archive_absent
     ARGS license --from-archive none.a
     ERR "anti: cannot read none.a")

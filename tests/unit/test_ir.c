@@ -966,11 +966,221 @@ static void refused_forms(void)
     arena_free(&arena);
 }
 
+/* The forms the verifier refuses that the tests above leave: an operand
+   past the temporaries after the operands of a call, a range on a void
+   result, the facts of a pointer on an integer, typed accesses of a lock,
+   an aggregate and a lane, the lane operations of each kind of simd
+   operation, a simd operation and a bitfield that name no type of the
+   module, the operand of a table slot, the ranges of a load, a slot past
+   the temporaries, a branch on overflow and the reads of the flags at the
+   start of a block, and a call that never returns at the end of one. */
+static void verifier_sides(void)
+{
+    struct arena arena = {0};
+    struct ir_module m;
+    struct ir_function *f;
+    struct ir_function *callee;
+    struct ir_function *stop;
+    struct ir_block *b0;
+    struct ir_block *b1;
+    struct ir_block *b2;
+    struct ir_field fields[4];
+    struct ir_operand args[1];
+    static const uint32_t lanes[4] = {0, 1, 2, 3};
+    uint32_t bits;
+    uint32_t ints;
+    uint32_t floats;
+    uint32_t p;
+    uint32_t x;
+    size_t i;
+
+    ir_module_init(&m, &arena, "main");
+    memset(fields, 0, sizeof fields);
+    fields[0].name = "plain";
+    fields[0].type = ir_scalar(IR_I32);
+    bits = ir_struct_add(&m, IR_AGG_STRUCT, "main.Plain", fields, 1, false, 0);
+    for (i = 0; i < 4; i++) {
+        fields[i].name = "l";
+        fields[i].type = ir_scalar(IR_I32);
+    }
+    ints = ir_simd_add(&m, "main.I4", fields, 4);
+    for (i = 0; i < 4; i++) {
+        fields[i].type = ir_scalar(IR_F32);
+    }
+    floats = ir_simd_add(&m, "main.F4", fields, 4);
+    callee = ir_function_add(&m, "main", "callee", IR_VOID, IR_NO_AGG);
+    ir_param_add(callee, IR_PTR, IR_NO_AGG);
+    ir_ret(callee, ir_block_add(callee), IR_VOID, ir_int_op(IR_I64, 0));
+    stop = ir_extern_add(&m, "stop", IR_VOID, false);
+    stop->never_returns = true;
+
+    /* A call whose third operand is past the temporaries, with a whole
+       argument after it. */
+    f = ir_function_add(&m, "main", "operands", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    args[0] = ir_temp_op(f, p);
+    ir_call(f, b0, IR_VOID, ir_func_op(callee), args, 1);
+    b0->insts[0].c = ir_temp_op(f, p);
+    b0->insts[0].c.as.temp = 99;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A range on a void result, an owning integer and an integer that is
+       dereferenceable. */
+    f = ir_function_add(&m, "main", "facts", IR_VOID, IR_NO_AGG);
+    f->result_range = true;
+    ir_param_add(f, IR_I64, IR_NO_AGG);
+    f->params[0].own = true;
+    ir_param_add(f, IR_I64, IR_NO_AGG);
+    f->params[1].deref_size = ir_sym_size_of(&m, ir_scalar(IR_I64));
+    ir_ret(f, ir_block_add(f), IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A slot of void, typed accesses of a lock word, of an aggregate and
+       of a lane of a simd struct, and a slot past the temporaries. */
+    f = ir_function_add(&m, "main", "accesses", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_slot(f, b0, ir_scalar(IR_VOID));
+    ir_load(f, b0, IR_LOCK, ir_temp_op(f, p));
+    ir_type_access(b0, ir_scalar(IR_I32), 0);
+    ir_load(f, b0, IR_AGG, ir_temp_op(f, p));
+    ir_type_access(b0, ir_scalar(IR_I32), 0);
+    ir_load(f, b0, IR_F32, ir_temp_op(f, p));
+    ir_type_access(b0, ir_aggregate(floats), 0);
+    ir_slot(f, b0, ir_scalar(IR_I64));
+    b0->insts[4].result = 99;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A lane operation that no kind takes on its lanes, and simd
+       operations whose type is no simd struct of the module. */
+    f = ir_function_add(&m, "main", "lanes", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_vbinary(f, b0, IR_SDIV, IR_I32, ir_temp_op(f, p), ir_temp_op(f, p),
+               ir_temp_op(f, p), ints);
+    ir_vunary(f, b0, IR_COPY, IR_I32, ir_temp_op(f, p), ir_temp_op(f, p),
+              ints);
+    ir_vreduce(f, b0, IR_FMUL, IR_F32, ir_temp_op(f, p), floats);
+    ir_vreduce(f, b0, IR_MUL, IR_I32, ir_temp_op(f, p), ints);
+    ir_vsplat(f, b0, IR_I32, ir_temp_op(f, p), ir_int_op(IR_I32, 1), ints);
+    b0->insts[4].of = ir_scalar(IR_I32);
+    ir_vsplat(f, b0, IR_I32, ir_temp_op(f, p), ir_int_op(IR_I32, 1), ints);
+    b0->insts[5].of.agg = 99;
+    ir_vshuffle(f, b0, IR_I32, ir_temp_op(f, p), ir_temp_op(f, p), lanes, 4,
+                ints);
+    b0->insts[6].args[0] = ir_temp_op(f, p);
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* Bitfield accesses of a scalar, of an aggregate the module does not
+       have and of a field the struct does not have, and a call through a
+       table whose operand is no global. */
+    f = ir_function_add(&m, "main", "fields", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_bitload(f, b0, IR_I32, ir_temp_op(f, p), bits, 0);
+    b0->insts[0].of = ir_scalar(IR_I32);
+    ir_bitload(f, b0, IR_I32, ir_temp_op(f, p), 99, 0);
+    ir_bitload(f, b0, IR_I32, ir_temp_op(f, p), bits, 5);
+    args[0] = ir_temp_op(f, p);
+    ir_call_indirect(f, b0, IR_VOID, ir_temp_op(f, p), callee, args, 1);
+    b0->insts[3].c = ir_int_op(IR_I64, 0);
+    b0->insts[3].field = 1;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* The ranges of a load: an upper bound alone, a bound that is no
+       constant, a bound of another type, and the ranges of a void and
+       of a float. */
+    f = ir_function_add(&m, "main", "ranges", IR_VOID, IR_NO_AGG);
+    p = ir_param_add(f, IR_PTR, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_load_range(f, b0, IR_I32, ir_temp_op(f, p), 0, 2);
+    b0->insts[0].b.kind = IR_NONE;
+    ir_load_range(f, b0, IR_I32, ir_temp_op(f, p), 0, 2);
+    b0->insts[1].c = ir_temp_op(f, p);
+    ir_load_range(f, b0, IR_I32, ir_temp_op(f, p), 0, 2);
+    b0->insts[2].c = ir_int_op(IR_I64, 2);
+    ir_load_range(f, b0, IR_I32, ir_temp_op(f, p), 0, 2);
+    b0->insts[3].type = IR_VOID;
+    b0->insts[3].b.type = IR_VOID;
+    b0->insts[3].c.type = IR_VOID;
+    ir_load_range(f, b0, IR_I32, ir_temp_op(f, p), 0, 2);
+    b0->insts[4].type = IR_F32;
+    b0->insts[4].b.type = IR_F32;
+    b0->insts[4].c.type = IR_F32;
+    ir_ret(f, b0, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A branch on overflow that starts its block, a flag that starts its
+       block, a flag of a temporary that the operation before it does not
+       write, in an i16, and a flag of a constant. */
+    f = ir_function_add(&m, "main", "starts", IR_VOID, IR_NO_AGG);
+    x = ir_param_add(f, IR_I64, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    b1 = ir_block_add(f);
+    b2 = ir_block_add(f);
+    ir_branch_ov(f, b0, ir_temp_op(f, x), b1, b2);
+    ir_flag(f, b1, IR_FLAG_CARRY, ir_temp_op(f, x));
+    ir_ret(f, b1, IR_VOID, ir_int_op(IR_I64, 0));
+    ir_flag_op(f, b2, IR_ADD_FL, IR_I64, ir_temp_op(f, x), ir_temp_op(f, x),
+               ir_int_op(IR_I8, 0));
+    ir_flag(f, b2, IR_FLAG_CARRY, ir_temp_op(f, x));
+    b2->insts[1].type = IR_I16;
+    ir_flag(f, b2, IR_FLAG_CARRY, ir_int_op(IR_I64, 0));
+    ir_ret(f, b2, IR_VOID, ir_int_op(IR_I64, 0));
+
+    /* A call that never returns at the end of its block. */
+    f = ir_function_add(&m, "main", "last", IR_VOID, IR_NO_AGG);
+    b0 = ir_block_add(f);
+    ir_call(f, b0, IR_VOID, ir_func_op(stop), NULL, 0);
+
+    verified(&m,
+             "main.operands b0: call uses %99, which does not exist\n"
+             "main.facts: the result is void and has a range\n"
+             "main.facts: parameter 0 is i64 and has a fact of a pointer\n"
+             "main.facts: parameter 1 is dereferenceable and may be none\n"
+             "main.facts: parameter 1 is i64 and has a fact of a pointer\n"
+             "main.accesses b0: slot names a type that does not exist\n"
+             "main.accesses b0: load of lock has a type\n"
+             "main.accesses b0: load of agg has a type\n"
+             "main.accesses b0: load has the type of a field of main.F4, "
+             "which is no struct\n"
+             "main.accesses b0: slot writes %99, which does not exist\n"
+             "main.lanes b0: vbinary takes no sdiv on lanes of i32\n"
+             "main.lanes b0: vunary takes no copy on lanes of i32\n"
+             "main.lanes b0: vreduce takes no fmul on lanes of f32\n"
+             "main.lanes b0: vreduce takes no mul on lanes of i32\n"
+             "main.lanes b0: vsplat names a type that is not a simd struct\n"
+             "main.lanes b0: vsplat names a type that is not a simd struct\n"
+             "main.lanes b0: vshuffle names a lane that is not a constant "
+             "index\n"
+             "main.fields b0: bitload names a field that is not a bitfield\n"
+             "main.fields b0: bitload names a field that is not a bitfield\n"
+             "main.fields b0: bitload names a field that is not a bitfield\n"
+             "main.fields b0: call names a table that is not a class and a "
+             "slot\n"
+             "main.ranges b0: load of i32 has a range of another type\n"
+             "main.ranges b0: load of i32 has a range of another type\n"
+             "main.ranges b0: load of i32 has a range of another type\n"
+             "main.ranges b0: load of void has a range of another type\n"
+             "main.ranges b0: load of f32 has a range of another type\n"
+             "main.starts b0: branchov does not follow its operation\n"
+             "main.starts b1: flag does not follow its operation\n"
+             "main.starts b2: flag reads a flag of a temporary into an i8\n"
+             "main.starts b2: flag does not follow its operation\n"
+             "main.starts b2: flag reads a flag of a temporary into an i8\n"
+             "main.starts b2: flag does not follow its operation\n"
+             "main.last b0: stop never returns, and the block goes on after "
+             "its call\n"
+             "main.last b0: the block does not end with a terminator\n");
+    ir_module_free(&m);
+    arena_free(&arena);
+}
+
 /* A class record names a global, a function, an aggregate or a field of
    the module in every part: the descriptors, the tables and the init,
    its aggregate, the aggregate and field of each subtable, and the
    descriptor of each `inject` and `provides` entry. One class gets each
-   wrong part and the others are whole. */
+   wrong part and the others are whole, the last after the wrong ones. An
+   init function in a module of no functions is past the list. */
 static void class_records(void)
 {
     struct arena arena = {0};
@@ -1024,13 +1234,54 @@ static void class_records(void)
     c->agg = agg;
     ir_class_provides(&m, c, "main.Log", g + 1);
 
+    c = ir_class_add(&m, "main", "Baseless");
+    c->descriptor = g;
+    c->base = g + 1;
+    c->agg = agg;
+
+    c = ir_class_add(&m, "main", "Tableless");
+    c->descriptor = g;
+    c->base = g;
+    c->table = g + 1;
+    c->agg = agg;
+
+    c = ir_class_add(&m, "main", "Uninitialized");
+    c->descriptor = g;
+    c->base = g;
+    c->init = 0;
+    c->agg = agg;
+
+    c = ir_class_add(&m, "main", "SubInterface");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_subtable(c, g + 1, g, agg, 0);
+
+    c = ir_class_add(&m, "main", "SubTable");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+    ir_class_subtable(c, g, g + 1, agg, 0);
+
+    c = ir_class_add(&m, "main", "Later");
+    c->descriptor = g;
+    c->base = g;
+    c->agg = agg;
+
     verified(&m,
              "class main.Shapeless names what the module does not hold\n"
              "class main.SubAggregate names what the module does not "
              "hold\n"
              "class main.SubField names what the module does not hold\n"
              "class main.Injected names what the module does not hold\n"
-             "class main.Provided names what the module does not hold\n");
+             "class main.Provided names what the module does not hold\n"
+             "class main.Baseless names what the module does not hold\n"
+             "class main.Tableless names what the module does not hold\n"
+             "class main.Uninitialized names what the module does not "
+             "hold\n"
+             "class main.SubInterface names what the module does not "
+             "hold\n"
+             "class main.SubTable names what the module does not hold\n");
     ir_module_free(&m);
     arena_free(&arena);
 }
@@ -1155,6 +1406,7 @@ void test_ir(void)
     arith_facts();
     type_accesses();
     refused_forms();
+    verifier_sides();
     no_module();
     main_of();
 }
