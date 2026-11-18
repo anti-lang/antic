@@ -107,6 +107,28 @@ static void path_parts(void)
         "5b0c2d1e7a94f3c6b8d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d\""));
 }
 
+/* The names manifest_file_name_valid takes, which a program takes from
+   `program` or from its directory: a name of the portable set without a
+   first `.` or `-` and a last `.`, and no name of a device of Windows
+   before a suffix, in either case. */
+static void file_names(void)
+{
+    CHECK(manifest_file_name_valid("Tree-2.0_x"));
+    CHECK(manifest_file_name_valid("1234"));
+    CHECK(manifest_file_name_valid("console"));
+    CHECK(manifest_file_name_valid("cot"));
+    CHECK(manifest_file_name_valid("conx.txt"));
+    CHECK(!manifest_file_name_valid(""));
+    CHECK(!manifest_file_name_valid(".tree"));
+    CHECK(!manifest_file_name_valid("-tree"));
+    CHECK(!manifest_file_name_valid("tree."));
+    CHECK(!manifest_file_name_valid("tr~ee"));
+    CHECK(!manifest_file_name_valid("con"));
+    CHECK(!manifest_file_name_valid("COM1.txt"));
+    CHECK(!manifest_file_name_valid("Lpt9"));
+    CHECK(manifest_name_valid("_tree._2"));
+}
+
 static void urls(void)
 {
     CHECK(repo_url_allowed("https://anti.example.com/repo"));
@@ -336,6 +358,7 @@ void test_deps(void)
     constraints();
     version_bounds();
     path_parts();
+    file_names();
     urls();
     manifest_fields();
     manifest_layout();
