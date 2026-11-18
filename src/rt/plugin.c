@@ -1201,18 +1201,27 @@ static int digest_file(const char *path, char hex[65])
     return ok;
 }
 
-/* The value of `library.<n>.<field>` of the index, or an empty text. */
-static struct anti_text index_field(const struct anti_toml *doc, int64_t n,
-                                    const char *field)
+/* The position of `library.<n>.<field>` in the index, or -1 when the
+   index holds no such key. */
+static int64_t index_at(const struct anti_toml *doc, int64_t n,
+                        const char *field)
 {
     char key[64];
     int written = snprintf(key, sizeof key, "library.%lld.%s", (long long)n,
                            field);
-    int64_t at = -1;
 
     if (written > 0 && (size_t)written < sizeof key) {
-        at = anti_rt_toml_find(doc, (const unsigned char *)key, written);
+        return anti_rt_toml_find(doc, (const unsigned char *)key, written);
     }
+    return -1;
+}
+
+/* The value of `library.<n>.<field>` of the index, or an empty text. */
+static struct anti_text index_field(const struct anti_toml *doc, int64_t n,
+                                    const char *field)
+{
+    int64_t at = index_at(doc, n, field);
+
     if (at < 0) {
         struct anti_text empty;
         empty.ptr = (const unsigned char *)"";
@@ -1224,7 +1233,12 @@ static struct anti_text index_field(const struct anti_toml *doc, int64_t n,
 
 /* Whether entry n of the index lists the interface. The list has no
    bound of its own, since a library may provide any number of
-   interfaces, and each of its items is a pair of the document. */
+   interfaces, and each of its items is a pair of the document.
+
+   T304 of docs/audit/tests-findings.md: the list ends where the index
+   holds no next element, and an empty element is one of the list, which
+   names no interface. antic keeps such an element of another library as
+   it stands, so the runtime reads the interfaces after it as antic does. */
 static int index_lists(const struct anti_toml *doc, int64_t n,
                        const unsigned char *path, int64_t length)
 {
@@ -1234,15 +1248,17 @@ static int index_lists(const struct anti_toml *doc, int64_t n,
     for (k = 0; k < count; k++) {
         char field[32];
         struct anti_text value;
+        int64_t at;
         int written = snprintf(field, sizeof field, "interfaces.%lld",
                                (long long)k);
         if (written <= 0 || (size_t)written >= sizeof field) {
             return 0;
         }
-        value = index_field(doc, n, field);
-        if (value.len == 0) {
+        at = index_at(doc, n, field);
+        if (at < 0) {
             return 0;
         }
+        value = anti_rt_toml_value(doc, at);
         if (anti_rt_same_bytes(value.ptr, value.len, path, length)) {
             return 1;
         }
