@@ -1,0 +1,7 @@
+//! An anonymous function after `snapshot` that does not parse gets one message.
+
+fn main() -> int
+{
+	let f = snapshot fn(n:) { };
+	return 0;
+}

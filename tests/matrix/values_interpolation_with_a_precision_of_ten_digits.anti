@@ -1,0 +1,10 @@
+//! A precision takes at most nine digits.
+import anti.text;
+
+fn main() -> int
+{
+	let x: f64 = 2.5;
+	let a = f"{x:.1234567890}";
+	free(a.ptr);
+	return 0;
+}

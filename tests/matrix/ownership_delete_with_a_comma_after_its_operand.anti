@@ -1,0 +1,21 @@
+//! A `,` after the operand of `delete` without an allocator after it deletes
+//! the object as `delete(b)` does.
+import anti.io;
+
+class Box
+{
+	pub n: int,
+
+	fn destruct(self)
+	{
+		io.println("destruct");
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { n: 1 };
+	delete(b,);
+	io.println("deleted");
+	return 0;
+}

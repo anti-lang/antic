@@ -1,0 +1,1 @@
+threads_join_without_its_opening_parenthesis.anti:8:7: error: expected `(`

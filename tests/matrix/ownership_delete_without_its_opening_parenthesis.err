@@ -1,0 +1,1 @@
+ownership_delete_without_its_opening_parenthesis.anti:8:9: error: expected `(`

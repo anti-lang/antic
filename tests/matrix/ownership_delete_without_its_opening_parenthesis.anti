@@ -1,0 +1,10 @@
+//! `delete` takes its operand in parentheses.
+
+class Box { n: int }
+
+fn main() -> int
+{
+	let b = alloc Box { n: 1 };
+	delete b;
+	return 0;
+}

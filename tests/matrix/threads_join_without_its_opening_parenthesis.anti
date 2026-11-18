@@ -1,0 +1,10 @@
+//! `join` takes its job in parentheses.
+
+worker fn run(n: int) { }
+
+fn main() -> int
+{
+	let j = dispatch 1 -> run;
+	join j;
+	return 0;
+}

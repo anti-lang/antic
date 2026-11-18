@@ -1,0 +1,11 @@
+//! A format specification ends after its precision or its kind, so a blank
+//! after the precision makes it no specification.
+import anti.text;
+
+fn main() -> int
+{
+	let x: f64 = 2.5;
+	let a = f"{x:.2 }";
+	free(a.ptr);
+	return 0;
+}

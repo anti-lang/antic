@@ -1,0 +1,10 @@
+//! `parallel` names its worker after `->`.
+
+worker fn run(items: []int) { }
+
+fn main() -> int
+{
+	let a = [1, 2, 3];
+	parallel a run;
+	return 0;
+}

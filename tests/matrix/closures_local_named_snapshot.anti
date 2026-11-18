@@ -1,0 +1,11 @@
+//! `snapshot` is a contextual word before `fn`, so a local may carry the name.
+import anti.io;
+
+fn main() -> int
+{
+	let snapshot = 2;
+	if snapshot * 2 == 4 {
+		io.println("snapshot 4");
+	}
+	return 0;
+}

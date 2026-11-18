@@ -1,0 +1,16 @@
+//! A call with type arguments stands in the condition of an `if`, where a
+//! struct literal does not.
+import anti.io;
+
+fn less<T: Ordered>(a: T, b: T) -> bool
+{
+	return a < b;
+}
+
+fn main() -> int
+{
+	if less<int>(1, 2) {
+		io.println("less");
+	}
+	return 0;
+}

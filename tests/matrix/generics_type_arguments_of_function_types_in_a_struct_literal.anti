@@ -1,0 +1,55 @@
+//! A struct literal names type arguments of function types, of a function type
+//! that may fail, of a function type with a kept parameter and of an array
+//! whose length a constant names, and the parser reads each as a type argument.
+import anti.io;
+import anti.lang;
+
+const N: int = 2;
+
+struct Holder<T>
+{
+	value: T,
+}
+
+fn show(n: int)
+{
+	if n == 1 {
+		io.println("show 1");
+	}
+}
+
+fn risky(n: int) may fail
+{
+	if n > 1 {
+		fail "too big";
+	}
+}
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn apply(keep f: fn(int) -> int) -> int
+{
+	return f(3);
+}
+
+fn main() -> int
+{
+	let s = Holder<fn(int)> { value: show };
+	s.value(1);
+	let r = Holder<fn(int) may fail> { value: risky };
+	r.value(2) catch e {
+		io.println("failed");
+	};
+	let a = Holder<fn(keep fn(int) -> int) -> int> { value: apply };
+	if a.value(twice) == 6 {
+		io.println("apply 6");
+	}
+	let c = Holder<[N]int> { value: [4, 5] };
+	if c.value[1] == 5 {
+		io.println("cell 5");
+	}
+	return 0;
+}

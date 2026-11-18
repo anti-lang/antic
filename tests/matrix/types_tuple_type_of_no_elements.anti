@@ -1,0 +1,7 @@
+//! A tuple has two or more elements, so `()` is no type.
+
+fn main() -> int
+{
+	let t: () = (1, 2);
+	return 0;
+}

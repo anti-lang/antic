@@ -1,0 +1,9 @@
+//! `dispatch` names its worker after `->`.
+
+worker fn run(n: int) { }
+
+fn main() -> int
+{
+	let j = dispatch 1 run;
+	return 0;
+}

@@ -1,0 +1,8 @@
+//! `send` takes its channel and its value in parentheses.
+
+fn main() -> int
+{
+	let c = chan int(4);
+	send c, 1;
+	return 0;
+}

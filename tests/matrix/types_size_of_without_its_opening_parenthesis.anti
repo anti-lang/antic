@@ -1,0 +1,6 @@
+//! `size_of` takes its type in parentheses.
+
+fn main() -> int
+{
+	return size_of int;
+}

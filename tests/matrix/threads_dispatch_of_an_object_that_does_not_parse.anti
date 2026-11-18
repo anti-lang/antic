@@ -1,0 +1,9 @@
+//! `dispatch` takes an object first.
+
+worker fn run(n: int) { }
+
+fn main() -> int
+{
+	let j = dispatch -> run;
+	return 0;
+}

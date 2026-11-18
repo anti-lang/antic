@@ -1,0 +1,7 @@
+//! The operand of `free` is an expression.
+
+fn main() -> int
+{
+	free();
+	return 0;
+}

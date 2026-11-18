@@ -1,0 +1,7 @@
+//! `chan int` takes its capacity in parentheses.
+
+fn main() -> int
+{
+	let c = chan int;
+	return 0;
+}

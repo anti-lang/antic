@@ -1,0 +1,7 @@
+//! `alloc` takes a type first.
+
+fn main() -> int
+{
+	let p = alloc(4, 4);
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! `may` after a function type stands before `fail`.
+
+fn show(n: int)
+{
+}
+
+fn main() -> int
+{
+	let f: fn(int) may = show;
+	return 0;
+}

@@ -1,0 +1,7 @@
+//! `alloc` takes a count after its type.
+
+fn main() -> int
+{
+	let p = alloc(int);
+	return 0;
+}

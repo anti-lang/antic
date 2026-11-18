@@ -1,0 +1,7 @@
+//! The repeat form of an array literal ends with `]`.
+
+fn main() -> int
+{
+	let a = [0; 4;
+		return a[0];
+}

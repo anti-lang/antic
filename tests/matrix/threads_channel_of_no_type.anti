@@ -1,0 +1,7 @@
+//! `chan` takes the type of its elements.
+
+fn main() -> int
+{
+	let c = chan (4);
+	return 0;
+}

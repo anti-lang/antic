@@ -1,0 +1,1 @@
+values_interpolation_with_a_blank_after_its_precision.anti:8:12: error: unknown format `{x:.2 }`
