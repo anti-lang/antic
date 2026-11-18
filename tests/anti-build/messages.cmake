@@ -148,6 +148,20 @@ anti_message(targets_unknown
           ${app_source} "${app_text}"
     ARGS build ${tools}
     ERR "anti: anti.toml: [targets] names plan9-x86_64, which is no target of Anti")
+# Only the end of the array ends a list of [targets]. T302 of
+# docs/audit/tests-findings.md: array_of_key of manifest.c took an empty
+# string or an inline table for the end of the list, so the build passed
+# over it and every name after it.
+anti_message(targets_empty_name
+    FILES anti.toml "${manifest_package}\n[targets]\ndefault = [\"${HOST}\", \"\"]\n"
+          ${app_source} "${app_text}"
+    ARGS build ${tools}
+    ERR "anti: anti.toml: [targets] names , which is no target of Anti")
+anti_message(targets_all_inline_table
+    FILES anti.toml "${manifest_package}\n[targets]\nall = [\"${HOST}\", { name = \"${HOST}\" }]\n"
+          ${app_source} "${app_text}"
+    ARGS build --target all ${tools}
+    ERR "anti: anti.toml: [targets] names , which is no target of Anti")
 anti_message(cpu_level
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     ARGS build --target linux-x86_64 --cpu v9 ${tools}
@@ -573,6 +587,26 @@ endfunction()
 anti_message(digests_of_another_form STATUS 0
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     SETUP write_digests_of_another_form
+    ARGS build ${tools})
+# Each line is read within its own bytes. T303 of
+# docs/audit/tests-findings.md: known_read of cache.c read the numbers of
+# an empty line, and of a line cut short after three of its numbers, from
+# the line after it, and the build ended out of memory.
+function(write_digests_with_an_empty_line)
+    file(WRITE "${USER_CACHE}/archive-digests.txt"
+         "\n1 2 3 4 ${zero_digest} /one\n")
+endfunction()
+anti_message(digests_with_an_empty_line STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP write_digests_with_an_empty_line
+    ARGS build ${tools})
+function(write_digests_with_a_line_cut_short)
+    file(WRITE "${USER_CACHE}/archive-digests.txt"
+         "1 2 3\n4 ${zero_digest} /one\n")
+endfunction()
+anti_message(digests_with_a_line_cut_short STATUS 0
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    SETUP write_digests_with_a_line_cut_short
     ARGS build ${tools})
 # The file is written beside its place first, and a directory that stands
 # there leaves the file of the digests as it was.

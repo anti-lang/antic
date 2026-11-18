@@ -171,6 +171,19 @@ anti_message(archive_index_names_no_module
     SETUP pack_archive
     ARGS ${resolve}
     OUT "${module}" "${frame}")
+# A key of a table without its `module` line names nothing, as the entry
+# of R184 in docs/decisions.md says, and leaves the table before it as it
+# was. T301 of
+# docs/audit/tests-findings.md: load_deployment of syms.c gave the key to
+# the table of the last `module` line it read.
+anti_message(archive_index_table_without_its_module
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "[module.a]\nmodule = \"prog\"\nid = \"${id}\"\n\n[module.b]\nid = \"other\"\n"
+          archive/${id}/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
 
 # The address of the text holds the letters of base sixteen, and a frame
 # of macOS counts from it, map_text of syms.c.

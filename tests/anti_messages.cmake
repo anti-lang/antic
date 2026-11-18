@@ -176,6 +176,26 @@ if(CMAKE_HOST_APPLE)
         SETUP license_record_without_the_library
         ARGS license --project --runtime "${license_stand_in}"
         ERR "antic: ${license_stand_in}/licenses/sources.txt holds no line of pcre2")
+    # Every element of `attribution` is a line of the notice. T302 of
+    # docs/audit/tests-findings.md: array_of_key of manifest.c took an
+    # empty string for the end of the list, and the lines after it left
+    # the notice.
+    function(license_record_of_no_library)
+        license_stand_in_archive("# The record.\n")
+    endfunction()
+    anti_message(license_project_attribution_after_an_empty_line
+        STATUS 0
+        FILES anti.toml "${license_manifest}attribution = [\"First\", \"\", \"Third\"]\n"
+              src/com/example/app.anti "//! A program.\n\nfn main() -> int\n{\n\treturn 0;\n}\n"
+        SETUP license_record_of_no_library
+        ARGS license --project --runtime "${license_stand_in}"
+        OUT "package anti.rt ${VERSION} 0BSD"
+            "package com.example.app 0.1.0 MIT"
+            "attribution First"
+            "attribution "
+            "attribution Third"
+            "text for anti.rt"
+            "The licence of the runtime.")
 endif()
 
 # anti sdk import.
