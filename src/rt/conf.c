@@ -475,7 +475,12 @@ static int element_of(struct anti_text name, size_t *name_length)
    The reader numbers the elements, so
    they stand in order under the keys runtime.<name>.0 and further. The
    length of the result goes to length, and the caller frees it with
-   free. */
+   free.
+
+   T305 of docs/audit/tests-findings.md: the separator stands before
+   every element after the first, an empty one as well, so an empty first
+   element stays the empty directory before the first separator, which
+   is the working directory, as an empty element after it is. */
 static char *join_elements(const struct anti_toml *doc, int64_t from,
                            const char *name, const char *path,
                            size_t *length)
@@ -505,7 +510,7 @@ static char *join_elements(const struct anti_toml *doc, int64_t from,
         value_length = strlen(value);
         grown = anti_rt_start_alloc(held + value_length + 2);
         memcpy(grown, out, held);
-        if (held > 0) {
+        if (i > from) {
             grown[held++] = anti_rt_path_list_separator();
         }
         memcpy(grown + held, value, value_length);
