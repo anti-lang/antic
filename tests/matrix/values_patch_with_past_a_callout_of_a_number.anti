@@ -1,0 +1,12 @@
+//! A callout of a number matches no text, so the match of `(?C1)b` is one byte
+//! long.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 45, 98, 99];
+	let data = room[0..4];
+	let n = data.patch(re#"(?C1)b"#, b"xy");
+	return 0;
+}
