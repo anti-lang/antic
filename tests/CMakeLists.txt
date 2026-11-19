@@ -7936,7 +7936,8 @@ endforeach()
 # cuts over two lines in the first paragraph of the module, which the
 # index renders as the page of the module does. fenced holds a fence on
 # the line after the first paragraph of the module, which ends the
-# paragraph of the index as it ends the one of the page.
+# paragraph of the index as it ends the one of the page, and listed an
+# item of a list there, which ends it as well.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
@@ -7946,7 +7947,8 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "marks_markdown|--markdown|marks|com.example.marks.md|marks.expected.md"
              "marks_index||marks|index.html|marks.index.expected.html"
              "cut_index||cut|index.html|cut.index.expected.html"
-             "fenced_index||fenced|index.html|fenced.index.expected.html")
+             "fenced_index||fenced|index.html|fenced.index.expected.html"
+             "listed_index||listed|index.html|listed.index.expected.html")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)

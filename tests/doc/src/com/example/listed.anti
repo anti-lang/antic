@@ -1,0 +1,9 @@
+//! Counts from 1 to 2:
+//! - one
+//! - two
+
+/// One.
+pub fn one() -> int
+{
+	return 1;
+}
