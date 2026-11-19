@@ -354,14 +354,17 @@ uint32_t lower_result_agg(struct lowerer *l, const struct type *t)
     return lower_is_aggregate(t) ? lower_agg_of(l, t) : IR_NO_AGG;
 }
 
+/* An enum extends as its underlying integer, which the header names and C
+   extends, by T349 of docs/audit/tests-findings.md. */
 static enum ir_ext param_ext(const struct type *t)
 {
     enum ir_type type = lower_ir_type_of(t);
+    const struct type *form = t->kind == TYPE_ENUM ? t->base : t;
 
     if (type != IR_I8 && type != IR_I16) {
         return IR_EXT_NONE;
     }
-    return types_is_signed(t) ? IR_EXT_SIGN : IR_EXT_ZERO;
+    return types_is_signed(form) ? IR_EXT_SIGN : IR_EXT_ZERO;
 }
 
 /* A parameter of 8 or 16 bits records whether it is signed, and an
