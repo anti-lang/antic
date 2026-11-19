@@ -135,6 +135,18 @@ anti_message(block_fence_never_closed
         "anti check: formatting: 1 file"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/open.anti:3:1: warning: the doc comment of `one` holds a fence that nothing closes [doc-markup]")
+# A name after a code span that `anti fmt` cuts over two lines. The span
+# ends on the second line, so the name after it is read as a name.
+anti_message(doc_name_after_a_span_cut_over_two_lines
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/cut.anti "//! A module.\n\n/// The function reads the text of one file and gives the form `fn read(path:\n/// str) -> int` that stands beside `missing_one` here.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 1"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/cut.anti:3:1: warning: `missing_one` in the doc comment of `one` resolves to nothing [doc-unresolved]")
 anti_message(module_fence_never_closed
     STATUS 0
     FILES anti.toml "${check_manifest}"

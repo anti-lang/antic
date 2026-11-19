@@ -1,0 +1,12 @@
+//! The name of a verb is no text the pattern matches, so the match of
+//! `(*MARK:abc)b` is one byte long.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 45, 98, 99];
+	let data = room[0..4];
+	let n = data.patch(re"(*MARK:abc)b", b"xy");
+	return 0;
+}

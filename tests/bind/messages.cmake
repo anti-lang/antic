@@ -188,6 +188,38 @@ anti_message(clang_pack_without_its_parentheses STATUS 0
     FILES api.h "#pragma clang diagnostic ignored \"-Wignored-pragmas\"\n#pragma pack(push, 1)\n#pragma pack\nstruct PackBare { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackBare *p);\n"
     OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
     ARGS ${clang_bind})
+# T317: a pop with a value pops and then sets the value, as clang reads it,
+# so the struct after `#pragma pack(pop, 2)` is packed to two bytes.
+anti_message(clang_pack_pop_with_a_value
+    FILES api.h "#pragma pack(push, 1)\n#pragma pack(push, 1)\n#pragma pack(pop, 2)\nstruct PackPopped { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackPopped *p);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: `PackPopped` is packed to more than one byte, which Anti has no form for")
+# T317: a pop with a label pops every push down to the one of that label,
+# so the pack of two bytes before it holds again.
+anti_message(clang_pack_pop_to_a_label
+    FILES api.h "#pragma pack(push, 2)\n#pragma pack(push, a)\n#pragma pack(1)\n#pragma pack(push)\n#pragma pack(pop, a)\nstruct PackLabel { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackLabel *p);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: `PackLabel` is packed to more than one byte, which Anti has no form for")
+# T317: a pop with a label that no push gave pops nothing, so the struct
+# keeps the pack of one byte.
+anti_message(clang_pack_pop_of_a_label_never_pushed STATUS 0
+    FILES api.h "#pragma pack(push, 1)\n#pragma pack(pop, none)\nstruct PackKept { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackKept *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+# T317: a pop with nothing pushed changes no pack, so the pack of one byte
+# set before it holds. The pragma before it keeps the warning of clang on
+# the empty stack out of the standard error.
+anti_message(clang_pack_pop_of_an_empty_stack_keeps_the_pack STATUS 0
+    FILES api.h "#pragma clang diagnostic ignored \"-Wignored-pragmas\"\n#pragma pack(1)\n#pragma pack(pop)\nstruct PackStays { char a; int b; };\n#pragma pack()\nvoid take(struct PackStays *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+# T317: clang ignores a pragma whose action is no push, pop or show, so
+# the pack of one byte set before it holds. The pragma before it keeps the
+# warning of clang on the unknown action out of the standard error.
+anti_message(clang_pack_of_an_unknown_action_keeps_the_pack STATUS 0
+    FILES api.h "#pragma clang diagnostic ignored \"-Wignored-pragmas\"\n#pragma pack(1)\n#pragma pack(foo)\nstruct PackIgnored { char a; int b; };\n#pragma pack()\nvoid take(struct PackIgnored *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
 # T311: clang declares a builtin that a body calls at the top of its AST,
 # marked implicit. No library defines it, so it is no function of the
 # header, and the shim of `hot` is the one function bound.

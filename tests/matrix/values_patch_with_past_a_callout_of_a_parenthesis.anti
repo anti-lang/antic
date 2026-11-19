@@ -1,0 +1,12 @@
+//! The text of a callout may hold a `)`, which ends no group, so the match of
+//! `(?C")xyz")b` is one byte long.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 45, 98, 99];
+	let data = room[0..4];
+	let n = data.patch(re#"(?C")xyz")b"#, b"xy");
+	return 0;
+}

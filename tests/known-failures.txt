@@ -20,3 +20,31 @@
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
 anti_bind_forms T316 The probe of `anti bind --clang --probe` declares a variable of a const-qualified struct and writes its fields, which C refuses.
+anti_bind_message_clang_pack_pop_with_a_value T317 A pop with a value drops the value, so the struct is bound as packed to one byte.
+anti_bind_message_clang_pack_pop_to_a_label T317 A pop with a label pops one level, so the struct is bound as packed to one byte.
+anti_bind_message_clang_pack_pop_of_a_label_never_pushed T317 A pop with a label that no push gave pops a level, so a struct of pack 1 is refused.
+anti_bind_message_clang_pack_pop_of_an_empty_stack_keeps_the_pack T317 A pop of an empty stack sets the pack to 0, so a struct of pack 1 is refused.
+anti_bind_message_clang_pack_of_an_unknown_action_keeps_the_pack T317 An unknown action sets the pack to 0, so a struct of pack 1 is refused.
+matrix_values_patch_with_past_a_verb_with_a_name_refused T318 The name of `(*MARK:abc)` counts as text of the match, so a `with` that cannot fit passes.
+matrix_values_patch_with_past_an_accept_refused T319 The text after `(*ACCEPT)` counts toward the fewest bytes, so a `with` that cannot fit passes.
+matrix_values_patch_with_past_a_callout_of_a_parenthesis_refused T320 A callout is read to the first `)` inside its string, so a `with` that cannot fit passes.
+fmt_comment_before_block_brace T321 `anti fmt` writes the brace of the block after a line comment into the comment.
+fmt_struct_literal_in_a_condition T322 `anti fmt` drops the parentheses around a condition that holds a struct literal.
+fmt_inline_handler_in_a_condition T323 `anti fmt` indents the statement after an `if` with an inline handler one tab deeper.
+fmt_doc_fence_after_a_tab T324 `anti fmt` reads no fence on a doc line that starts with a tab and fills it into the paragraph.
+fmt_doc_dash_at_the_width T325 The fill of `anti fmt` starts a line with a `-` word, which opens an item of a list.
+anti_fmt_block_doc_indented_gutter T326 `anti fmt` keeps the indent of a block doc under its gutter, which a second run removes.
+anti_doc_cut_index T327 The index renders the first paragraph line by line, so a code span cut over two lines stays text.
+anti_check_message_doc_name_after_a_span_cut_over_two_lines T328 A code span ends at the end of its line, so the name after it gives no warning.
+matrix_values_format_of_a_c_wchar_below_zero_dev T329 `f"..."` writes a `c_wchar` through `append_uint`, so -1 is written as a `u64`. host=macos
+matrix_values_format_of_a_c_wchar_below_zero_release T329 `f"..."` writes a `c_wchar` through `append_uint`, so -1 is written as a `u64`. host=macos
+matrix_values_format_of_a_c_wchar_below_zero_memory_checks T329 `f"..."` writes a `c_wchar` through `append_uint`, so -1 is written as a `u64`. host=macos
+matrix_values_format_of_a_power_of_two_in_fewest_digits_dev T330 Below a power of two the shortest digits round up, which `shortest` does not try.
+matrix_values_format_of_a_power_of_two_in_fewest_digits_release T330 Below a power of two the shortest digits round up, which `shortest` does not try.
+matrix_values_format_of_a_power_of_two_in_fewest_digits_memory_checks T330 Below a power of two the shortest digits round up, which `shortest` does not try.
+matrix_values_patch_with_a_limit_passes_over_an_unset_group_dev T331 The limit of `patch` counts a match whose group took no part.
+matrix_values_patch_with_a_limit_passes_over_an_unset_group_release T331 The limit of `patch` counts a match whose group took no part.
+matrix_values_patch_with_a_limit_passes_over_an_unset_group_memory_checks T331 The limit of `patch` counts a match whose group took no part.
+matrix_values_byte_pattern_with_a_class_in_a_comment_dev T332 A byte pattern reads a class inside a `#` comment of `(?x)`.
+matrix_values_byte_pattern_with_a_class_in_a_comment_release T332 A byte pattern reads a class inside a `#` comment of `(?x)`.
+matrix_values_byte_pattern_with_a_class_in_a_comment_memory_checks T332 A byte pattern reads a class inside a `#` comment of `(?x)`.

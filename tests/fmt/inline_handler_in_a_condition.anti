@@ -1,0 +1,17 @@
+//! A handler on one line in the condition of an `if`, without parentheses.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	return n;
+}
+
+fn main() -> int
+{
+	let i = 3;
+	if value(i) catch e { yield 0; } == 0 {
+		return 1;
+	}
+	return 0;
+}

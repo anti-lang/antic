@@ -7714,6 +7714,16 @@ if(NOT ANTIC_HOST_OS STREQUAL "windows")
             -P "${ANTIC_RUNNERS}/run_anti_fmt_write.cmake")
 endif()
 
+# A block doc comment whose ` * ` gutter stands before lines that share an
+# indent. One run of `anti fmt` writes the form that a second run keeps.
+add_test(NAME anti_fmt_block_doc_indented_gutter
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/fmt"
+        "-DNAME=block_doc_indented_gutter"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt-block-doc-indented-gutter"
+        -P "${ANTIC_RUNNERS}/run_anti_fmt.cmake")
+
 # A `type` alias of a function type leaves the functions after it as they
 # stand. The source is in the canonical form, so fmt_canonical passes over
 # it until `anti fmt` agrees: finding T025 of docs/audit/tests-findings.md.
@@ -7721,6 +7731,15 @@ add_expect_test(fmt_alias_of_function STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/alias_of_function.anti")
+
+# A line comment between the condition of an `if` and the brace of its
+# block. The comment ends its line, so the brace stays on the next one.
+# The source is in the canonical form, and fmt_canonical passes over it
+# until `anti fmt` agrees.
+add_expect_test(fmt_comment_before_block_brace STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_before_block_brace.anti")
 
 # An ordinary comment between a value and a binary operator. The source is
 # in the canonical form, and fmt_canonical passes over it until `anti fmt`
@@ -7738,6 +7757,22 @@ add_expect_test(fmt_default_struct_literal STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/default_struct_literal.anti")
 
+# A `-` word at the width of a doc comment stays at the end of its line,
+# so the fill starts no item of a list. The source is in the canonical
+# form, and fmt_canonical passes over it until `anti fmt` agrees.
+add_expect_test(fmt_doc_dash_at_the_width STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_dash_at_the_width.anti")
+
+# A fence of a doc comment whose line starts with a tab, which anti doc
+# and anti check read as a fence. The source is in the canonical form, and
+# fmt_canonical passes over it until `anti fmt` agrees.
+add_expect_test(fmt_doc_fence_after_a_tab STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_fence_after_a_tab.anti")
+
 # A field of a class body without its comma before a function of the
 # body, in the canonical form: finding T293 of
 # docs/audit/tests-findings.md.
@@ -7753,6 +7788,24 @@ add_expect_test(fmt_handler_in_parentheses STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/handler_in_parentheses.anti")
+
+# A handler on one line in the condition of an `if`, without parentheses.
+# The statement after the `if` keeps its indent. The source is in the
+# canonical form, and fmt_canonical passes over it until `anti fmt`
+# agrees.
+add_expect_test(fmt_inline_handler_in_a_condition STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/inline_handler_in_a_condition.anti")
+
+# A struct literal inside the parentheses of a condition. The parentheses
+# stay, since without them the `{` of the literal opens the block. The
+# source is in the canonical form, and fmt_canonical passes over it until
+# `anti fmt` agrees.
+add_expect_test(fmt_struct_literal_in_a_condition STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/struct_literal_in_a_condition.anti")
 
 # What ends a value and what opens a type, in the canonical form: a char,
 # a bytes literal, a pattern literal, `none` and `here` before an operator,
@@ -7850,7 +7903,9 @@ endforeach()
 # no doc text of its module, so the index names it alone, and its item
 # names an item of an import by the full path of the module, holds a line
 # that starts with a tab and a link with a DEL byte, and ends in an empty
-# line, which the Markdown page keeps.
+# line, which the Markdown page keeps. cut holds a code span that anti fmt
+# cuts over two lines in the first paragraph of the module, which the
+# index renders as the page of the module does.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
@@ -7858,7 +7913,8 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "operators_private|--markdown\\|--private|operators|com.example.operators.md|operators.private.expected.md"
              "marks_html||marks|com.example.marks.html|marks.expected.html"
              "marks_markdown|--markdown|marks|com.example.marks.md|marks.expected.md"
-             "marks_index||marks|index.html|marks.index.expected.html")
+             "marks_index||marks|index.html|marks.index.expected.html"
+             "cut_index||cut|index.html|cut.index.expected.html")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)

@@ -1,0 +1,11 @@
+//! A line comment between the condition of an `if` and the brace of its block.
+
+fn main() -> int
+{
+	let a = 1;
+	if a == 1 // first
+	{
+		return 1;
+	}
+	return 0;
+}

@@ -1,0 +1,12 @@
+//! `(*ACCEPT)` ends the match where it stands, which gives the reader of a
+//! pattern no fewest bytes, so `with` fits it when it is empty alone.
+
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 45, 98, 99];
+	let data = room[0..4];
+	let n = data.patch(re"a(*ACCEPT)bc", b"xy");
+	return 0;
+}

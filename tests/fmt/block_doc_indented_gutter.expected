@@ -1,0 +1,14 @@
+//! A block doc comment whose gutter stands before lines of one indent.
+
+/**
+indented a indented b
+*/
+pub fn one() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return one() - 1;
+}

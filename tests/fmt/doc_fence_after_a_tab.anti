@@ -1,0 +1,16 @@
+//! A fence of a doc comment whose line starts with a tab.
+
+/// Example:
+/// 	```anti
+/// 	let a = 1;
+/// 	let b = 2;
+/// 	```
+pub fn one() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return one() - 1;
+}

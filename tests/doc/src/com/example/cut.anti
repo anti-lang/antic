@@ -1,0 +1,8 @@
+//! A paragraph that is long enough to pass the eightieth column holds `fn
+//! read(path: str) -> int`, a span of code.
+
+/// One.
+pub fn one() -> int
+{
+	return 1;
+}

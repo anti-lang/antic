@@ -1,0 +1,27 @@
+//! `f"..."` writes a `c_wchar` as the value it holds, which `as i64` reads. A
+//! `c_wchar` is signed on macOS and Linux x86_64, so the bits of `0xFFFFFFFF`
+//! hold -1 there, and it is unsigned on the other targets.
+
+import anti.io;
+import anti.text;
+
+fn same(name: str, written: str, read: str)
+{
+	if text.equal(written, read) {
+		io.println(f"{name}: the value as i64");
+	} else {
+		io.println(f"{name}: {written} where i64 writes {read}");
+	}
+	free(written.ptr);
+	free(read.ptr);
+}
+
+fn main() -> int
+{
+	let bits: u32 = 0xFFFFFFFF;
+	let w = bits as c_wchar;
+	let wide = w as i64;
+	same("decimal", f"{w}", f"{wide}");
+	same("hex", f"{w:x}", f"{wide:x}");
+	return 0;
+}
