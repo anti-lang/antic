@@ -23,7 +23,6 @@ set(SKIP
     "${TESTS}/fmt/comment_before_operator.anti"
     "${TESTS}/fmt/default_struct_literal.anti"
     "${TESTS}/fmt/doc_dash_at_the_width.anti"
-    "${TESTS}/fmt/doc_fence_after_a_tab.anti"
     "${TESTS}/fmt/loose.anti"
     "${TESTS}/matrix/classes_call_in_an_inherited_field_of_a_default_parameter.anti"
     "${TESTS}/matrix/types_as_with_a_question_mark_before_a_number_type.anti"

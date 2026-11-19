@@ -1262,6 +1262,19 @@ static size_t doc_indent(const char *s, size_t length)
     return n;
 }
 
+/* Whether a line of doc text is a fence: three backticks after spaces and
+   tabs, as `anti doc` and `anti check` read it, by T324 of
+   docs/audit/tests-findings.md. */
+static bool is_fence(const char *s, size_t length)
+{
+    size_t n = 0;
+
+    while (n < length && (s[n] == ' ' || s[n] == '\t')) {
+        n++;
+    }
+    return length - n >= 3 && memcmp(s + n, "```", 3) == 0;
+}
+
 static bool starts_with(const char *s, size_t length, const char *prefix)
 {
     size_t n = strlen(prefix);
@@ -1298,7 +1311,7 @@ static void wrap_doc(const char *text, size_t length, size_t used,
         }
         first = false;
         indent = doc_indent(text + i, end - i);
-        if (starts_with(text + i + indent, end - i - indent, "```")) {
+        if (is_fence(text + i, end - i)) {
             fenced = !fenced;
             text_append_bytes(out, text + i, end - i);
             i = end + 1;
@@ -1336,9 +1349,7 @@ static void wrap_doc(const char *text, size_t length, size_t used,
                 tail++;
             }
             lead_in = doc_indent(text + next, tail - next);
-            if (lead_in == tail - next ||
-                starts_with(text + next + lead_in, tail - next - lead_in,
-                            "```") ||
+            if (lead_in == tail - next || is_fence(text + next, tail - next) ||
                 starts_with(text + next + lead_in, tail - next - lead_in,
                             "- ") ||
                 lead_in != columns_of(rest, strlen(rest))) {
