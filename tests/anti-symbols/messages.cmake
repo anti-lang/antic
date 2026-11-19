@@ -203,6 +203,16 @@ anti_message(archive_index_table_without_its_module
     SETUP pack_archive
     ARGS ${resolve}
     OUT "${module}" "${frame} good src/good.anti:7")
+# A table whose name is longer than the one of the last `module` line, and
+# starts with it, is another table.
+anti_message(archive_index_table_of_a_longer_name
+    STATUS 0
+    FILES trace.txt "${module}\n${frame}\n"
+          archive/index.toml "[module.a]\nmodule = \"prog\"\nid = \"${id}\"\n\n[module.ab]\nid = \"other\"\n"
+          archive/${id}/prog.map "${map}"
+    SETUP pack_archive
+    ARGS ${resolve}
+    OUT "${module}" "${frame} good src/good.anti:7")
 
 # The address of the text holds the letters of base sixteen, and a frame
 # of macOS counts from it, map_text of syms.c.

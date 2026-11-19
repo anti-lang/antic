@@ -854,6 +854,13 @@ anti_message(path_with_a_control_byte
           ../un${delete}its/src/com/example/units.anti "${library_text}"
     ARGS build ${tools}
     ERR "anti: ./anti.toml: the path ../un${delete}its of the dependency com.example.units holds a control byte")
+# A tab is a control byte as well, which the reader of TOML keeps in a
+# string. The reader refuses the path before it looks for the directory.
+anti_message(path_with_a_tab
+    FILES anti.toml "${manifest_package}\n[dependencies]\n\"com.example.units\" = { path = \"../un\tits\" }\n"
+          ${app_source} "${app_text}"
+    ARGS build ${tools}
+    ERR "anti: ./anti.toml: the path ../un\tits of the dependency com.example.units holds a control byte")
 # A double quote stands in a path of POSIX, and the lock file refuses it.
 # Windows takes no such name.
 if(NOT CMAKE_HOST_WIN32)

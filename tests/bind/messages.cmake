@@ -27,6 +27,10 @@ anti_message(api_no_functions
     FILES api.json "{\"structs\": []}"
     ARGS bind api.json -o "${WORK}/out"
     ERR "anti: api.json holds no API description of rlparser")
+anti_message(api_root_not_an_object
+    FILES api.json "[]"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json holds no API description of rlparser")
 anti_message(api_struct_name
     FILES api.json "{\"functions\": [], \"structs\": [{\"name\": \"2bad\", \"fields\": []}]}"
     ARGS bind api.json -o "${WORK}/out"
@@ -38,6 +42,17 @@ anti_message(api_struct_twice
     ERR "anti: api.json names the struct `A` twice")
 
 # An API description that binds with a warning.
+# A list of fields that is no array holds no field.
+anti_message(api_struct_fields_not_an_array STATUS 0
+    FILES api.json "{\"functions\": [], \"structs\": [{\"name\": \"Half\", \"fields\": \"x\"}]}"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: warning: `Half` has no field and is left out"
+    OUT "bind: anti.api from api.json, 0 functions, 1 warning")
+# A parameter without its name binds, and its function with it.
+anti_message(api_parameter_without_a_name STATUS 0
+    FILES api.json "{\"functions\": [{\"name\": \"f\", \"returnType\": \"void\", \"params\": [{\"type\": \"int\"}]}]}"
+    ARGS bind api.json -o "${WORK}/out"
+    OUT "bind: anti.api from api.json, 1 functions, 0 warnings")
 # A part that is `null` is a part the description lacks.
 anti_message(api_part_is_null STATUS 0
     FILES api.json "{\"functions\": [], \"structs\": null}"

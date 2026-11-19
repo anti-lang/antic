@@ -343,6 +343,29 @@ static void table_repeat_empty(void)
     anti_rt_toml_free(doc);
 }
 
+/* A text that ends inside a key or a value, without its line break, and
+   a quoted key that starts with a dot before a header of an array. */
+static void ends_of_input(void)
+{
+    struct anti_toml *doc = read_toml("a = 1");
+
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, "a"), "1");
+    }
+    anti_rt_toml_free(doc);
+    doc = read_toml("a");
+    CHECK(doc == NULL);
+    anti_rt_toml_free(doc);
+    doc = read_toml("'.a' = 1\n[[t]]\nx = 2\n");
+    CHECK(doc != NULL);
+    if (doc != NULL) {
+        CHECK_STR(value_of(doc, ".a"), "1");
+        CHECK_STR(value_of(doc, "t.0.x"), "2");
+    }
+    anti_rt_toml_free(doc);
+}
+
 void test_toml(void)
 {
     inline_table();
@@ -351,6 +374,7 @@ void test_toml(void)
     inline_table_unclosed();
     table_repeat_limit();
     table_repeat_empty();
+    ends_of_input();
     table_repeat_cost();
     key_length();
     string_forms();
