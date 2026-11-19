@@ -695,10 +695,14 @@ static void page_render(struct text *out, const struct doc_page *p,
 }
 
 /* The first paragraph of a doc text, which the index prints beside the
-   name of the module. */
+   name of the module. Its lines are joined with a space and rendered as
+   one text, as doc_html renders a paragraph, so a code span or a link
+   cut over two lines reads as on the page, by T327 of
+   docs/audit/tests-findings.md. */
 static void first_paragraph(struct text *out, const struct text *doc,
                             const struct doc_page *page, enum doc_form form)
 {
+    struct text joined = {0};
     size_t at = 0;
 
     while (at < doc->length) {
@@ -706,17 +710,16 @@ static void first_paragraph(struct text *out, const struct text *doc,
         if (lead_of(doc->data, at, end) == end) {
             break;
         }
-        if (form == DOC_HTML) {
-            if (at > 0) {
-                text_append(out, " ");
-            }
-            inline_html(out, doc->data + at, end - at, page);
-        } else {
-            text_appendf(out, "%s%.*s", at > 0 ? " " : "", (int)(end - at),
-                         doc->data + at);
-        }
+        text_appendf(&joined, "%s%.*s", at > 0 ? " " : "", (int)(end - at),
+                     doc->data + at);
         at = end + 1;
     }
+    if (joined.length > 0 && form == DOC_HTML) {
+        inline_html(out, joined.data, joined.length, page);
+    } else if (joined.length > 0) {
+        text_append_bytes(out, joined.data, joined.length);
+    }
+    text_free(&joined);
 }
 
 static void index_render(struct text *out, const struct doc_page *pages,
