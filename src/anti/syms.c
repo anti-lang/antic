@@ -1117,13 +1117,16 @@ static void resolve_frame_line(struct cursor *c,
 /* DESIGN: every line of the trace comes out as it went in. A frame
    whose module has symbols gains its function and its line after it. A
    frame no archive answers for stays raw. So does every line that is no
-   frame, such as the message of an error before its trace. */
+   frame, such as the message of an error before its trace. The trace is
+   walked by its length, so a NUL byte, as of a log it was pasted from, is
+   a byte of its line, by T310 of docs/audit/tests-findings.md. */
 int syms_resolve(const char *trace, const char *const *symbols, size_t count)
 {
     struct symbol_units units = {0};
     struct texts modules = {0};
     struct text input = {0};
     const char *line;
+    const char *end;
     size_t i;
     int status = 1;
 
@@ -1137,9 +1140,11 @@ int syms_resolve(const char *trace, const char *const *symbols, size_t count)
         goto done;
     }
     line = text_cstr(&input);
-    while (*line != '\0') {
-        const char *stop = strchr(line, '\n');
-        size_t length = stop != NULL ? (size_t)(stop - line) : strlen(line);
+    end = line + input.length;
+    while (line < end) {
+        const char *stop = memchr(line, '\n', (size_t)(end - line));
+        size_t length = stop != NULL ? (size_t)(stop - line)
+                                     : (size_t)(end - line);
         size_t shown = length > 0 && line[length - 1] == '\r' ? length - 1
                                                               : length;
         struct cursor c;
