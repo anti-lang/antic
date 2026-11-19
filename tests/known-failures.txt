@@ -20,11 +20,6 @@
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
 anti_bind_forms T316 The probe of `anti bind --clang --probe` declares a variable of a const-qualified struct and writes its fields, which C refuses.
-anti_bind_message_clang_pack_pop_with_a_value T317 A pop with a value drops the value, so the struct is bound as packed to one byte.
-anti_bind_message_clang_pack_pop_to_a_label T317 A pop with a label pops one level, so the struct is bound as packed to one byte.
-anti_bind_message_clang_pack_pop_of_a_label_never_pushed T317 A pop with a label that no push gave pops a level, so a struct of pack 1 is refused.
-anti_bind_message_clang_pack_pop_of_an_empty_stack_keeps_the_pack T317 A pop of an empty stack sets the pack to 0, so a struct of pack 1 is refused.
-anti_bind_message_clang_pack_of_an_unknown_action_keeps_the_pack T317 An unknown action sets the pack to 0, so a struct of pack 1 is refused.
 matrix_values_patch_with_past_a_verb_with_a_name_refused T318 The name of `(*MARK:abc)` counts as text of the match, so a `with` that cannot fit passes.
 matrix_values_patch_with_past_an_accept_refused T319 The text after `(*ACCEPT)` counts toward the fewest bytes, so a `with` that cannot fit passes.
 matrix_values_patch_with_past_a_callout_of_a_parenthesis_refused T320 A callout is read to the first `)` inside its string, so a `with` that cannot fit passes.

@@ -1428,24 +1428,41 @@ static bool marker_line(const char *s, int64_t *line)
     return true;
 }
 
-/* The stack of `#pragma pack` values that `push` saves. */
+/* The stack of `#pragma pack` values that `push` saves, each with the
+   label of its push, which a pop with that label returns to. A label
+   points into the text that read_preprocessed reads, which outlives the
+   stack. */
+struct pack_slot {
+    const char *label;
+    size_t label_length;
+    int value;
+};
+
 struct pack_stack {
-    int items[64];
+    struct pack_slot items[64];
     int depth;
 };
 
 /* The pack after the pragma at, a `#pragma pack` line, from the pack
-   before it: push, pop, a value and a push with a value, as MSVC and
-   clang read them, and show. Each argument stands between commas, and the value is
-   the argument that starts with a digit, so a label such as `id1` sets
-   no pack, by T314 of docs/audit/tests-findings.md. */
+   before it, as clang reads it. Each argument stands between commas. The
+   value is the argument that starts with a digit, so a label such as
+   `id1` sets no pack, by T314 of docs/audit/tests-findings.md, and any
+   other word than push, pop and show is a label. A push saves the pack
+   with its label, and a pop returns to the last slot, or with a label to
+   the slot of that label and drops the slots after it. A pop that finds
+   no slot changes no pack. A value then sets the pack, after the push or
+   the pop. `show` changes nothing, and a pragma whose first argument is a
+   label is ignored, as clang ignores an unknown action. T317. */
 static int pragma_pack(const char *at, struct pack_stack *stack, int pack)
 {
     const char *args = strchr(at, '(');
     const char *digit = NULL;
+    const char *label = NULL;
+    size_t label_length = 0;
     bool push = false;
     bool pop = false;
     bool show = false;
+    bool first = true;
     int value = pack;
 
     if (args == NULL) {
@@ -1474,7 +1491,14 @@ static int pragma_pack(const char *at, struct pack_stack *stack, int pack)
             show = true;
         } else if (length > 0 && *start >= '0' && *start <= '9') {
             digit = start;
+        } else if (length > 0) {
+            if (first) {
+                return pack;
+            }
+            label = start;
+            label_length = length;
         }
+        first = false;
         if (*at == ',') {
             at++;
         }
@@ -1483,21 +1507,37 @@ static int pragma_pack(const char *at, struct pack_stack *stack, int pack)
         /* `show` prints the pack and changes nothing. */
         return pack;
     }
-    if (pop) {
-        value = stack->depth > 0 ? stack->items[--stack->depth] : 0;
-    } else {
-        int number = digit != NULL ? leading_int(digit) : -1;
-        if (push && stack->depth <
-                        (int)(sizeof stack->items / sizeof stack->items[0])) {
-            stack->items[stack->depth++] = pack;
+    if (push) {
+        if (stack->depth <
+            (int)(sizeof stack->items / sizeof stack->items[0])) {
+            struct pack_slot *slot = &stack->items[stack->depth++];
+            slot->label = label;
+            slot->label_length = label_length;
+            slot->value = pack;
         }
-        /* clang ignores a value that does not fit, and the
-           pack stays as it was. */
-        if (digit == NULL) {
-            value = push ? pack : 0;
-        } else if (number >= 0) {
+    } else if (pop) {
+        int found = stack->depth;
+        while (label != NULL && found > 0 &&
+               (stack->items[found - 1].label_length != label_length ||
+                strncmp(stack->items[found - 1].label, label,
+                        label_length) != 0)) {
+            found--;
+        }
+        if (found > 0) {
+            value = stack->items[found - 1].value;
+            stack->depth = found - 1;
+        }
+    }
+    if (digit != NULL) {
+        int number = leading_int(digit);
+        /* clang ignores a value that does not fit, and the pack stays as
+           it was. */
+        if (number >= 0) {
             value = number;
         }
+    } else if (!push && !pop) {
+        /* `#pragma pack()` gives the pack of the target. */
+        value = 0;
     }
     return value;
 }
