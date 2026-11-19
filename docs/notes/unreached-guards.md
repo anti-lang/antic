@@ -1291,6 +1291,38 @@ The sides left unsorted: in `pragma_pack` of `src/anti/bindclang.c`, a
 warning of `-Wignored-pragmas`, and the reader takes the arguments it
 finds.
 
+## The sides of batch 3ad
+
+Batch 3ad of the third phase read the readers of text of the standard
+library, the runtime, `anti fmt`, `anti doc`, `anti check` and the lexer,
+and fixed T317 to T332 in `src/anti/bindclang.c`, `src/antic/pattern.c`,
+`src/anti/fmt.c`, `src/anti/doc.c`, `src/antic/sema_doc.c`,
+`src/antic/sema_expr.c`, `src/rt/text.c`, `src/rt/patterns.c` and
+`src/rt/regex.c`. It sorted the sides of `src/anti/bindclang.c` that no
+test reaches.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `find_clang` of `src/anti/bindclang.c` | A host that `target_host` does not know, a directory of anti that the platform layer cannot give, and one without a separator. | The suite runs anti of a tree on a known host, from a path that holds a separator. |
+| `leading_int` of `src/anti/bindclang.c` | A version that starts with no digit, and one past the range of an `int`. | `major_version` hands it the text after `clang version `, which clang starts with its major, and the value of `#pragma pack` starts with a digit. |
+| `where_to_get` and `say_no_runtime` of `src/anti/bindclang.c` | A host that `target_host` does not know, and a system that names neither place of the runtime of the user. | The suite runs on a known host whose home and data directory are set. |
+| `names_record` of `src/anti/bindclang.c` | A typedef whose type has no list of inner nodes, a type without its kind and a record or a declaration without its id. | clang writes the inner node of every type of a typedef, the kind of every node and the id of every declaration. |
+| The search of the enums in `type_name_taken`, `typedef_named` and `enum_named` of `src/anti/bindclang.c` | An entry of an enum without its declaration, and one without its tag where a name matches. | Every entry the reader adds holds its declaration, and an entry that names a typedef holds the tag of the enum. |
+| `named_anonymous` of `src/anti/bindclang.c` | The spelling `(anonymous` of clang releases before 13. | The pinned clang writes `(unnamed`. |
+| `declare_record` of `src/anti/bindclang.c` | A record without `tagUsed`, an anonymous member of a record without its C name. | clang writes `tagUsed` for every record, and a record that holds a member has its C name already. |
+| The enum base of `declare_enum` in `src/anti/bindclang.c` | A fixed base that parses to a type that is no scalar. | C takes an integer type as the base of an enum alone. |
+| `after_group` of `src/anti/bindclang.c` | A spelling of clang that ends inside a parenthesis. | clang writes every parenthesis of a type with its pair. |
+| `read_macros` of `src/anti/bindclang.c` | A macro that `evaluate` reads and `bind_eval_const` refuses. | `evaluate` gives a value that `bind_eval_const` takes. |
+
+The sides left unsorted, all in code of the fixes of this batch:
+`flags_end` and `flags_extended` of `src/rt/regex.c` for a NUL byte among
+the flags, a `-` and a `^`, `widen` there for a group `(?x:`, groups
+nested past `WIDEN_GROUPS` and a comment that runs to the end of the
+pattern, `skip_callout` of `src/antic/pattern.c` for a callout of a
+number, of `{` and of a doubled delimiter and a string that never
+closes, and `first_paragraph` of `src/anti/doc.c` for an empty first
+paragraph.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

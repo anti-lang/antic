@@ -800,6 +800,22 @@ not re-open a settled decision without asking Eddie.
   tabs. It ran each sanitizer suite in the six parts of `asan`, the last
   up to test 7895: `asan` 285 s, 204 s, 285 s, 184 s, 130 s and 600 s,
   `ubsan` 284 s, 211 s, 293 s, 191 s, 131 s and 629 s.
+  Batch 3ad of the third phase of coverage measured `host` in the same
+  three parts, up to test 7925: 387 s, 283 s and 338 s before the commit
+  of T317 to T332, 396 s, 287 s and 348 s before the fix of T317, 401 s,
+  294 s and 341 s before that of T318, 404 s, 292 s and 339 s before
+  that of T319, 391 s, 284 s and 340 s before that of T320, 389 s, 288 s
+  and 350 s before that of T321, 420 s, 297 s and 339 s before that of
+  T322, 380 s, 272 s and 328 s before that of T323, 374 s, 275 s and
+  339 s before that of T324, 386 s, 274 s and 324 s before that of T325,
+  378 s, 276 s and 326 s before that of T326, 376 s, 275 s and 337 s
+  before that of T327, 377 s, 273 s and 339 s before that of T328,
+  375 s, 273 s and 330 s before that of T329, 377 s, 273 s and 325 s
+  before that of T330, 369 s, 271 s and 333 s before that of T331, and
+  372 s, 273 s and 328 s before that of T332. It ran each sanitizer
+  suite in the six parts of `asan`, the last up to test 7923: `asan`
+  252 s, 187 s, 266 s, 170 s, 123 s and 606 s, `ubsan` 256 s, 189 s,
+  271 s, 176 s, 127 s and 627 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
