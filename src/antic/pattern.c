@@ -141,7 +141,8 @@ struct reader {
     bool caseless;              /* `(?i)` */
     bool extended;              /* `(?x)` */
     int64_t groups;             /* the capturing groups opened so far */
-    bool unsure;                /* `(?|`, `(?n)` or `\K`: no least length */
+    bool unsure;                /* `(?|`, `(?n)`, `\K` or `(*ACCEPT)`: no least
+                                   length */
 };
 
 static void set_add(struct set *s, unsigned c)
@@ -758,6 +759,12 @@ static struct node *verb_group(struct reader *r, struct node *group)
     while (end < r->n && r->s[end] != ':' && r->s[end] != ')') {
         end++;
     }
+    /* `(*ACCEPT)` ends the match where it stands, so the text after it
+       may stand in no match, and the reader gives no least length, by
+       T319 of docs/audit/tests-findings.md. */
+    if (end - name == 6 && memcmp(r->s + name, "ACCEPT", 6) == 0) {
+        r->unsure = true;
+    }
     if (end < r->n && r->s[end] == ':' &&
         group_name(r->s + name, end - name)) {
         group->atomic = end - name == 6 &&
@@ -1350,9 +1357,10 @@ static const struct node *find_group(const struct node *n, int64_t group)
 /* DESIGN: the fit rule of `patch` asks, for a pattern literal, whether
    `with` fits every span a match can give. The reader answers with the
    fewest bytes the group can match. A backreference or a call counts as
-   empty, and a branch reset, `(?n)` and `\K` give no answer at all, so
-   the count is 0 and only an empty `with` fits. Counting too few can
-   refuse a call that would have fit, and never passes one that cannot. */
+   empty, and a branch reset, `(?n)`, `\K` and `(*ACCEPT)` give no answer
+   at all, so the count is 0 and only an empty `with` fits. Counting too
+   few can refuse a call that would have fit, and never passes one that
+   cannot. */
 int64_t pattern_least_bytes(const char *bytes, size_t length,
                             int64_t group)
 {
