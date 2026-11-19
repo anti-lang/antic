@@ -1386,8 +1386,66 @@ static size_t marker_length(const char *s)
     return s[2] == '#' && s[3] == '!' ? 4 : 3;
 }
 
+/* Whether a line holds whitespace alone. */
+static bool blank_line(const char *s, size_t length)
+{
+    size_t n = 0;
+
+    while (n < length && (s[n] == ' ' || s[n] == '\t' || s[n] == '\r')) {
+        n++;
+    }
+    return n == length;
+}
+
+/* Remove the whitespace every line of text that holds more than
+   whitespace shares, as the lexer removes it from a doc token. */
+static void strip_common(struct text *text)
+{
+    const char *s = text_cstr(text);
+    struct text out = {0};
+    size_t common = SIZE_MAX;
+    size_t i;
+
+    for (i = 0; i <= text->length;) {
+        size_t end = i;
+        size_t lead = 0;
+        while (end < text->length && s[end] != '\n') {
+            end++;
+        }
+        while (i + lead < end && (s[i + lead] == ' ' || s[i + lead] == '\t' ||
+                                  s[i + lead] == '\r')) {
+            lead++;
+        }
+        if (i + lead < end && lead < common) {
+            common = lead;
+        }
+        i = end + 1;
+    }
+    if (common == SIZE_MAX || common == 0) {
+        return;
+    }
+    for (i = 0; i <= text->length;) {
+        size_t end = i;
+        while (end < text->length && s[end] != '\n') {
+            end++;
+        }
+        if (i > 0) {
+            text_append(&out, "\n");
+        }
+        if (end - i > common && !blank_line(s + i, end - i)) {
+            text_append_bytes(&out, s + i + common, end - i - common);
+        }
+        i = end + 1;
+    }
+    text_clear(text);
+    text_append_bytes(text, out.data, out.length);
+    text_free(&out);
+}
+
 /* Remove the ` * ` gutter of a block comment, which every non-empty line
-   of the block carries when it has one. */
+   of the block carries when it has one, and then the indent the lines
+   share after it, which the lexer would remove on the next read, by T326
+   of docs/audit/tests-findings.md. */
 static void strip_gutter(struct text *text)
 {
     const char *s = text_cstr(text);
@@ -1429,6 +1487,7 @@ static void strip_gutter(struct text *text)
     text_clear(text);
     text_append_bytes(text, out.data, out.length);
     text_free(&out);
+    strip_common(text);
 }
 
 /* One line of a doc comment, which stands even when it is empty: a
