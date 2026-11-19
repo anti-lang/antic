@@ -1,0 +1,12 @@
+//! A source whose lines end with CRLF.
+
+/// The program.
+fn main() -> int
+{
+	// The comment of a line.
+	/* The comment of
+	   two lines. */
+	let s = "a
+b";
+	return s.len as int - 3; // after code
+}

@@ -1,0 +1,17 @@
+//! A comment after the brace of a body, of a block and of an anonymous function.
+
+fn apply(f: fn(int) -> int) -> int
+{ // the body
+	return f(1);
+}
+
+fn main() -> int
+{
+	let n = apply(fn(x) { // one more
+		return x + 1;
+	});
+	if n == 2 { /* two */ // done
+		return 0;
+	}
+	return 1;
+}

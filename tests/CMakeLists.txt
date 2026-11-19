@@ -7724,6 +7724,16 @@ add_test(NAME anti_fmt_block_doc_indented_gutter
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt-block-doc-indented-gutter"
         -P "${ANTIC_RUNNERS}/run_anti_fmt.cmake")
 
+# A source whose lines end with CRLF. Its canonical form ends every line
+# with LF, the lines of its comments and of a string literal among them.
+add_test(NAME anti_fmt_comments_with_crlf
+    COMMAND "${CMAKE_COMMAND}"
+        "-DANTI=$<TARGET_FILE:anti>"
+        "-DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/fmt"
+        "-DNAME=comments_with_crlf"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/fmt-comments-with-crlf"
+        -P "${ANTIC_RUNNERS}/run_anti_fmt.cmake")
+
 # A `type` alias of a function type leaves the functions after it as they
 # stand. The source is in the canonical form, so fmt_canonical passes over
 # it until `anti fmt` agrees: finding T025 of docs/audit/tests-findings.md.
@@ -7731,6 +7741,15 @@ add_expect_test(fmt_alias_of_function STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/alias_of_function.anti")
+
+# A comment after the brace of an item body, of a block and of an
+# anonymous function keeps its place on the line of the brace. The source
+# is in the canonical form, and fmt_canonical passes over it until
+# `anti fmt` agrees.
+add_expect_test(fmt_comment_after_block_brace STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_after_block_brace.anti")
 
 # A line comment between the condition of an `if` and the brace of its
 # block. The comment ends its line, so the brace stays on the next one.

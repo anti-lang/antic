@@ -13,3 +13,6 @@ tests/raw/raw_bytes.expected -text
 
 # The test of a source with a NUL byte reads one NUL from this file.
 tests/errors/nul_byte.bin -text
+
+# The source of the test of `anti fmt` over CRLF holds a CR before every LF.
+tests/fmt/comments_with_crlf.anti -text

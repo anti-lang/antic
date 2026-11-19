@@ -9,6 +9,9 @@
 # stability of docs/tooling.md, which asks that `anti fmt` on its own
 # output changes nothing, and `--check`, which writes nothing and lists
 # the files that differ.
+#
+# Each file is read as hexadecimal, since a read of text drops the CR of
+# a CRLF, which the fixture of a source with CRLF holds.
 
 cmake_minimum_required(VERSION 3.21)
 
@@ -43,8 +46,8 @@ string(FIND "${text}" "${NAME}.anti" at)
 if(at LESS 0)
     message(FATAL_ERROR "--check named no file\n${text}")
 endif()
-file(READ "${WORK}/${NAME}.anti" after_check)
-file(READ "${FIXTURE}/${NAME}.anti" before)
+file(READ "${WORK}/${NAME}.anti" after_check HEX)
+file(READ "${FIXTURE}/${NAME}.anti" before HEX)
 if(NOT after_check STREQUAL before)
     message(FATAL_ERROR "--check wrote to the file")
 endif()
@@ -54,9 +57,9 @@ run_fmt("${WORK}/${NAME}.anti" status text)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "fmt failed with ${status}\n${text}")
 endif()
-file(READ "${WORK}/${NAME}.anti" formed)
-file(READ "${FIXTURE}/${NAME}.expected" expected)
-expect_same_text("the canonical form of ${FIXTURE}/${NAME}.anti"
+file(READ "${WORK}/${NAME}.anti" formed HEX)
+file(READ "${FIXTURE}/${NAME}.expected" expected HEX)
+expect_same_bytes("the canonical form of ${FIXTURE}/${NAME}.anti"
                  "${expected}" "${formed}")
 
 # Format stability: `anti fmt` on its own output changes nothing, and
@@ -65,8 +68,8 @@ run_fmt("${WORK}/${NAME}.anti" status text)
 if(NOT status EQUAL 0 OR NOT text STREQUAL "")
     message(FATAL_ERROR "the second run changed the file\n${text}")
 endif()
-file(READ "${WORK}/${NAME}.anti" again)
-expect_same_text("the form of the second run" "${expected}" "${again}")
+file(READ "${WORK}/${NAME}.anti" again HEX)
+expect_same_bytes("the form of the second run" "${expected}" "${again}")
 run_fmt("--check;${WORK}/${NAME}.anti" status text)
 if(NOT status EQUAL 0 OR NOT text STREQUAL "")
     message(FATAL_ERROR "--check reported a formatted file\n${text}")
