@@ -1,0 +1,36 @@
+//! A library for C that exports enums over a signed integer of 8 and of 16
+//! bits, as a parameter and as a result. C passes a value below zero, and Anti
+//! reads it as the enum value C gave.
+
+/// Three steps of a level, over 16 bits.
+export enum Level: i16 { Low = -1, Mid = 0, High = 1 }
+
+/// Three signs, over 8 bits.
+export enum Sign: i8 { Minus = -1, Zero = 0, Plus = 1 }
+
+/// 1 when `x` is `Low`.
+export fn is_low(x: Level) -> int
+{
+	if x == Level.Low {
+		return 1;
+	}
+	return 0;
+}
+
+/// 1 when `x` is `Minus`.
+export fn is_minus(x: Sign) -> int
+{
+	if x == Sign.Minus {
+		return 1;
+	}
+	return 0;
+}
+
+/// The level below `x`, and `Low` below `Low`.
+export fn lower(x: Level) -> Level
+{
+	if x == Level.High {
+		return Level.Mid;
+	}
+	return Level.Low;
+}

@@ -12,7 +12,7 @@
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
 #             tight, tight_aligned, wide, callbacks, forged_notice,
-#             doc_close, constant_names or tuple_names
+#             doc_close, constant_names, tuple_names or levels
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -410,6 +410,17 @@ elseif(CASE STREQUAL "wide")
             SOURCES "${SOURCES}/wide.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/wide${EXE}" "${SOURCES}/wide.expected")
+elseif(CASE STREQUAL "levels")
+    # An enum over a signed integer of 8 and of 16 bits crosses as that
+    # integer, as a parameter and as a result. C passes a value below
+    # zero and reads one back.
+    library(levels static "${dir}")
+    string(STRIP "${tool_stdout}" line)
+    string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
+    program("${dir}/levels${EXE}" OPTIONS -std=c11 -I "${dir}"
+            SOURCES "${SOURCES}/levels.c"
+            INPUTS "${library_file}" "${runtime_library}")
+    expect_output("${dir}/levels${EXE}" "${SOURCES}/levels.expected")
 elseif(CASE STREQUAL "ledger")
     # A synchronized class crosses with the bytes of its hidden lock, and
     # two threads of C call it without losing an addition.
