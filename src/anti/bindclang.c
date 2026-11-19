@@ -1884,7 +1884,12 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
         const struct json_value *node = inner->items[i];
         const char *kind = json_member_string(node, "kind");
         track(&r, json_get(node, "loc"));
-        if (kind != NULL && in_header(&r) && strcmp(kind, "FunctionDecl") == 0) {
+        /* T311: clang declares a builtin that a body of the header
+           calls, such as __builtin_expect, at the top of its AST, marked
+           implicit and placed at the call. No library defines it, so it
+           is no function of the header. */
+        if (kind != NULL && in_header(&r) && strcmp(kind, "FunctionDecl") == 0 &&
+            !json_member_true(node, "isImplicit")) {
             declare_function(&r, node);
         }
         track(&r, json_get(node, "range"));
