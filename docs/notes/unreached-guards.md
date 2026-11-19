@@ -1270,6 +1270,27 @@ short key at the top of the manifest reaches. In `src/rt/toml.c`, a
 comment that runs to the end of the text without its line break and a
 header cut short after its name.
 
+## The sides of batch 3ac
+
+Batch 3ac of the third phase read the readers of `src/anti/`, `src/rt/`
+and `src/antic/` that no batch had read, and fixed T309 to T315 in
+`src/anti/main.c`, `src/anti/syms.c`, `src/anti/bindclang.c`,
+`src/anti/bindexpr.c` and `src/antic/sema_simd.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `license_command` of `src/anti/main.c` | An option of `anti license` that takes a value and stands last, at the test `i + 1 < argc` of the first pass and the tests `i + 1 < count` of `--from`, `--from-archive` and `--runtime`. | `lacks_value` refuses such an option before the command runs, and the first pass copies each option with its value. |
+| `command_takes_value` of `src/anti/main.c` | A command without a list of options that take a value. | `license_command` calls it for `license` alone, which has its list. |
+| `names_record` of `src/anti/bindclang.c` | A typedef without the type it names, a type without its kind and a record without its id. | clang writes the type of every typedef, the kind of every type and the id of every record. |
+| The loop of the records of `bind_read_clang` in `src/anti/bindclang.c` | An anonymous record without `tagUsed`. | clang writes `tagUsed` for every record. |
+| `sema_check_simd_binary` of `src/antic/sema_simd.c` | A lane of `char` at `==`, `!=` and the four orders. | The declaration refuses a lane of `char`, so a `simd struct` holds none. |
+
+The sides left unsorted: in `pragma_pack` of `src/anti/bindclang.c`, a
+`#pragma pack` whose arguments run to the end of the line without their
+`)`, and an empty argument between two commas. clang ignores both with a
+warning of `-Wignored-pragmas`, and the reader takes the arguments it
+finds.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
