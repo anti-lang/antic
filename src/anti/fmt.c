@@ -1205,8 +1205,20 @@ static size_t columns_of(const char *s, size_t n)
     return columns;
 }
 
+/* Whether a word at the start of a line of doc text opens markup there,
+   which `anti doc` renders: a `-` that makes a `- ` item, or three
+   backticks of a fence. */
+static bool opens_markup(const char *word, size_t length)
+{
+    return (length == 1 && word[0] == '-') ||
+           (length >= 3 && memcmp(word, "```", 3) == 0);
+}
+
 /* One paragraph of a doc comment, filled to the width. The text of first
-   opens its first line and the text of rest opens every line after it. */
+   opens its first line and the text of rest opens every line after it. A
+   word that would open markup at the start of a line stays at the end of
+   the line before it, past the width, by T325 of
+   docs/audit/tests-findings.md. */
 static void wrap_paragraph(struct text *out, const char *first,
                            const char *rest, const char *body, size_t length,
                            size_t columns)
@@ -1234,7 +1246,8 @@ static void wrap_paragraph(struct text *out, const char *first,
             text_append(out, open);
             column = columns_of(open, strlen(open));
             fresh = false;
-        } else if (column + 1 + width <= columns) {
+        } else if (column + 1 + width <= columns ||
+                   opens_markup(body + start, i - start)) {
             text_append(out, " ");
             column++;
         } else {

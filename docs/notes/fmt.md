@@ -97,7 +97,9 @@ backticks toggles a fence, and a line inside one is written as it stands. An
 empty line is written as it stands and separates two paragraphs. Every other
 line opens a unit. The unit runs on while the lines below it stand at the same
 indent and open no item of their own. A `- ` item carries its continuation two
-columns in, and a line of a deeper indent opens a unit of its own.
+columns in, and a line of a deeper indent opens a unit of its own. A `-` or three
+backticks would open markup at the start of a line. Such a word stays at the end
+of the line before it, past the width.
 
 Writing the text back at the indent of the item is what makes the pass stable. A
 line form writes one space after the marker, so the lexer reads one common
