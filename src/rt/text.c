@@ -371,12 +371,13 @@ static void exact(uint64_t m, int e, struct decimal *out)
     out->count = n;
 }
 
+static void cut_to(struct decimal *v, int64_t keep, bool up);
+
 /* Keep the first keep digits of v and round the rest away, a tie to the
    even digit. Below one digit the value rounds to zero or to one unit of
    the place before its first digit. */
 static void round_to(struct decimal *v, int64_t keep)
 {
-    int64_t i;
     bool up;
 
     if (v->count == 0 || keep >= v->count) {
@@ -394,6 +395,15 @@ static void round_to(struct decimal *v, int64_t keep)
         up = keep + 1 < v->count ||
              (keep > 0 && (v->d[keep - 1] - '0') % 2 == 1);
     }
+    cut_to(v, keep, up);
+}
+
+/* Keep the first keep digits of v, which has more, from 0 on, and add one
+   unit of the last place when up holds. */
+static void cut_to(struct decimal *v, int64_t keep, bool up)
+{
+    int64_t i;
+
     v->count = keep;
     if (up) {
         i = keep - 1;
@@ -452,16 +462,30 @@ static void shortest(const struct parts *p, struct decimal *out)
     } else {
         exact(2 * p->m - 1, p->e - 1, &low);
     }
+    /* The value rounded to a count of digits is the nearer of the two
+       values of that count around it. Below a power of two the interval
+       reaches half as far down as up, so where the nearer lies outside it
+       the other one may lie inside, and it is tried next, by T330 of
+       docs/audit/tests-findings.md. */
     for (digits = 1; digits < 17; digits++) {
-        int below;
-        int above;
-        *out = value;
-        round_to(out, digits);
-        below = compare(out, &low);
-        above = compare(out, &high);
-        if ((below > 0 || (even && below == 0)) &&
-            (above < 0 || (even && above == 0))) {
-            return;
+        int k;
+        for (k = 0; k < 3; k++) {
+            int below;
+            int above;
+            *out = value;
+            if (k == 0) {
+                round_to(out, digits);
+            } else if (digits < out->count) {
+                cut_to(out, digits, k == 2);
+            } else {
+                break;
+            }
+            below = compare(out, &low);
+            above = compare(out, &high);
+            if ((below > 0 || (even && below == 0)) &&
+                (above < 0 || (even && above == 0))) {
+                return;
+            }
         }
     }
     *out = value;
