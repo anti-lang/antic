@@ -784,6 +784,7 @@ bool bind_struct_const(struct bind_module *b, const char *name,
                        const struct bind_names *names, const char *doc)
 {
     const char *s = elements;
+    const char *close;
     struct text type = {0};
     struct text literal = {0};
     struct bind_const *c;
@@ -845,6 +846,7 @@ bool bind_struct_const(struct bind_module *b, const char *name,
         }
         field++;
         if (*end == '}') {
+            close = end;
             break;
         }
         s = end + 1;
@@ -852,10 +854,15 @@ bool bind_struct_const(struct bind_module *b, const char *name,
             s++;
         }
         if (*s == '}') {
+            close = s;
             break;
         }
     }
-    if (field != r->field_count) {
+    /* T313: the literal ends at its `}`. A member or another expression
+       after it gives a value of another type, so the macro is left out. */
+    for (s = close + 1; *s == ' ' || *s == '\t'; s++) {
+    }
+    if (field != r->field_count || *s != '\0') {
         goto done;
     }
     text_append(&literal, " }");
