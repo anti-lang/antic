@@ -1,0 +1,13 @@
+//! Adds numbers.
+//! ```anti
+//! let a = 1;
+//! ```
+//! - one item
+//!
+//! The rest of the text.
+
+/// One.
+pub fn one() -> int
+{
+	return 1;
+}

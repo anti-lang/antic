@@ -21,6 +21,7 @@ set(SKIP
     "${TESTS}/errors/syntax.anti"
     "${TESTS}/fmt/block_doc_indented_gutter.anti"
     "${TESTS}/fmt/comment_after_block_brace.anti"
+    "${TESTS}/fmt/comment_before_a_token_of_a_rule.anti"
     "${TESTS}/fmt/comments_with_crlf.anti"
     "${TESTS}/fmt/comment_before_operator.anti"
     "${TESTS}/fmt/default_struct_literal.anti"

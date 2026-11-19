@@ -1,0 +1,16 @@
+//! A struct whose name spells the elements of a tuple of the header.
+
+export struct int_int
+{
+	v: int,
+}
+
+export fn two(a: int_int, b: int) -> (int_int, int)
+{
+	return (a, b);
+}
+
+export fn three(a: int, b: int, c: int) -> (int, int, int)
+{
+	return (a, b, c);
+}

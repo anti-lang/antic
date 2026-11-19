@@ -11,7 +11,8 @@
 #             simd, classes, failing, tuples, flags, ledger, variants,
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
-#             tight, tight_aligned, wide, callbacks or forged_notice
+#             tight, tight_aligned, wide, callbacks, forged_notice,
+#             doc_close, constant_names or tuple_names
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -443,6 +444,19 @@ elseif(CASE STREQUAL "callbacks")
             SOURCES "${SOURCES}/callbacks.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/callbacks${EXE}" "${SOURCES}/callbacks.expected")
+elseif(CASE STREQUAL "doc_close" OR CASE STREQUAL "constant_names" OR
+       CASE STREQUAL "tuple_names")
+    # The header of a library compiles as C11 and as C++17. doc_close
+    # holds a doc text with `/*` and `*/`, constant_names a constant whose
+    # name a parameter and a field carry, and tuple_names a struct whose
+    # name spells the elements of a tuple.
+    library(${CASE} static "${dir}")
+    file(WRITE "${dir}/${CASE}_include.c"
+         "#include \"${CASE}.h\"\n\nint main(void)\n{\n    return 0;\n}\n")
+    tool_run("" ${CC} -std=c11 -fsyntax-only -I "${dir}"
+                "${dir}/${CASE}_include.c")
+    tool_run("" ${CXX} -std=c++17 -fsyntax-only -I "${dir}"
+                "${dir}/${CASE}_include.c")
 elseif(CASE STREQUAL "forged_notice")
     # A trace reads the build id of a module from its notice
     # anti_licenses, here the one a C program carries. A notice in the

@@ -385,6 +385,17 @@ anti_message(clang_macro_is_no_constant STATUS 0
     OUT "bind: anti.api from api.h, 0 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: the macro `NOW` is no constant and is skipped")
+# T340: a string macro of bytes that are no UTF-8, which a `str` of Anti
+# cannot hold. CMake writes the byte itself, which a table cannot spell.
+function(header_of_a_latin_string)
+    string(ASCII 233 byte)
+    file(WRITE "${PROJECT}/api.h" "#define CAFE \"caf${byte}\"\nint f(void);\n")
+endfunction()
+anti_message(clang_macro_of_bytes_that_are_no_utf8 STATUS 0
+    SETUP header_of_a_latin_string
+    OUT "bind: anti.api from api.h, 1 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: the macro `CAFE` is no constant and is skipped")
 anti_message(clang_variable STATUS 0
     FILES api.h "extern int counter;\nint count(void);\n"
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"

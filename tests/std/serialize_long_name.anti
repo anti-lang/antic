@@ -1,0 +1,31 @@
+//! A field whose name is longer than 256 bytes, through `serialize` and
+//! `Object.deserialize`.
+
+import anti.io;
+import anti.mem;
+import anti.text;
+
+class Long
+{
+	pub f_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long: int = 1,
+}
+
+fn main() -> int
+{
+	let k = alloc Long { };
+	k.f_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long = 5;
+	let b = text.Builder.new();
+	k.serialize(&b);
+	io.println(f"{b.text().len}");
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
+	if back == none || !(back is *Long) {
+		io.println("refused");
+		return 2;
+	}
+	let e = back as *Long;
+	io.println(f"{e.f_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long_long}");
+	arena.free_all();
+	delete(k);
+	return 0;
+}

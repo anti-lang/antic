@@ -24,6 +24,7 @@
 #include "syms.h"
 #include "target.h"
 #include "text.h"
+#include "toml.h"
 #include "zip.h"
 
 #if !defined(_WIN32)
@@ -37,6 +38,7 @@
 #define FIFO "test_syms-fifo"
 #define TREE_DIR "test_syms-dir"
 #define CONF_DIR "test_syms-conf"
+#define QUOTE_DIR "test_syms-quote'd"
 
 static void write_file(const char *path, const char *text)
 {
@@ -437,6 +439,74 @@ static void broken_entries(void)
     remove(TRACE);
 }
 
+/* The value of the key of the index of a deployment archive that ends in
+   field, read by the reader of TOML that `anti symbols` reads it with. */
+static void index_value(const char *archive, const char *field,
+                        struct text *out)
+{
+    struct zip_archive z;
+    struct text index = {0};
+    struct anti_toml *doc = NULL;
+    size_t i;
+    int64_t n;
+
+    CHECK(zip_read(archive, &z));
+    for (i = 0; i < z.count; i++) {
+        if (strcmp(text_cstr(&z.items[i].name), "index.toml") == 0) {
+            CHECK(zip_unpack(&z, i, &index));
+        }
+    }
+    zip_archive_free(&z);
+    doc = anti_rt_toml_read((const unsigned char *)index.data,
+                            (int64_t)index.length);
+    CHECK(doc != NULL);
+    for (n = 0; doc != NULL && n < anti_rt_toml_count(doc); n++) {
+        const char *key = (const char *)anti_rt_toml_key(doc, n).ptr;
+        if (files_ends_with(key, field)) {
+            text_append(out, (const char *)anti_rt_toml_value(doc, n).ptr);
+        }
+    }
+    if (doc != NULL) {
+        anti_rt_toml_free(doc);
+    }
+    text_free(&index);
+}
+
+/* The index of a deployment archive names a program and the archive it
+   came from as they stand, with a quote in the name of each. The module
+   is the stem `check` compares, and the source is a path of the disk. */
+static void inventory_quoted_names(void)
+{
+    static const char map[] =
+        "# The map of a symbols archive of Anti.\n# build "
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n";
+    struct zip_entry entry;
+    struct text module = {0};
+    struct text source = {0};
+
+    CHECK(files_remove_tree(QUOTE_DIR));
+    CHECK(platform_make_dir(QUOTE_DIR));
+    write_file(QUOTE_DIR "/conf.toml", "[runtime]\nthreads = 2\n");
+    write_file(QUOTE_DIR "/tra'cer",
+               "MZ\nANTI_LICENSES_BEGIN\nbuild "
+               "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+               "\npackage com.example.app 1.0 MIT\n");
+    memset(&entry, 0, sizeof entry);
+    entry.name = "tra'cer.map";
+    entry.bytes = map;
+    entry.size = sizeof map - 1;
+    CHECK(zip_write(QUOTE_DIR "/tra'cer-symbols.zip", &entry, 1));
+    CHECK(syms_inventory(QUOTE_DIR "/conf.toml", NULL,
+                         QUOTE_DIR "/all.zip") == 0);
+    index_value(QUOTE_DIR "/all.zip", ".module", &module);
+    index_value(QUOTE_DIR "/all.zip", ".source", &source);
+    CHECK_STR(text_cstr(&module), "tra'cer");
+    CHECK_STR(text_cstr(&source), QUOTE_DIR "/tra'cer-symbols.zip");
+    text_free(&module);
+    text_free(&source);
+    CHECK(files_remove_tree(QUOTE_DIR));
+}
+
 void test_syms(void)
 {
     unit_without_id();
@@ -449,4 +519,5 @@ void test_syms(void)
     report_fifo();
     report_universal();
     broken_entries();
+    inventory_quoted_names();
 }

@@ -1,0 +1,7 @@
+//! A doc comment that holds the bytes that close a comment of C.
+
+/// Matches `a/*` and stops at `*/` here.
+export fn glob(n: int) -> int
+{
+	return n;
+}

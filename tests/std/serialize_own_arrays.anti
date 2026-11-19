@@ -1,0 +1,40 @@
+//! An `own` pointer to an array and an `own` slice of arrays, through
+//! `serialize` and `Object.deserialize`.
+
+import anti.io;
+import anti.mem;
+import anti.text;
+
+class Rows
+{
+	pub own pair: ?*[2]i32 = none,
+	pub own rows: [][2]i32,
+}
+
+fn main() -> int
+{
+	let k = alloc Rows { rows: [][2]i32 { ptr: none, len: 0 } };
+	k.pair = alloc([2]i32, 1);
+	if let p = k.pair {
+		*p = [3, 4];
+	}
+	let a = alloc([2]i32, 2) else {
+		return 1;
+	};
+	a[0] = [1, 2];
+	a[1] = [3, 4];
+	k.rows = [][2]i32 { ptr: a, len: 2 };
+	let b = text.Builder.new();
+	k.serialize(&b);
+	io.println(b.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
+	if back == none || !(back is *Rows) {
+		return 2;
+	}
+	let e = back as *Rows;
+	io.println(f"equal {e.equals(k)}");
+	arena.free_all();
+	delete(k);
+	return 0;
+}

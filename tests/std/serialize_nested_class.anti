@@ -1,0 +1,37 @@
+//! A class nested in a class, through `serialize` and `Object.deserialize`.
+
+import anti.io;
+import anti.mem;
+import anti.text;
+
+class Outer
+{
+	class Inner
+	{
+		pub x: int = 3,
+	}
+	pub fn make(self) -> *Object
+	{
+		return alloc Inner { x: 5 };
+	}
+}
+
+fn main() -> int
+{
+	let o = alloc Outer { };
+	let i = o.make();
+	let b = text.Builder.new();
+	i.serialize(&b);
+	io.println(b.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
+	if back == none {
+		io.println("refused");
+	} else {
+		io.println(f"equal {back.equals(i)}");
+	}
+	arena.free_all();
+	delete(i);
+	delete(o);
+	return 0;
+}

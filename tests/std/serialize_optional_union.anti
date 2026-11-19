@@ -1,0 +1,47 @@
+//! A `?T` of a union that holds a value, which `serialize` writes as `null`.
+//! `Object.deserialize` then leaves the field at its default, as it leaves the
+//! union beside it.
+
+import anti.io;
+import anti.mem;
+import anti.text;
+
+union Word
+{
+	i: i32,
+	f: f32,
+}
+
+class Words
+{
+	pub w: Word,
+	pub ow: ?Word = none,
+	pub fn construct(self)
+	{
+		self.w = Word { i: 7 };
+		self.ow = Word { i: 7 };
+	}
+}
+
+fn main() -> int
+{
+	let k = alloc Words { w: Word { i: 1 } };
+	let b = text.Builder.new();
+	k.serialize(&b);
+	io.println(b.text());
+	let arena = mem.ArenaAllocator.new(mem.LibcAllocator.get(), 1024);
+	let back = Object.deserialize(b.text(), &arena);
+	if back == none || !(back is *Words) {
+		return 2;
+	}
+	let e = back as *Words;
+	io.println(f"w {e.w.i}");
+	if let w = e.ow {
+		io.println(f"ow {w.i}");
+	} else {
+		io.println("ow none");
+	}
+	arena.free_all();
+	delete(k);
+	return 0;
+}

@@ -1,0 +1,14 @@
+//! A constant whose name a parameter and a field of the header carry.
+
+export const width: int = 3;
+
+export struct Size
+{
+	width: int,
+	height: int,
+}
+
+export fn area(width: int, height: int) -> int
+{
+	return width * height;
+}

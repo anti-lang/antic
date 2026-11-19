@@ -3225,7 +3225,7 @@ foreach(case static shared exports two loader header bundle classes
         failing tuples flags variants nested simd names handlers ledger
         generics optional forms views never never_cpp ctypes
         ctypes_shared ctypes_bundle tight tight_aligned wide callbacks
-        forged_notice)
+        forged_notice doc_close constant_names tuple_names)
     # The C program of ledger starts its threads with pthreads.
     if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
         continue()
@@ -7751,6 +7751,16 @@ add_expect_test(fmt_comment_after_block_brace STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_after_block_brace.anti")
 
+# A comment between a token that a rule of the formatter reads and the
+# piece after it: the `fn` of an anonymous function after `=`, the brace
+# of a handler after `catch` and the `while` of a `do` block after `}`.
+# The source is in the canonical form, and fmt_canonical passes over it
+# until `anti fmt` agrees.
+add_expect_test(fmt_comment_before_a_token_of_a_rule STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_before_a_token_of_a_rule.anti")
+
 # A line comment between the condition of an `if` and the brace of its
 # block. The comment ends its line, so the brace stays on the next one.
 # The source is in the canonical form, and fmt_canonical passes over it
@@ -7924,7 +7934,9 @@ endforeach()
 # that starts with a tab and a link with a DEL byte, and ends in an empty
 # line, which the Markdown page keeps. cut holds a code span that anti fmt
 # cuts over two lines in the first paragraph of the module, which the
-# index renders as the page of the module does.
+# index renders as the page of the module does. fenced holds a fence on
+# the line after the first paragraph of the module, which ends the
+# paragraph of the index as it ends the one of the page.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
@@ -7933,7 +7945,8 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "marks_html||marks|com.example.marks.html|marks.expected.html"
              "marks_markdown|--markdown|marks|com.example.marks.md|marks.expected.md"
              "marks_index||marks|index.html|marks.index.expected.html"
-             "cut_index||cut|index.html|cut.index.expected.html")
+             "cut_index||cut|index.html|cut.index.expected.html"
+             "fenced_index||fenced|index.html|fenced.index.expected.html")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)

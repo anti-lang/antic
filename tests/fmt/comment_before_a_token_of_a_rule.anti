@@ -1,0 +1,33 @@
+//! Comments before the tokens that the rules of the formatter read.
+
+import anti.lang;
+
+fn value(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let g = /* id */ fn(x: int) -> int {
+		return x;
+	};
+	let i = 3;
+	if value(i) catch /* any */ { yield 0; } == 0 {
+		return 1;
+	}
+	if value(i) catch e /* any */ { yield 0; } == 0 {
+		return 1;
+	}
+	do {
+		i = i - 1;
+	} /* again */ while i > 0
+	do {
+		i = i + 1;
+	} // again
+	while i < 3
+	return g(i);
+}
