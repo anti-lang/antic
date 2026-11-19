@@ -1072,6 +1072,10 @@ static bool signature_code(const struct type *fn, bool wide,
     return true;
 }
 
+/* DESIGN: the table entry of a function that may fail returns the error
+   and takes an out pointer for its result, which no Value carries, so the
+   function has no text and reflect.call refuses it with NOT_CARRIED, by
+   T347 of docs/audit/tests-findings.md. */
 static const struct ir_global *signature_text(struct lowerer *l,
                                               const struct type *fn)
 {
@@ -1079,7 +1083,8 @@ static const struct ir_global *signature_text(struct lowerer *l,
     struct text code = {0};
     const struct ir_global *g;
 
-    if (!signature_code(fn, true, &code)) {
+    if (fn == NULL || (fn->kind == TYPE_FN && fn->may_fail) ||
+        !signature_code(fn, true, &code)) {
         text_free(&code);
         return NULL;
     }
@@ -1088,6 +1093,15 @@ static const struct ir_global *signature_text(struct lowerer *l,
     g = lower_literal_global(l, &text);
     text_free(&code);
     return g;
+}
+
+/* The parameters fn declares, self among them. The out pointer of a
+   function that may fail is no parameter of it, by T347 of
+   docs/audit/tests-findings.md. */
+static size_t declared_params(const struct type *fn)
+{
+    return fn->may_fail && fn->has_out ? fn->param_count - 1
+                                       : fn->param_count;
 }
 
 /* The list of public functions of the chain, in table order. */
@@ -1142,7 +1156,7 @@ static struct ir_global *class_functions(struct lowerer *l,
         item->items[RT_FUNCTION_PARAM_COUNT].integer =
             fn != NULL && fn->symbol != NULL &&
                     fn->symbol->type->kind == TYPE_FN
-                ? fn->symbol->type->param_count
+                ? declared_params(fn->symbol->type)
                 : 1;
         item->items[RT_FUNCTION_SIGNATURE].scalar = IR_PTR;
         item->items[RT_FUNCTION_SIGNATURE_LENGTH].kind = IR_CONST_INT;
