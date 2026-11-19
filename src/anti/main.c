@@ -388,6 +388,8 @@ static int build_command(int argc, char **argv)
     return status != 0 ? status : build_with_runtime(&request);
 }
 
+static bool command_takes_value(const char *command, const char *option);
+
 /* `anti license --project [--notice]` with the options of `anti build`
    in rest: the build of the project, which prints its notice or writes
    it as NOTICE.txt.
@@ -462,6 +464,12 @@ static int license_command(int argc, char **argv)
             written = true;
         } else {
             rest[count++] = argv[i];
+            /* T309: the word after an option that takes a value is its
+               value, by the [provisional] entry of R155, so --notice and
+               --project there name a binary and a directory. */
+            if (command_takes_value("license", argv[i]) && i + 1 < argc) {
+                rest[count++] = argv[++i];
+            }
         }
     }
     if (project) {
@@ -1048,22 +1056,39 @@ static bool takes_value(const char *const *list, const char *option)
     return false;
 }
 
+/* The list of value_options of command, from the option after its name,
+   or NULL for a command that takes no value. */
+static const char *const *values_of(const char *command)
+{
+    const char *const *list = value_options;
+
+    while (*list != NULL && strcmp(*list, command) != 0) {
+        while (*list != NULL) {
+            list++;
+        }
+        list++;
+    }
+    return *list != NULL ? list : NULL;
+}
+
+/* Whether option takes a value in command. */
+static bool command_takes_value(const char *command, const char *option)
+{
+    const char *const *list = values_of(command);
+
+    return list != NULL && takes_value(list, option);
+}
+
 /* R155 of "Rules of 2026-10-13": an option that takes a value and stands
    last gets one line that names it, and 2, as antic gives. A word after
    such an option is its value, whatever it looks like, as the parser of
    each command reads it. Returns false when argv lacks no value. */
 static bool lacks_value(int argc, char **argv)
 {
-    const char *const *list = value_options;
+    const char *const *list = values_of(argv[1]);
     int i;
 
-    while (*list != NULL && strcmp(*list, argv[1]) != 0) {
-        while (*list != NULL) {
-            list++;
-        }
-        list++;
-    }
-    if (*list == NULL) {
+    if (list == NULL) {
         return false;
     }
     /* symbols and sdk name a command of their own before the options. */
