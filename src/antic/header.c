@@ -362,6 +362,23 @@ static void declaration(struct text *out, const struct type *t,
     text_free(&inner);
 }
 
+/* The n bytes of a line of doc text at p, with a backslash between a
+   `*` and a `/` that stand side by side, in either order. The text then
+   neither closes the C comment nor opens one inside it, by T339 of
+   docs/audit/tests-findings.md. */
+static void comment_line(struct text *out, const char *p, size_t n)
+{
+    size_t i;
+
+    for (i = 0; i < n; i++) {
+        text_append_bytes(out, p + i, 1);
+        if (i + 1 < n && ((p[i] == '*' && p[i + 1] == '/') ||
+                          (p[i] == '/' && p[i + 1] == '*'))) {
+            text_append(out, "\\");
+        }
+    }
+}
+
 /* A doc comment as a C comment at indent, one line for one line of text
    and a gutter of stars otherwise. */
 static void doc_comment(struct text *out, const struct doc_text *doc,
@@ -374,14 +391,18 @@ static void doc_comment(struct text *out, const struct doc_text *doc,
         return;
     }
     if (memchr(p, '\n', doc->length) == NULL) {
-        text_appendf(out, "%s/** %.*s */\n", indent, (int)doc->length, p);
+        text_appendf(out, "%s/** ", indent);
+        comment_line(out, p, doc->length);
+        text_append(out, " */\n");
         return;
     }
     text_appendf(out, "%s/**\n", indent);
     while (p < end) {
         const char *nl = memchr(p, '\n', (size_t)(end - p));
         size_t n = nl != NULL ? (size_t)(nl - p) : (size_t)(end - p);
-        text_appendf(out, "%s *%s%.*s\n", indent, n > 0 ? " " : "", (int)n, p);
+        text_appendf(out, "%s *%s", indent, n > 0 ? " " : "");
+        comment_line(out, p, n);
+        text_append(out, "\n");
         p += n + 1;
     }
     text_appendf(out, "%s */\n", indent);

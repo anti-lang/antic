@@ -450,13 +450,17 @@ elseif(CASE STREQUAL "doc_close" OR CASE STREQUAL "constant_names" OR
     # holds a doc text with `/*` and `*/`, constant_names a constant whose
     # name a parameter and a field carry, and tuple_names a struct whose
     # name spells the elements of a tuple.
+    # The C++ check reads a file of its own suffix, since clang deprecates
+    # a `.c` file read as C++ and the warning is an error here.
     library(${CASE} static "${dir}")
-    file(WRITE "${dir}/${CASE}_include.c"
-         "#include \"${CASE}.h\"\n\nint main(void)\n{\n    return 0;\n}\n")
+    set(include_text
+        "#include \"${CASE}.h\"\n\nint main(void)\n{\n    return 0;\n}\n")
+    file(WRITE "${dir}/${CASE}_include.c" "${include_text}")
+    file(WRITE "${dir}/${CASE}_include.cpp" "${include_text}")
     tool_run("" ${CC} -std=c11 -fsyntax-only -I "${dir}"
                 "${dir}/${CASE}_include.c")
     tool_run("" ${CXX} -std=c++17 -fsyntax-only -I "${dir}"
-                "${dir}/${CASE}_include.c")
+                "${dir}/${CASE}_include.cpp")
 elseif(CASE STREQUAL "forged_notice")
     # A trace reads the build id of a module from its notice
     # anti_licenses, here the one a C program carries. A notice in the
