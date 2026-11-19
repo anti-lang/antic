@@ -8,20 +8,11 @@ import anti.text;
 
 fn main() -> int
 {
-	let r = ByteRegex.compile("(?x) a # [^é] \n b") catch {
-		io.println("refused");
-		return 0;
-	};
-	io.println("compiled");
 	let data = "xab".to_bytes();
-	let found = data.matches(r) catch {
-		free(data.ptr);
-		return 0;
-	};
+	let found = data.matches(re"(?x) a # [^é]
+		b");
 	if found {
 		io.println("matched");
-	} else {
-		io.println("no match");
 	}
 	free(data.ptr);
 	return 0;

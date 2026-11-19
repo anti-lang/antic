@@ -442,12 +442,58 @@ static int64_t put_class(struct wide *w, const unsigned char *s, int64_t n,
     return scan.end;
 }
 
+/* The groups whose mode `(?x)` widen keeps, nested. A group deeper than
+   that keeps the mode it opened in. */
+#define WIDEN_GROUPS 256
+
+/* The end of the flags of `(?flags)` or `(?flags:` at s from i, the byte
+   after `(?`, which is the `)` or the `:`: letters of the options, `-`
+   and `^`. -1 where no flags stand there. */
+static int64_t flags_end(const unsigned char *s, int64_t n, int64_t i)
+{
+    int64_t k = i;
+
+    while (k < n && s[k] != ')' && s[k] != ':') {
+        if (s[k] == 0 || strchr("imnsxUJaDSWPT^-", s[k]) == NULL) {
+            return -1;
+        }
+        k++;
+    }
+    return k < n && k > i ? k : -1;
+}
+
+/* The mode `x` after the flags of s from i to end, from extended before
+   them: `x` sets it, after a `-` clears it, and `^` clears it. */
+static bool flags_extended(const unsigned char *s, int64_t i, int64_t end,
+                           bool extended)
+{
+    bool on = true;
+
+    for (; i < end; i++) {
+        if (s[i] == '-') {
+            on = false;
+        } else if (s[i] == '^') {
+            extended = false;
+        } else if (s[i] == 'x') {
+            extended = on;
+        }
+    }
+    return extended;
+}
+
 /* Write into w the pattern PCRE2 compiles for the byte pattern s, and
    give 0 after a refusal. A character outside ASCII becomes an atom of
-   its bytes, and a class that holds one a choice. */
+   its bytes, and a class that holds one a choice. Under `(?x)` a `#`
+   opens a comment to the end of its line, which PCRE2 reads as no part of
+   the pattern, so a `[` there opens no class, by T332 of
+   docs/audit/tests-findings.md. A flag holds to the end of the group it
+   stands in, and `(?x:` within its own group. */
 static int widen(struct wide *w, const unsigned char *s, int64_t n,
                  int32_t *code, int64_t *offset)
 {
+    bool modes[WIDEN_GROUPS];
+    bool extended = false;
+    int64_t depth = 0;
     int64_t i = 0;
 
     while (i < n) {
@@ -476,6 +522,40 @@ static int widen(struct wide *w, const unsigned char *s, int64_t n,
                 end++;
             }
             end = end < n ? end + 1 : n;
+            put_span(w, s, i, end);
+            i = end;
+        } else if (c == '(') {
+            int64_t end = i + 1 < n && s[i + 1] == '?' ? flags_end(s, n, i + 2)
+                                                       : -1;
+            bool inner = flags_extended(s, i + 2, end, extended);
+            if (end < 0 || s[end] == ':') {
+                if (depth < WIDEN_GROUPS) {
+                    modes[depth] = extended;
+                }
+                depth++;
+            }
+            if (end < 0) {
+                put(w, c, i);
+                i++;
+            } else {
+                extended = inner;
+                put_span(w, s, i, end + 1);
+                i = end + 1;
+            }
+        } else if (c == ')') {
+            if (depth > 0) {
+                depth--;
+                if (depth < WIDEN_GROUPS) {
+                    extended = modes[depth];
+                }
+            }
+            put(w, c, i);
+            i++;
+        } else if (c == '#' && extended) {
+            int64_t end = i;
+            while (end < n && s[end] != '\n') {
+                end++;
+            }
             put_span(w, s, i, end);
             i = end;
         } else if (c >= 0x80) {
