@@ -1758,7 +1758,10 @@ static struct expr *format_value_call(struct checker *c,
     bool fits;
 
     if (types_is_integer(t)) {
-        bool is_signed = types_is_signed(t);
+        /* A `c_wchar` has the signedness of `wchar_t` on the target, which
+           the back end gives `as int`, so it goes to `append_int` as the
+           `int` it holds, by T329 of docs/audit/tests-findings.md. */
+        bool is_signed = types_is_signed(t) || t->kind == TYPE_CWCHAR;
         fits = spec->precision < 0 && spec->kind != 'e' && spec->kind != 'f';
         name = is_signed ? TEXT_APPEND_INT : TEXT_APPEND_UINT;
         args[0] = t->kind == TYPE_I64 || t->kind == TYPE_U64

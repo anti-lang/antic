@@ -20,9 +20,6 @@
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
 anti_bind_forms T316 The probe of `anti bind --clang --probe` declares a variable of a const-qualified struct and writes its fields, which C refuses.
-matrix_values_format_of_a_c_wchar_below_zero_dev T329 `f"..."` writes a `c_wchar` through `append_uint`, so -1 is written as a `u64`. host=macos
-matrix_values_format_of_a_c_wchar_below_zero_release T329 `f"..."` writes a `c_wchar` through `append_uint`, so -1 is written as a `u64`. host=macos
-matrix_values_format_of_a_c_wchar_below_zero_memory_checks T329 `f"..."` writes a `c_wchar` through `append_uint`, so -1 is written as a `u64`. host=macos
 matrix_values_format_of_a_power_of_two_in_fewest_digits_dev T330 Below a power of two the shortest digits round up, which `shortest` does not try.
 matrix_values_format_of_a_power_of_two_in_fewest_digits_release T330 Below a power of two the shortest digits round up, which `shortest` does not try.
 matrix_values_format_of_a_power_of_two_in_fewest_digits_memory_checks T330 Below a power of two the shortest digits round up, which `shortest` does not try.

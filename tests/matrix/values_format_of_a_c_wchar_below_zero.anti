@@ -7,11 +7,13 @@ import anti.text;
 
 fn same(name: str, written: str, read: str)
 {
-	if text.equal(written, read) {
-		io.println(f"{name}: the value as i64");
-	} else {
-		io.println(f"{name}: {written} where i64 writes {read}");
+	let line = f"{name}: the value as i64";
+	if !text.equal(written, read) {
+		free(line.ptr);
+		line = f"{name}: {written} where i64 writes {read}";
 	}
+	io.println(line);
+	free(line.ptr);
 	free(written.ptr);
 	free(read.ptr);
 }
