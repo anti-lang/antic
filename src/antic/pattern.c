@@ -681,6 +681,30 @@ static bool lookaround_name(const unsigned char *name, size_t length)
     return false;
 }
 
+/* Whether name, before the `:` of `(*name:`, opens a group whose text
+   after the `:` is pattern: an atomic group, an assertion or a script run.
+   Every other name there is a verb, as `(*MARK:abc)`, whose text up to
+   the `)` is its argument and matches nothing, by T318 of
+   docs/audit/tests-findings.md. */
+static bool group_name(const unsigned char *name, size_t length)
+{
+    static const char *const names[] = {
+        "atomic", "sr", "script_run", "asr", "atomic_script_run"
+    };
+    size_t i;
+
+    if (lookaround_name(name, length)) {
+        return true;
+    }
+    for (i = 0; i < sizeof names / sizeof names[0]; i++) {
+        if (strlen(names[i]) == length &&
+            memcmp(names[i], name, length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* The body of a group up to its `)`, under the flags of the group, which
    end with it. */
 static struct node *group_body(struct reader *r, struct node *group)
@@ -724,7 +748,8 @@ static int read_flags(struct reader *r)
 }
 
 /* A group that starts `(*`, from the `*`: a named group such as
-   `(*atomic:` or a verb such as `(*FAIL)`, which matches no text. */
+   `(*atomic:` or a verb such as `(*FAIL)` or `(*MARK:abc)`, which matches
+   no text. */
 static struct node *verb_group(struct reader *r, struct node *group)
 {
     size_t name = r->pos + 1;
@@ -733,7 +758,8 @@ static struct node *verb_group(struct reader *r, struct node *group)
     while (end < r->n && r->s[end] != ':' && r->s[end] != ')') {
         end++;
     }
-    if (end < r->n && r->s[end] == ':') {
+    if (end < r->n && r->s[end] == ':' &&
+        group_name(r->s + name, end - name)) {
         group->atomic = end - name == 6 &&
                         memcmp(r->s + name, "atomic", 6) == 0;
         group->zero_width = lookaround_name(r->s + name, end - name);
