@@ -220,6 +220,11 @@ static const struct value_type value_types[] = {
     {"f64", IR_F64, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64},
     {"str", IR_AGG, IR_EXT_NONE, ANTI_VALUE_STR, IR_AGG},
     {"ptr", IR_PTR, IR_EXT_NONE, ANTI_VALUE_PTR, IR_PTR},
+    /* The types of C whose width the target gives. The back end turns
+       a conversion of one width into a copy. */
+    {"c_long", IR_CLONG, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64},
+    {"c_ulong", IR_CLONG, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
+    {"c_wchar", IR_CWCHAR, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
 };
 
 /* The most names a signature holds: the result and the parameters. */

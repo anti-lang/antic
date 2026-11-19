@@ -1006,8 +1006,13 @@ static struct ir_global *class_ancestors(struct lowerer *l,
 }
 
 /* The name a signature gives a type that a reflect.Value carries, or
-   NULL for a type it cannot carry. */
-static const char *value_type_name(const struct type *t)
+   NULL for a type it cannot carry. wide names the C types whose width
+   the target gives and the enums as well, which reflect.call carries
+   since T346 of docs/audit/tests-findings.md.
+   DESIGN: the structural hash of an interface reads the signature
+   without them, as before T346, so the chain of every interface stays
+   the one a plugin built before the fix carries. */
+static const char *value_type_name(const struct type *t, bool wide)
 {
     static const char *const names[] = {
         [TYPE_VOID] = "void", [TYPE_BOOL] = "bool", [TYPE_CHAR] = "char",
@@ -1015,8 +1020,20 @@ static const char *value_type_name(const struct type *t)
         [TYPE_I64] = "i64",   [TYPE_U8] = "u8",     [TYPE_U16] = "u16",
         [TYPE_U32] = "u32",   [TYPE_U64] = "u64",   [TYPE_F32] = "f32",
         [TYPE_F64] = "f64",   [TYPE_STR] = "str",
+        [TYPE_CLONG] = "c_long", [TYPE_CULONG] = "c_ulong",
+        [TYPE_CWCHAR] = "c_wchar",
     };
 
+    /* An enum passes as its underlying integer, and a Value carries it
+       as that integer, as reflect.get gives a field of it. */
+    if (t->kind == TYPE_ENUM) {
+        return wide && t->base != NULL ? value_type_name(t->base, wide)
+                                       : NULL;
+    }
+    if (!wide && (t->kind == TYPE_CLONG || t->kind == TYPE_CULONG ||
+                  t->kind == TYPE_CWCHAR)) {
+        return NULL;
+    }
     /* A function with its context is two words, which no Value
        carries, so reflect.call refuses a function that takes one. */
     if (t->kind == TYPE_POINTER ||
@@ -1034,18 +1051,19 @@ static const char *value_type_name(const struct type *t)
    the whole program writes one trampoline per such text, so equal
    signatures share one. A signature holding a type that a Value cannot
    carry has no text, and reflect.call refuses the function. */
-static bool signature_code(const struct type *fn, struct text *code)
+static bool signature_code(const struct type *fn, bool wide,
+                           struct text *code)
 {
     const char *name;
     size_t i;
 
     if (fn == NULL || fn->kind != TYPE_FN ||
-        (name = value_type_name(fn->result)) == NULL) {
+        (name = value_type_name(fn->result, wide)) == NULL) {
         return false;
     }
     text_append(code, name);
     for (i = 1; i < fn->param_count; i++) {
-        name = value_type_name(fn->params[i]);
+        name = value_type_name(fn->params[i], wide);
         if (name == NULL || strcmp(name, "void") == 0) {
             return false;
         }
@@ -1061,7 +1079,7 @@ static const struct ir_global *signature_text(struct lowerer *l,
     struct text code = {0};
     const struct ir_global *g;
 
-    if (!signature_code(fn, &code)) {
+    if (!signature_code(fn, true, &code)) {
         text_free(&code);
         return NULL;
     }
@@ -1213,7 +1231,7 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
                        table.entries[i].name.length);
         h = ir_hash_bytes(h, ":", 1);
         if (fn != NULL && fn->symbol != NULL &&
-            signature_code(fn->symbol->type, &code)) {
+            signature_code(fn->symbol->type, false, &code)) {
             h = ir_hash_bytes(h, text_cstr(&code), code.length);
         } else {
             text_format_name(params, sizeof params, "%zu",
