@@ -1,4 +1,5 @@
-//! A comment after the brace of a body, of a block and of an anonymous function.
+//! A comment after the brace of a body, of a block and of an anonymous
+//! function.
 
 fn apply(f: fn(int) -> int) -> int
 { // the body

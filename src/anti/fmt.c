@@ -772,6 +772,9 @@ struct emitter {
        brackets its `fn` stood in. */
     bool anonymous;
     size_t anonymous_brackets;
+    /* The pieces before this index were written already: the comments
+       behind the `{` of a body that spans lines. */
+    size_t written;
 };
 
 static void text_clear(struct text *t)
@@ -1679,6 +1682,23 @@ static bool anonymous_fn(const struct emitter *e)
     }
 }
 
+/* The ordinary comments that stand behind the `{` at index, on its line.
+   They keep their place there, so the line of the brace ends after them,
+   by T333 of docs/audit/tests-findings.md. */
+static void keep_comments_behind(struct emitter *e, const struct piece_list *l,
+                                 size_t index)
+{
+    int line = l->items[index].end_line;
+    size_t i = index + 1;
+
+    while (i < l->count && l->items[i].kind == PIECE_COMMENT &&
+           l->items[i].line == line) {
+        append_piece(e, &l->items[i], true);
+        i++;
+    }
+    e->written = i;
+}
+
 /* DESIGN: the body of an anonymous function opens on the line of its
    signature. It indents one tab past that line, as a statement block
    does. Its `}` opens the line that goes on with the expression around
@@ -1712,6 +1732,7 @@ static void emit_anonymous_open(struct emitter *e, const struct piece_list *l,
         e->inlined++;
         return;
     }
+    keep_comments_behind(e, l, (size_t)(p - l->items));
     flush(e);
     e->depth = f.depth + (f.cont ? 1 : 0) + 1;
     e->cont = false;
@@ -1791,6 +1812,7 @@ static void emit_brace_open(struct emitter *e, const struct piece_list *l,
         e->stmt.colons = 0;
         return;
     }
+    keep_comments_behind(e, l, (size_t)(p - l->items));
     flush(e);
     e->cont = false;
     e->depth++;
@@ -2198,7 +2220,7 @@ bool fmt_source(const char *source, size_t length, struct text *out)
     reset_statement(&e);
     for (i = 0; i < pieces.count; i++) {
         const struct piece *p = &pieces.items[i];
-        if (p->dropped) {
+        if (p->dropped || i < e.written) {
             continue;
         }
         if (breaks_line(&e, &pieces, i, p)) {
