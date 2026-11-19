@@ -20,7 +20,6 @@ set(SKIP
     "${TESTS}/errors/lexical.anti"
     "${TESTS}/errors/syntax.anti"
     "${TESTS}/fmt/block_doc_indented_gutter.anti"
-    "${TESTS}/fmt/comment_before_block_brace.anti"
     "${TESTS}/fmt/comment_before_operator.anti"
     "${TESTS}/fmt/default_struct_literal.anti"
     "${TESTS}/fmt/doc_dash_at_the_width.anti"

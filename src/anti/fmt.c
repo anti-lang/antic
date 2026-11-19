@@ -1624,6 +1624,12 @@ static void emit_brace_open(struct emitter *e, const struct piece_list *l,
         flush(e);
         e->cont = false;
     }
+    /* The brace of a block that opens its line, after a line comment,
+       stands at the indent of its statement, by T321 of
+       docs/audit/tests-findings.md. */
+    if (kind == BRACE_BLOCK && e->line.length == 0) {
+        e->cont = false;
+    }
     f.kind = kind;
     f.inlined = inlined;
     f.from_do = e->stmt.first == TOKEN_DO;
@@ -1957,6 +1963,12 @@ static bool breaks_line(struct emitter *e, const struct piece_list *l,
         return false;
     }
     if (p->kind != PIECE_TOKEN) {
+        return true;
+    }
+    /* A line comment ends its line, so the piece after it opens the
+       next one, the brace of a statement block among them, by T321 of
+       docs/audit/tests-findings.md. */
+    if (e->prev->kind == PIECE_COMMENT && e->src[e->prev->offset + 1] == '/') {
         return true;
     }
     kind = p->token->kind;
