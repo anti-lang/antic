@@ -145,7 +145,7 @@ fn half(n: int) -> int
 - A tuple type is an anonymous struct with C layout. `(int, str)` is a struct of two fields in that order, laid out as the target lays out structs. It is passed and returned by value under the struct rules. Two tuple types are the same when their element types are the same in order.
 - A tuple value is `(a, b)`. Its elements are `t.0`, `t.1`, up to the last. Destructuring is `let (a, b) = e;` and `for i, x in items`, and nowhere else: not in a parameter list and not nested.
 - `for i, x in items` is destructuring of an `(int, T)` per element, and `for i, x in &items` of an `(int, *T)`. `let (result, flags) = a + b;` is destructuring of a `(T, Flags)` result.
-- The C header writes a tuple as a named struct, `struct anti_tuple_int_str { int64_t _0; const struct anti_str *_1; }`, one per distinct tuple type used in an exported signature.
+- The C header writes a tuple as a named struct, `struct anti_tuple_int_str { int64_t _0; const struct anti_str *_1; }`, one per distinct tuple type used in an exported signature. The name writes the length of each user type name before it, so `(int, my_type)` is `anti_tuple_int_7my_type`, by B of "Answers of 2026-11-19" in `docs/decisions.md`.
 - Tuples are for functions that have two answers and no name for the pair: `divmod`, `min_max`, a coordinate pair, the flags. A tuple of more than three elements is a struct that has not been named yet. So is one that crosses a module boundary. The site says so.
 
 ## Error origin and stack traces
@@ -798,7 +798,7 @@ class Button
 - An owned function value, `own fn(...)`, is two words, the code and the address of a snapshot, and frees the snapshot with its owner. It is written where the value is kept: `own handler: fn(Event)` for a field, and `keep own f: fn(Event)` for a parameter that keeps and owns what it is given. A named function or a non-capturing one fits there too, with no snapshot, and holds `none` in the second word. An `own` field of type `?fn(...)` takes `none`, as its default and with `=`.
 - An owned function value is freed with its owner, is not copied by `=`, and is copied by `dup`, which copies its snapshot.
 - A snapshot is one block that starts with its size in bytes and holds the captured values and the bytes of any captured `str`. Freeing and copying it need nothing specific to the closure. `anti_rt_snapshot_free` gives the block back, and one runtime function copies it for `dup` by that size. Freeing `none` does nothing.
-- A parameter that does not keep its argument is passed as two words, the code and a context pointer. The context is `none` for a function that captures nothing. An owned value passes there too, and lends its snapshot for the call.
+- A parameter that does not keep its argument is passed as two words, the code and a context pointer. The context is `none` for a function that captures nothing. An owned value passes there too, and lends its snapshot for the call. `==` and `!=` between a value of this form and a plain function value of one signature compare the code.
 - The header writes a parameter of two words the C way, as a callback and a `void *` context. It writes an `own fn` field as a struct of the code pointer and the snapshot pointer, and declares `anti_rt_snapshot_free`.
 - An `extern fn` takes plain C function pointers only, so a closure cannot reach C. Passing an `own fn` where a plain C function pointer is expected is refused.
 
