@@ -1312,7 +1312,6 @@ test reaches.
 | `declare_record` of `src/anti/bindclang.c` | A record without `tagUsed`, an anonymous member of a record without its C name. | clang writes `tagUsed` for every record, and a record that holds a member has its C name already. |
 | The enum base of `declare_enum` in `src/anti/bindclang.c` | A fixed base that parses to a type that is no scalar. | C takes an integer type as the base of an enum alone. |
 | `after_group` of `src/anti/bindclang.c` | A spelling of clang that ends inside a parenthesis. | clang writes every parenthesis of a type with its pair. |
-| `read_macros` of `src/anti/bindclang.c` | A macro that `evaluate` reads and `bind_eval_const` refuses. | `evaluate` gives a value that `bind_eval_const` takes. |
 
 The sides left unsorted, all in code of the fixes of this batch:
 `flags_end` and `flags_extended` of `src/rt/regex.c` for a NUL byte among
@@ -1322,6 +1321,41 @@ pattern, `skip_callout` of `src/antic/pattern.c` for a callout of a
 number, of `{` and of a doubled delimiter and a string that never
 closes, and `first_paragraph` of `src/anti/doc.c` for an empty first
 paragraph.
+
+## The sides of batch 3ae
+
+Batch 3ae of the third phase read the writers whose output a reader of
+the project reads again, and fixed T333 to T337, T339 and T340 in
+`src/anti/fmt.c`, `src/anti/syms.c`, `src/anti/doc.c`,
+`src/antic/header.c` and `src/anti/bindexpr.c`. It sorted the sides of
+`src/antic/pattern.c` that no test reaches, and tested the callouts of a
+number and in braces of `skip_callout` there. The fix of T340 gives
+`bind_eval_const` a value it refuses, a string of bytes that are no UTF-8,
+so the row of `read_macros` left the section of batch 3ad.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `pattern_compiles`, `pattern_group_count` and `pattern_group_number` of `src/antic/pattern.c` | A message of PCRE2 with no room, and a compile that gives no code. | Each caller passes a room of its own, and the checker counts the groups of a pattern that compiled once already. |
+| `take_char`, `class_char`, `parse_escape`, `posix_end`, `parse_class`, `read_flags`, `verb_group` and `group_body` of `src/antic/pattern.c` | A pattern that ends inside a character, an escape, a class, a POSIX name, a group or a `\Q`, a group without its `)` and a range whose end is a class escape. | antic hands the reader a pattern that PCRE2 compiled, and PCRE2 refuses each of these, so every construct the reader opens closes before the end. |
+| `posix_class` of `src/antic/pattern.c` | An empty POSIX name, a name of four bytes other than `word` and one of six other than `xdigit`. | PCRE2 refuses a POSIX name it does not know, and `word` and `xdigit` are its names of those lengths. |
+| `verb_group` of `src/antic/pattern.c` | A named group of six bytes other than `atomic`. | PCRE2 names no other group of six bytes. |
+| `read_number` of `src/antic/pattern.c` | A count or a reference of more than nine digits. | PCRE2 refuses a repeat past 65535 and a reference past the groups of the pattern. |
+| `first_of`, `least`, `narrow_after`, `follow_within` and `parse_cat` of `src/antic/pattern.c` | A group or an alternation without children, a `\Q` sequence of none and a child outside its parent. | `group_body` adds the alternation it reads to every group, an alternation holds one branch at the least, and `add_child` keeps every child in its parent. The `switch` over every kind of node has no `default`, which the measurement counts. |
+| `pattern_least_bytes` of `src/antic/pattern.c` | A group that the tree does not hold. | Each caller passes a group of the literal, which the checker counted from the same pattern. |
+
+The sides left unsorted: `set_range` of `src/antic/pattern.c` for a range
+past 255 in a text pattern and `skip_extended` there for a control byte
+below a tab under `(?x)`, which a literal may hold. In the code of the
+fixes of this batch they are `append_lf` of `src/anti/fmt.c` for a CR
+without its LF inside a token, `emit_comment` there for an empty line of
+a block comment of its own line, and `first_paragraph` of
+`src/anti/doc.c` for a line of fewer than three bytes, of fewer than two
+and one that opens with `-` before no space. Two sides of `src/anti/fmt.c`
+no input reaches: `scan_gap` for a line comment that holds no byte, since
+it holds `//`, and `anonymous_fn` for a last token that is a comment,
+since it reads the tokens alone. The other sides of `src/anti/fmt.c` stay
+as batches 3l and 3q sorted them, beside the code of the fixes of batch
+3ad.
 
 ## Not in this note
 
