@@ -707,7 +707,10 @@ static bool fits_span(int64_t at, int64_t length, int64_t span)
    lies outside its match, and a lookbehind reads the bytes before it. The
    limit of a search, a missing group and a with that does not fit are so
    found before any byte changes. A match whose group did not take part
-   is passed over and not counted. */
+   is passed over and not counted, so the limit counts places: the walk
+   takes every match, stops at the place a positive limit reaches and
+   keeps the last places for a negative one, by T331 of
+   docs/audit/tests-findings.md. */
 int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
                             int64_t length, const unsigned char *with,
                             int64_t with_length, int64_t into,
@@ -717,6 +720,7 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
     int64_t count;
     int64_t group = into;
     int64_t places = 0;
+    int64_t first;
     int64_t status;
     int64_t i;
     struct anti_growing offsets = {NULL, 0, 0};
@@ -742,22 +746,17 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
         return ANTI_RT_REGEX_MISFIT;
     }
     md = match_data(pattern, 1);
-    status = walk_begin(&it, pattern, data, length, limit);
-    while (status >= 0 &&
+    status = walk_begin(&it, pattern, data, length, 0);
+    while (status >= 0 && (limit <= 0 || places < limit) &&
            (status = advance(&it.cursor, &it.current, md)) == FOUND) {
         const PCRE2_SIZE *ov = pcre2_get_ovector_pointer(md);
-        int64_t start = (int64_t)ov[2 * group];
-        int64_t end = (int64_t)ov[2 * group + 1];
-        int64_t offset;
+        int64_t span[2];
         if (ov[2 * group] == PCRE2_UNSET) {
             continue;
         }
-        if (!fits_span(at, with_length, end - start)) {
-            status = ANTI_RT_REGEX_MISFIT;
-            break;
-        }
-        offset = start + at;
-        grow_append(&offsets, (const unsigned char *)&offset, sizeof offset);
+        span[0] = (int64_t)ov[2 * group];
+        span[1] = (int64_t)ov[2 * group + 1];
+        grow_append(&offsets, (const unsigned char *)span, sizeof span);
         places++;
     }
     pcre2_match_data_free(md);
@@ -765,14 +764,22 @@ int64_t anti_rt_regex_patch(const void *pattern, unsigned char *data,
         free(offsets.bytes);
         return status;
     }
-    for (i = 0; i < places && with_length > 0; i++) {
-        int64_t offset;
-        memcpy(&offset, offsets.bytes + i * (int64_t)sizeof offset,
-               sizeof offset);
-        memcpy(data + offset, with, (size_t)with_length);
+    first = limit < 0 && places + limit > 0 ? places + limit : 0;
+    for (i = first; i < places; i++) {
+        int64_t span[2];
+        memcpy(span, offsets.bytes + i * (int64_t)sizeof span, sizeof span);
+        if (!fits_span(at, with_length, span[1] - span[0])) {
+            free(offsets.bytes);
+            return ANTI_RT_REGEX_MISFIT;
+        }
+    }
+    for (i = first; i < places && with_length > 0; i++) {
+        int64_t span[2];
+        memcpy(span, offsets.bytes + i * (int64_t)sizeof span, sizeof span);
+        memcpy(data + span[0] + at, with, (size_t)with_length);
     }
     free(offsets.bytes);
-    return places;
+    return places - first;
 }
 
 /* The first place from from on where the find_length bytes at find stand
