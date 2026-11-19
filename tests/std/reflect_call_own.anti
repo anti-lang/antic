@@ -1,0 +1,46 @@
+//! `reflect.call` of a public function with an `own` parameter. The function
+//! owns what it is given, and a pointer of a `Value` stays the caller's, so the
+//! call would give the object a second owner. It fails with `NOT_CARRIED` and
+//! runs nothing.
+import anti.lang;
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 1,
+}
+
+class Box
+{
+	pub taken: int = 0,
+
+	pub fn take(self, own p: *Point) -> int
+	{
+		let x = p.x;
+		delete(p);
+		self.taken += 1;
+		return x;
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let o: *Object = b;
+	let p = alloc Point { x: 5 };
+	let args = [reflect.of_ptr(p as *byte)];
+
+	/* The seven functions of the root and its nine hooks come first,
+	   then those of the class. */
+	reflect.call(o, 16, args[0..1]) catch e {
+		printf("refused %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
+			e.message.ptr);
+		yield reflect.nothing();
+	};
+	printf("%d %d\n".ptr, b.taken as c_int, p.x as c_int);
+	delete(p);
+	delete(b);
+	return 0;
+}

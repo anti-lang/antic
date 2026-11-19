@@ -1,0 +1,42 @@
+//! The function list of a class counts the parameters of a public function that
+//! may fail as the function declares them, `self` among them. The out pointer
+//! of its result is no parameter of the function.
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub v: int = 3,
+
+	pub fn half(self, x: int) -> int may fail
+	{
+		if x < 0 {
+			fail "below zero";
+		}
+		return x / 2;
+	}
+
+	pub fn touch(self, x: int) may fail
+	{
+		if x < 0 {
+			fail "below zero";
+		}
+		self.v = x;
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let d = reflect.describe(b as *byte) else { return 1; };
+	let i = 16;
+	while i < reflect.function_count(d) do {
+		let f = reflect.function(d, i);
+		printf("%.*s %d\n".ptr, f.name.len as c_int, f.name.ptr,
+			f.param_count as c_int);
+		i += 1;
+	}
+	delete(b);
+	return 0;
+}

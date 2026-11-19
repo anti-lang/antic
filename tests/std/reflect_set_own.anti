@@ -1,0 +1,35 @@
+//! `reflect.set` of an `own` pointer field. The field owns what it holds, and a
+//! pointer of a `Value` stays the caller's, so a write would give the object a
+//! second owner and lose the one the field held. `set` fails with `NOT_CARRIED`
+//! and writes nothing, and `get` reads the field.
+import anti.lang;
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 1,
+}
+
+class Holder
+{
+	pub own p: ?*Point = none,
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { p: alloc Point { x: 7 } };
+	let d = reflect.describe(h as *byte) else { return 1; };
+	let q = alloc Point { x: 9 };
+	reflect.set(h as *byte, d, 0, reflect.of_ptr(q as *byte)) catch e {
+		printf("refused %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
+			e.message.ptr);
+	};
+	let v = reflect.get(h as *byte, d, 0);
+	let held = v.data.p as *Point;
+	printf("kind %d %d\n".ptr, v.kind as c_int, held.x as c_int);
+	delete(h);
+	delete(q);
+	return 0;
+}

@@ -1,0 +1,69 @@
+//! `reflect.call` calls a public function whose parameter and result are a
+//! `c_long`, a `c_ulong`, a `c_wchar` or an enum. A `Value` carries each of
+//! them, as `reflect.get` gives a field of the type, so the call goes through
+//! the table and gives the result.
+import anti.lang;
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+enum Level: i16 { Low = -1, High = 1 }
+
+class Box
+{
+	pub fn long(self, x: c_long) -> c_long
+	{
+		return x - 1;
+	}
+
+	pub fn ulong(self, x: c_ulong) -> c_ulong
+	{
+		return x + 1;
+	}
+
+	pub fn wide(self, x: c_wchar) -> c_wchar
+	{
+		return x + 1;
+	}
+
+	pub fn level(self, x: Level) -> Level
+	{
+		if x == Level.Low {
+			return Level.High;
+		}
+		return Level.Low;
+	}
+}
+
+/// Print the result of the function at `index` of `o`, or the code of the error
+/// of the call.
+fn show(o: *Object, index: int, args: []reflect.Value)
+{
+	let v = reflect.call(o, index, args) catch e {
+		printf("refused %d\n".ptr, e.code as c_int);
+		return;
+	};
+	if v.kind == reflect.ValueKind.Int {
+		printf("int %lld\n".ptr, v.data.i);
+	} else {
+		printf("kind %d %llu\n".ptr, v.kind as c_int, v.data.u);
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let o: *Object = b;
+
+	/* The seven functions of the root and its nine hooks come first,
+	   then those of the class. */
+	let int_args = [reflect.of_int(-5)];
+	let uint_args = [reflect.of_uint(65)];
+	let level_args = [reflect.of_int(-1)];
+	show(o, 16, int_args[0..1]);
+	show(o, 17, uint_args[0..1]);
+	show(o, 18, uint_args[0..1]);
+	show(o, 19, level_args[0..1]);
+	delete(b);
+	return 0;
+}
