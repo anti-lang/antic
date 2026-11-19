@@ -175,6 +175,19 @@ anti_message(clang_packed_to_one_after_show STATUS 0
         "    2 | #pragma pack(show)"
         "      |         ^"
         "1 warning generated.")
+# clang -E writes a pragma as it stands, so the blanks around each
+# argument of `#pragma pack` are no part of it.
+anti_message(clang_packed_with_blanks_around_the_arguments STATUS 0
+    FILES api.h "#pragma pack( push , id , 1 )\nstruct PackSpaced { char a; int b; };\n#pragma pack( pop , id )\nvoid take(struct PackSpaced *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+# clang ignores `#pragma pack` without its parentheses, so the pack before
+# it holds. The pragma before it keeps the warning of clang out of the
+# standard error.
+anti_message(clang_pack_without_its_parentheses STATUS 0
+    FILES api.h "#pragma clang diagnostic ignored \"-Wignored-pragmas\"\n#pragma pack(push, 1)\n#pragma pack\nstruct PackBare { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackBare *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
 # T311: clang declares a builtin that a body calls at the top of its AST,
 # marked implicit. No library defines it, so it is no function of the
 # header, and the shim of `hot` is the one function bound.

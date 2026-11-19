@@ -1,0 +1,10 @@
+//! A user of the first version of `counter` that holds a copy of `Can`, whose
+//! later file changes the default of a field alone.
+
+import com.example.counter;
+
+/// A new can.
+pub fn make() -> *counter.Can<int>
+{
+	return alloc counter.Can<int> { v: 0 };
+}

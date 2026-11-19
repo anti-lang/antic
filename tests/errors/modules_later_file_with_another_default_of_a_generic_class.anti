@@ -1,0 +1,12 @@
+//! A library file holds a copy of a generic class of `counter`, made from the
+//! first type entry of the generic. The later file of `counter` changes the
+//! default of a field alone. By "Answers of 2026-11-12" the read refuses the
+//! library file, as it refuses a change of a body.
+
+import com.example.can_user;
+
+fn main() -> int
+{
+	let c = can_user.make();
+	return c.get();
+}

@@ -1,0 +1,10 @@
+//! An export const whose type the program does not declare. The type is the
+//! mistake and gets the one message.
+
+/// The limit for C.
+export const LIMIT: Nope = 1;
+
+fn main() -> int
+{
+	return 0;
+}

@@ -4486,7 +4486,7 @@ set_tests_properties(antl_stale_counter_before PROPERTIES
 set(stale_users "")
 foreach(user item final static table bound moved reach gone pusher filler
         keeper grower copy copy_read tin pick tally jar changer turner half
-        halver doubler thrice)
+        halver doubler thrice can)
     add_test(NAME antl_stale_${user}_user
         COMMAND antic -c -I "${STALE}/before" -I "${LIBS}/stale_before"
                 --runtime "${ANTIC_RUNTIME_DIR}"
@@ -4613,10 +4613,12 @@ set_tests_properties(error_modules_later_file_without_a_generic_function
 # digest of the tree of each generic it copied, and the signature of each
 # function it reaches in another library. The later file of `counter`
 # changes the bodies of `tally` and `Jar.get` alone, and gives `Changer.get`
-# and `half` an `f64` in place of an `int`.
+# and `half` an `f64` in place of an `int`. It changes the default of a
+# field of `Can` alone, which the digest refuses as it refuses a body.
 foreach(case
         "modules_later_file_with_another_tree_of_a_generic_function|tally_user|tally"
-        "modules_later_file_with_another_tree_of_a_generic_class|jar_user|Jar")
+        "modules_later_file_with_another_tree_of_a_generic_class|jar_user|Jar"
+        "modules_later_file_with_another_default_of_a_generic_class|can_user|Can")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)
     list(GET parts 1 user)

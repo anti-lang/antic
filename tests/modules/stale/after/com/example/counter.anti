@@ -170,3 +170,16 @@ pub fn thrice<T>(n: int) -> f64
 {
 	return 3.5;
 }
+
+/// A generic class whose default of `n` differs from the first file.
+pub class Can<T>
+{
+	pub v: T,
+	pub n: int = 2,
+
+	/// The count of the can.
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}

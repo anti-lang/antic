@@ -187,3 +187,16 @@ pub fn thrice<T>(n: int) -> int
 {
 	return n * 3;
 }
+
+/// A generic class whose later file changes the default of a field alone.
+pub class Can<T>
+{
+	pub v: T,
+	pub n: int = 1,
+
+	/// The count of the can.
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
