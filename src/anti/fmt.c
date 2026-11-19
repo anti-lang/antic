@@ -119,6 +119,12 @@ static void scan_gap(const char *src, size_t from, size_t to, int *line,
             while (i < to && src[i] != '\n') {
                 i++;
             }
+            /* The CR of a CRLF ends the line and stays out of the
+               comment, so the canonical form ends each line with LF
+               alone, by T334 of docs/audit/tests-findings.md. */
+            while (i > start && src[i - 1] == '\r') {
+                i--;
+            }
         } else {
             i += 2;
             while (i + 1 < to && !(src[i] == '*' && src[i + 1] == '/')) {
@@ -1090,12 +1096,31 @@ static bool space_before(const struct emitter *e, const struct piece *p)
     return true;
 }
 
+/* The n bytes at s, with the CR of each CRLF left out. A block comment
+   and a string literal may span lines, and the canonical form ends every
+   line with LF alone, by T334 of docs/audit/tests-findings.md. The lexer
+   reads a CRLF inside a string literal as a single LF, so the literal
+   keeps its value. */
+static void append_lf(struct text *out, const char *s, size_t n)
+{
+    size_t from = 0;
+    size_t i;
+
+    for (i = 0; i + 1 < n; i++) {
+        if (s[i] == '\r' && s[i + 1] == '\n') {
+            text_append_bytes(out, s + from, i - from);
+            from = i + 1;
+        }
+    }
+    text_append_bytes(out, s + from, n - from);
+}
+
 static void append_piece(struct emitter *e, const struct piece *p, bool space)
 {
     if (space) {
         text_append(&e->line, " ");
     }
-    text_append_bytes(&e->line, e->src + p->offset, p->length);
+    append_lf(&e->line, e->src + p->offset, p->length);
     e->prev_prefix = p->kind == PIECE_TOKEN &&
                      prefix_operator(e, p->token->kind);
     e->prev2 = e->prev;
@@ -1589,11 +1614,14 @@ static void emit_comment(struct emitter *e, const struct piece *p)
     flush(e);
     for (i = 0; i <= p->length;) {
         size_t end = i;
+        size_t stop;
         while (end < p->length && s[end] != '\n') {
             end++;
         }
+        stop = end < p->length && end > i && s[end - 1] == '\r' ? end - 1
+                                                                : end;
         if (i == 0) {
-            text_append_bytes(&e->line, s, end);
+            text_append_bytes(&e->line, s, stop);
             flush(e);
         } else {
             /* The lines below the first of a block comment stand as
@@ -1603,7 +1631,7 @@ static void emit_comment(struct emitter *e, const struct piece *p)
                 text_append(e->out, "\n");
                 e->blank = false;
             }
-            text_append_bytes(e->out, s + i, end - i);
+            text_append_bytes(e->out, s + i, stop - i);
             text_append(e->out, "\n");
         }
         i = end + 1;

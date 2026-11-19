@@ -34,6 +34,8 @@ one, and the rules move the breaks they name:
   behind it. A comment keeps its position, so the line ends after it.
 - A line comment ends its line, so the brace of a statement block after it
   opens the next line, at the indent of the statement.
+- Every line ends with LF. The CR of a CRLF stays out of a comment and of a
+  string literal, whose value the lexer reads with LF alone.
 
 A line that carries an open statement takes one extra tab, which is the wrapped
 continuation line of the rules. The level of a line is the number of open
