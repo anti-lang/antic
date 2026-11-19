@@ -1,0 +1,56 @@
+//! `reflect.get` and `reflect.set` over a field of each integer type whose
+//! width differs from 64 bits, of each C type whose width the target gives, and
+//! of a function. `get` widens the field to 64 bits by its sign, and `set`
+//! keeps the low bytes of the value. An index below zero reaches no field.
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+fn twice(x: i32) -> i32
+{
+	return x * 2;
+}
+
+class Holder
+{
+	pub a: i32 = -5,
+	pub b: u16 = 65535,
+	pub c: u32 = 4000000000,
+	pub d: u64 = 18446744073709551615,
+	pub e: c_long = -7,
+	pub f: c_ulong = 9,
+	pub g: c_wchar = 65,
+	pub h: fn(i32) -> i32 = twice,
+}
+
+fn main() -> int
+{
+	let o = alloc Holder { };
+	let d = reflect.describe(o as *byte) else { return 1; };
+	let i = 0;
+	while i < 7 do {
+		let v = reflect.get(o as *byte, d, i);
+		printf("%d %d %lld\n".ptr, i as c_int, v.kind as c_int, v.data.i);
+		i += 1;
+	}
+	let h = reflect.get(o as *byte, d, 7);
+	printf("fn %d %d\n".ptr, h.kind as c_int, (h.data.p == none) as c_int);
+	reflect.set(o as *byte, d, 0, reflect.of_int(-70000)) catch fatal;
+	reflect.set(o as *byte, d, 1, reflect.of_uint(70000)) catch fatal;
+	reflect.set(o as *byte, d, 2, reflect.of_uint(5000000000)) catch fatal;
+	reflect.set(o as *byte, d, 3, reflect.of_uint(3)) catch fatal;
+	reflect.set(o as *byte, d, 4, reflect.of_int(-8)) catch fatal;
+	reflect.set(o as *byte, d, 5, reflect.of_uint(10)) catch fatal;
+	reflect.set(o as *byte, d, 6, reflect.of_uint(66)) catch fatal;
+	printf("%d %u %u %llu %ld %lu %d\n".ptr, o.a as c_int, o.b as c_uint,
+		o.c as c_uint, o.d, o.e, o.f, o.g as c_int);
+
+	/* An index below zero gives a value of kind None and an error. */
+	let below = reflect.get(o as *byte, d, -1);
+	printf("below %d\n".ptr, below.kind as c_int);
+	reflect.set(o as *byte, d, -1, reflect.of_int(1)) catch e {
+		printf("refused %d\n".ptr, e.code as c_int);
+	};
+	delete(o);
+	return 0;
+}
