@@ -773,6 +773,20 @@ not re-open a settled decision without asking Eddie.
   of `asan`, the last up to test 7869: `asan` 273 s, 188 s, 267 s,
   172 s, 119 s and 602 s, `ubsan` 270 s, 200 s, 275 s, 186 s, 129 s and
   626 s.
+  Batch 3ab of the third phase of coverage measured `host` in the same
+  three parts: 404 s, 319 s and 346 s before the commit of T304 to T308,
+  up to test 7878, 399 s, 288 s and 348 s before the fix of T304, where
+  `link_identity_macos-arm64` failed on the new runtime, and 401 s, 289 s
+  and 342 s once its digest stood written, 403 s, 291 s and 352 s before
+  that of T305, 405 s, 292 s and 354 s before that of T306, 404 s, 299 s
+  and 348 s before that of T307, 404 s, 292 s and 349 s before that of
+  T308, where `anti_build_message_fault_out_of_memory_in_the_manifest_reader`
+  failed on the larger document, and 402 s, 294 s and 348 s once it named
+  88 bytes, and 402 s, 292 s and 339 s before the commit of the tests of
+  the sides of the readers, up to test 7883. It ran each sanitizer suite
+  in the six parts of `asan`, the last up to test 7881: `asan` 285 s,
+  200 s, 282 s, 181 s, 127 s and 606 s, `ubsan` 266 s, 198 s, 284 s,
+  186 s, 129 s and 624 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.

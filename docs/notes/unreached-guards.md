@@ -1248,6 +1248,28 @@ which a tab in the string reaches, since the reader of TOML takes every
 byte but the quote and the line break, and a key of the manifest no
 longer than `inject.` at the test of `interface_of`.
 
+## The sides of batch 3ab
+
+Batch 3ab of the third phase read the readers of `src/rt/`, `src/anti/`
+and `src/antic/` for an entry that a missing key or an empty element ends
+or drops, and fixed T304 to T308 in `src/rt/plugin.c`, `src/rt/conf.c`,
+`src/anti/syms.c`, `src/anti/manifest.c` and `src/rt/toml.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `index_lists` of `src/rt/plugin.c` | A list of interfaces as long as the document, at the end of its loop, and a field name past 32 bytes. | `discover_in` reads the `path` of the entry first and passes over an entry without one, so the pairs of the document outnumber the interfaces. `interfaces.` and 19 digits fit 32 bytes. |
+| `index_at` of `src/rt/plugin.c` | A key of the index past 64 bytes. | `library.`, 19 digits, a dot and the longest field, `interfaces.` with 19 digits, take 58 bytes. |
+| `read_elements` of `src/rt/registry.c` | An element of a slice without the comma before it. | The scan before it counted the elements with their commas, and it fails the text without one. |
+| `syms_map_lookup` of `src/anti/syms.c` | A name of a line of the map that is blank to its start. | `cursor_blank` passed the blanks before the name, so its first byte is no blank. |
+
+The sides left unsorted: the test `key.len <= 8` of `join_elements` of
+`src/rt/conf.c`, which an empty quoted key after an array of `[runtime]`
+reaches and refuses as a key outside the tables. The test of `inject_of`
+of `src/anti/manifest.c` for a key no longer than `inject.`, which a
+short key at the top of the manifest reaches. In `src/rt/toml.c`, a
+comment that runs to the end of the text without its line break and a
+header cut short after its name.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
