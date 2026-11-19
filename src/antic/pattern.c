@@ -810,6 +810,31 @@ static struct node *flag_group(struct reader *r, size_t start,
     return group;
 }
 
+/* Skip the argument of a callout, from the byte after `(?C`: a number, or
+   a string between delimiters, where a doubled delimiter stands for
+   itself and `{` closes with `}`, as PCRE2 reads it. A `)` inside the
+   string ends no group, by T320 of docs/audit/tests-findings.md. */
+static void skip_callout(struct reader *r)
+{
+    int open = peek(r, 0);
+    int close = open == '{' ? '}' : open;
+
+    if (open <= 0 || strchr("`'\"^%#${", open) == NULL) {
+        return;
+    }
+    r->pos++;
+    while (r->pos < r->n) {
+        if (r->s[r->pos] != close) {
+            r->pos++;
+        } else if (r->pos + 1 < r->n && r->s[r->pos + 1] == close) {
+            r->pos += 2;
+        } else {
+            r->pos++;
+            return;
+        }
+    }
+}
+
 /* A group, from the byte after its `(`. Returns NULL for a comment and
    for flags that apply to the rest of the enclosing group. */
 static struct node *parse_group(struct reader *r, size_t start)
@@ -870,6 +895,8 @@ static struct node *parse_group(struct reader *r, size_t start)
         skip_past(r, ')');
         return NULL;
     case 'C':
+        r->pos++;
+        skip_callout(r);
         skip_past(r, ')');
         group->kind = NODE_EMPTY;
         group->span.end = r->pos;
