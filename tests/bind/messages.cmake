@@ -165,6 +165,16 @@ anti_message(clang_packed_to_one_with_a_label_of_a_digit STATUS 0
     FILES api.h "#pragma pack(push, r2d2, 1)\nstruct PackOne { char a; int b; };\n#pragma pack(pop, r2d2)\nvoid take(struct PackOne *p);\n"
     OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
     ARGS ${clang_bind})
+# T314: `show` prints the pack and changes it not, so the struct after it
+# stays packed to one byte. clang writes the value it shows.
+anti_message(clang_packed_to_one_after_show STATUS 0
+    FILES api.h "#pragma pack(push, 1)\n#pragma pack(show)\nstruct PackShown { char a; int b; };\n#pragma pack(pop)\nvoid take(struct PackShown *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind}
+    ERR "api.h:2:9: warning: value of #pragma pack(show) == 1"
+        "    2 | #pragma pack(show)"
+        "      |         ^"
+        "1 warning generated.")
 # T311: clang declares a builtin that a body calls at the top of its AST,
 # marked implicit. No library defines it, so it is no function of the
 # header, and the shim of `hot` is the one function bound.

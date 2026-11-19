@@ -1436,29 +1436,64 @@ struct pack_stack {
 
 /* The pack after the pragma at, a `#pragma pack` line, from the pack
    before it: push, pop, a value and a push with a value, as MSVC and
-   clang read them. */
+   clang read them, and show. Each argument stands between commas, and the value is
+   the argument that starts with a digit, so a label such as `id1` sets
+   no pack, by T314 of docs/audit/tests-findings.md. */
 static int pragma_pack(const char *at, struct pack_stack *stack, int pack)
 {
     const char *args = strchr(at, '(');
+    const char *digit = NULL;
+    bool push = false;
+    bool pop = false;
+    bool show = false;
     int value = pack;
 
-    if (args != NULL && strstr(args, "pop") != NULL) {
-        value = stack->depth > 0 ? stack->items[--stack->depth] : 0;
-    } else if (args != NULL) {
-        const char *digit = args;
-        bool push = strstr(args, "push") != NULL;
-        int number;
-        while (*digit != '\0' && (*digit < '0' || *digit > '9')) {
-            digit++;
+    if (args == NULL) {
+        return pack;
+    }
+    for (at = args + 1; *at != '\0' && *at != ')' && *at != '\n';) {
+        const char *start;
+        size_t length;
+        while (*at == ' ' || *at == '\t') {
+            at++;
         }
+        start = at;
+        while (*at != '\0' && *at != ',' && *at != ')' && *at != '\n') {
+            at++;
+        }
+        length = (size_t)(at - start);
+        while (length > 0 &&
+               (start[length - 1] == ' ' || start[length - 1] == '\t')) {
+            length--;
+        }
+        if (length == 4 && strncmp(start, "push", 4) == 0) {
+            push = true;
+        } else if (length == 3 && strncmp(start, "pop", 3) == 0) {
+            pop = true;
+        } else if (length == 4 && strncmp(start, "show", 4) == 0) {
+            show = true;
+        } else if (length > 0 && *start >= '0' && *start <= '9') {
+            digit = start;
+        }
+        if (*at == ',') {
+            at++;
+        }
+    }
+    if (show) {
+        /* `show` prints the pack and changes nothing. */
+        return pack;
+    }
+    if (pop) {
+        value = stack->depth > 0 ? stack->items[--stack->depth] : 0;
+    } else {
+        int number = digit != NULL ? leading_int(digit) : -1;
         if (push && stack->depth <
                         (int)(sizeof stack->items / sizeof stack->items[0])) {
             stack->items[stack->depth++] = pack;
         }
-        number = leading_int(digit);
         /* clang ignores a value that does not fit, and the
            pack stays as it was. */
-        if (*digit == '\0') {
+        if (digit == NULL) {
             value = push ? pack : 0;
         } else if (number >= 0) {
             value = number;
