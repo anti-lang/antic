@@ -148,6 +148,30 @@ anti_message(trace_lines_of_windows
     SETUP pack_archive
     ARGS ${resolve}
     OUT "first" "second" "last")
+# T310: a NUL byte of a trace, as of a log the trace was pasted from, is
+# a byte of its line, and every line after it comes out as it went in.
+# CMake holds no NUL in a string, so the trace joins the NUL file of
+# tests/errors/ between two parts, and the output the case reads has lost
+# the NUL.
+function(trace_with_a_nul)
+    get_filename_component(tables "${TABLE}" DIRECTORY)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E cat "${PROJECT}/before.txt"
+                            "${tables}/../errors/nul_byte.bin"
+                            "${PROJECT}/after.txt"
+                    OUTPUT_FILE "${PROJECT}/trace.txt"
+                    RESULT_VARIABLE status)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the trace was not written")
+    endif()
+    pack_archive()
+endfunction()
+anti_message(trace_with_a_nul_byte
+    STATUS 0
+    FILES before.txt "${module}\nnote " after.txt "of the log\n${frame}\n"
+          archive/prog.map "${map}"
+    SETUP trace_with_a_nul
+    ARGS ${resolve}
+    OUT "${module}" "note of the log" "${frame} good src/good.anti:7")
 # R183 of "Rules of 2026-10-13" in docs/decisions.md: an archive without
 # the debug link answers a frame through its map. The offset of a frame of
 # Linux counts from address 0.

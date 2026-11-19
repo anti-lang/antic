@@ -101,6 +101,12 @@ struct FormsKept
 };
 #pragma pack(pop)
 
+/* T312: a typedef of a pointer or an array of a struct without a tag
+   names the pointer or the array, so the struct has no name and is not
+   bound. */
+typedef struct { int a; } *FormsHandle;
+typedef struct { int b; } FormsRow[4];
+
 /* A union that a typedef names without a tag. */
 typedef union { int i; float f; } FormsEither;
 

@@ -155,6 +155,31 @@ anti_message(clang_struct_without_a_field STATUS 0
     OUT "bind: anti.api from api.h, 1 functions, 1 warning"
     ARGS ${clang_bind}
     ERR "anti: api.h: warning: `Empty` has no field and is left out")
+# T314: the value of `#pragma pack` is the number among its arguments, so
+# a label before it, or a label that holds a digit, changes no pack.
+anti_message(clang_packed_to_four_with_a_label
+    FILES api.h "#pragma pack(push, id1, 4)\nstruct PackFour { char a; int b; };\n#pragma pack(pop, id1)\nvoid take(struct PackFour *p);\n"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: `PackFour` is packed to more than one byte, which Anti has no form for")
+anti_message(clang_packed_to_one_with_a_label_of_a_digit STATUS 0
+    FILES api.h "#pragma pack(push, r2d2, 1)\nstruct PackOne { char a; int b; };\n#pragma pack(pop, r2d2)\nvoid take(struct PackOne *p);\n"
+    OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
+    ARGS ${clang_bind})
+# T311: clang declares a builtin that a body calls at the top of its AST,
+# marked implicit. No library defines it, so it is no function of the
+# header, and the shim of `hot` is the one function bound.
+anti_message(clang_implicit_builtin STATUS 0
+    FILES api.h "static inline int hot(int x) { return __builtin_expect(x, 1); }\n"
+    OUT "bind: anti.api from api.h, 1 functions and a shim, 0 warnings"
+    ARGS ${clang_bind})
+# T313: a compound literal is a constant of its struct when nothing
+# follows its `}`. A member of one is a value of another type, which the
+# evaluator does not read.
+anti_message(clang_compound_literal_with_a_member STATUS 0
+    FILES api.h "typedef struct Color { unsigned char r, g, b, a; } Color;\n#define RED_R (Color){ 230, 41, 55, 255 }.r\n"
+    OUT "bind: anti.api from api.h, 0 functions, 1 warning"
+    ARGS ${clang_bind}
+    ERR "anti: api.h: warning: the macro `RED_R` is no constant and is skipped")
 anti_message(clang_aligned_without_a_value
     FILES api.h "struct __attribute__((aligned)) Most { int a; };\nvoid take(struct Most *m);\n"
     ARGS ${clang_bind}

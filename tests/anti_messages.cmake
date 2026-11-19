@@ -36,6 +36,16 @@ anti_message(license_from_no_notice
 anti_message(license_from_absent
     ARGS license --from none --runtime "${RUNTIME}"
     ERR "anti: cannot read none")
+# T309: a word after an option that takes a value is its value, by the
+# [provisional] entry of R155, so --notice and --project there name a
+# binary and a runtime archive and no form of the command.
+anti_message(license_from_an_option_word
+    ARGS license --from --notice --runtime "${RUNTIME}"
+    ERR "anti: cannot read --notice")
+anti_message(license_runtime_an_option_word
+    DIRECTORIES --project/licenses
+    ARGS license --runtime --project
+    ERR "anti: --project/licenses holds no licence text, so --project is no runtime archive")
 # A notice ends at its end marker, so the bytes of a program that lacks
 # the marker hold none.
 set(license_id "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
