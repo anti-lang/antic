@@ -735,18 +735,23 @@ static enum state state_of(const struct binary *b,
     return MISSING;
 }
 
-/* Write a literal string of TOML, which takes every byte but the quote
-   and the end of a line as it stands. A path of Windows keeps its
-   backslashes that way. */
+/* Write a string of TOML in quotes it does not hold, as index_string of
+   src/antic/driver_index.c writes one. The subset of src/rt/toml.c reads
+   the bytes between the quotes as they stand, so a path of Windows keeps
+   its backslashes, and a name that holds `'` stands in double quotes, by
+   T336 of docs/audit/tests-findings.md. A byte the subset cannot hold,
+   the other quote beside `'` or the end of a line, is left out. */
 static void toml_literal(struct text *out, const char *key, const char *value)
 {
-    text_appendf(out, "%s = '", key);
+    char quote = strchr(value, '\'') != NULL ? '"' : '\'';
+
+    text_appendf(out, "%s = %c", key, quote);
     for (; *value != '\0'; value++) {
-        if (*value != '\'' && *value != '\n' && *value != '\r') {
+        if (*value != quote && *value != '\n' && *value != '\r') {
             text_append_bytes(out, value, 1);
         }
     }
-    text_append(out, "'\n");
+    text_appendf(out, "%c\n", quote);
 }
 
 int syms_inventory(const char *conf, const char *from, const char *out)
