@@ -713,6 +713,11 @@ struct frame {
     enum brace_kind kind;
     bool inlined;               /* the `}` stands on the line of the `{` */
     bool from_do;               /* `do {`, so `} while` joins */
+    /* The block of a handler, `catch e { }`, stands inside an expression,
+       which goes on after its `}`, by T323 of
+       docs/audit/tests-findings.md. The handler of a `try` block opens a
+       statement of its own, which its `}` ends. */
+    bool handler;
     struct statement saved;
     /* The body of an anonymous function interrupts an expression. The
        indent, the continuation and the open brackets of the line it
@@ -1622,6 +1627,12 @@ static void emit_anonymous_close(struct emitter *e, const struct piece *p,
     free(f->bracket_type);
 }
 
+/* Whether the piece p is the token kind. */
+static bool is_token(const struct piece *p, enum token_kind kind)
+{
+    return p != NULL && p->kind == PIECE_TOKEN && p->token->kind == kind;
+}
+
 static void emit_brace_open(struct emitter *e, const struct piece_list *l,
                             const struct piece *p)
 {
@@ -1657,6 +1668,10 @@ static void emit_brace_open(struct emitter *e, const struct piece_list *l,
     f.kind = kind;
     f.inlined = inlined;
     f.from_do = e->stmt.first == TOKEN_DO;
+    f.handler = e->stmt.first != TOKEN_CATCH && e->stmt.first != TOKEN_TRY &&
+                (is_token(e->prev, TOKEN_CATCH) ||
+                 (is_token(e->prev, TOKEN_IDENT) &&
+                  is_token(e->prev2, TOKEN_CATCH)));
     f.saved = e->stmt;
     append_piece(e, p, space_before(e, p));
     push_frame(e, f);
@@ -1687,7 +1702,7 @@ static void emit_brace_close(struct emitter *e, const struct piece *p)
     if (f.inlined) {
         e->inlined--;
         append_piece(e, p, true);
-        if (f.kind == BRACE_LITERAL) {
+        if (f.kind == BRACE_LITERAL || f.handler) {
             e->stmt = f.saved;
         } else {
             reset_statement(e);
@@ -1700,7 +1715,7 @@ static void emit_brace_close(struct emitter *e, const struct piece *p)
         e->depth--;
     }
     append_piece(e, p, false);
-    if (f.kind == BRACE_LITERAL) {
+    if (f.kind == BRACE_LITERAL || f.handler) {
         e->stmt = f.saved;
     } else {
         reset_statement(e);
