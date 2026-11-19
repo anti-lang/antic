@@ -1357,6 +1357,28 @@ since it reads the tokens alone. The other sides of `src/anti/fmt.c` stay
 as batches 3l and 3q sorted them, beside the code of the fixes of batch
 3ad.
 
+## The sides of batch 3af
+
+Batch 3af of the third phase read the reflection runtime of
+`src/rt/reflect.c` and `src/rt/call.c` against the records of the
+descriptors that `src/antic/lower_desc.c` writes and the trampolines of
+`src/antic/whole_tables.c`. It fixed T346 to T348 there and T349 in
+`src/antic/lower.c`, and tested `get` and `set` over a field of each
+width and an index below zero.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `anti_rt_reflect_class_name`, `anti_rt_reflect_parent`, `anti_rt_reflect_field_count`, `field_at`, `anti_rt_reflect_function_count` and `function_at` of `src/rt/reflect.c` | A descriptor that is `NULL`. | Every function of `anti.reflect` takes the descriptor as `*byte`, which never holds `none`, and C alone could pass one. |
+| `field_at` and `function_at` of `src/rt/reflect.c` | A descriptor without its list of fields or of functions. | `--no-reflect` drops the lists, and antic refuses a call of `anti.reflect` in such a build. |
+| `anti_rt_reflect_get` and `anti_rt_reflect_set` of `src/rt/reflect.c` | An object that is `NULL`. | `get` and `set` take the object as `*byte`, which never holds `none`. |
+| `value_type_name` of `src/antic/lower_desc.c` | An enum without its underlying integer. | The checker gives every enum a base, `int` when it names none. |
+| `signature_text` of `src/antic/lower_desc.c` | A function without a type, and a type that is no function type. | `class_functions` passes the symbol of a function of the table, which the checker typed. |
+
+The sides left unsorted: `value_type_name` of `src/antic/lower_desc.c`
+for a `c_long`, a `c_ulong` or a `c_wchar` in the structural hash of an
+interface, which a program reaches with an abstract class whose function
+takes one. No test reads that hash against the one a plugin carries.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
