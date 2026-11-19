@@ -160,8 +160,10 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 /// float narrows to the field's type. A float narrows to an `f16` field through
 /// `f32`, as `as f16` takes one. An index out of range, a field that no `Value`
 /// carries and a value of another kind each fail with the code that names the
-/// reason, and write nothing. `d` describes the class of `object` or a base of
-/// it, as for `get`.
+/// reason, and write nothing. An `own` field fails with `NOT_CARRIED`, since
+/// the pointer of a `Value` stays the caller's and a write would give the
+/// object a second owner. `d` describes the class of `object` or a base of it,
+/// as for `get`.
 pub fn set(object: *byte, d: *byte, index: int, value: Value) may fail
 {
 	let v = value;
@@ -282,8 +284,9 @@ pub fn of_ptr(v: *byte) -> Value
 /// object as any call does. The result is the value the function returns, which
 /// is of kind `None` for a function without a result. An index out of range
 /// fails with the code `BAD_INDEX`, and a signature with a type that no `Value`
-/// carries with `NOT_CARRIED`. Arguments of another count fail with
-/// `WRONG_COUNT`, and of another kind with `WRONG_KIND`.
+/// carries with `NOT_CARRIED`, and so do a function that may fail and one with
+/// an `own` parameter. Arguments of another count fail with `WRONG_COUNT`, and
+/// of another kind with `WRONG_KIND`.
 pub fn call(object: *Object, index: int, args: []Value) -> Value may fail
 {
 	let result = nothing();

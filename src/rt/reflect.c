@@ -208,8 +208,12 @@ int64_t anti_rt_reflect_set(void *object, const struct anti_descriptor *d,
     if (f == NULL || object == NULL) {
         return ANTI_REFLECT_BAD_INDEX;
     }
+    /* DESIGN: an `own` field owns what it holds, and a pointer of a Value
+       stays its caller's, so a write would give the object a second owner
+       and lose the one the field held. set passes over the field, as over
+       an `own fn` field, by T348 of docs/audit/tests-findings.md. */
     kind = value_kind(f->type);
-    if (kind == ANTI_VALUE_NONE) {
+    if (kind == ANTI_VALUE_NONE || f->owned != 0) {
         return ANTI_REFLECT_NOT_CARRIED;
     }
     if (value->kind != kind) {

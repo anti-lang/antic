@@ -1072,19 +1072,36 @@ static bool signature_code(const struct type *fn, bool wide,
     return true;
 }
 
+/* Whether the function sym names takes a parameter after self with
+   `own`. A pointer of a Value stays its caller's, so an argument there
+   would give the object a second owner, by T348 of
+   docs/audit/tests-findings.md. */
+static bool takes_owned(const struct symbol *sym)
+{
+    size_t i;
+
+    for (i = 1; sym->owned != NULL && i < sym->owned_count; i++) {
+        if (sym->owned[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* DESIGN: the table entry of a function that may fail returns the error
    and takes an out pointer for its result, which no Value carries, so the
    function has no text and reflect.call refuses it with NOT_CARRIED, by
    T347 of docs/audit/tests-findings.md. */
 static const struct ir_global *signature_text(struct lowerer *l,
-                                              const struct type *fn)
+                                              const struct symbol *sym)
 {
+    const struct type *fn = sym->type;
     struct token_text text;
     struct text code = {0};
     const struct ir_global *g;
 
     if (fn == NULL || (fn->kind == TYPE_FN && fn->may_fail) ||
-        !signature_code(fn, true, &code)) {
+        takes_owned(sym) || !signature_code(fn, true, &code)) {
         text_free(&code);
         return NULL;
     }
@@ -1138,7 +1155,7 @@ static struct ir_global *class_functions(struct lowerer *l,
         const struct item *fn = table.entries[i].fn;
         const struct ir_global *signature =
             fn != NULL && fn->symbol != NULL
-                ? signature_text(l, fn->symbol->type)
+                ? signature_text(l, fn->symbol)
                 : NULL;
         text.bytes = table.entries[i].name.text;
         text.length = table.entries[i].name.length;
