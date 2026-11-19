@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "bindexpr.h"
+#include "../rt/utf.h"
 
 /* DESIGN: the evaluator recurses once per prefix operator, cast and
    parenthesis. It recurses once more per macro a name leads it into,
@@ -698,6 +699,24 @@ void bind_float_text(double f, const char *type, struct text *out)
     text_free(&number);
 }
 
+/* Whether the bytes of s are UTF-8, which a `str` of Anti holds alone. */
+static bool utf8_text(const char *s)
+{
+    const unsigned char *p = (const unsigned char *)s;
+    size_t n = strlen(s);
+    size_t length;
+
+    while (n > 0) {
+        anti_rt_utf8_decode(p, n, &length);
+        if (length == 0) {
+            return false;
+        }
+        p += length;
+        n -= length;
+    }
+    return true;
+}
+
 static void string_text(const char *s, struct text *out)
 {
     const unsigned char *p = (const unsigned char *)s;
@@ -765,6 +784,13 @@ bool bind_eval_const(struct bind_module *b, const char *name,
         bind_float_text(v->f, v->type, &value);
         break;
     case BIND_EVAL_STRING:
+        /* A string of bytes that are no UTF-8 is no constant of Anti,
+           and the caller skips the macro with a warning, by T340 of
+           docs/audit/tests-findings.md. */
+        if (!utf8_text(v->text)) {
+            text_free(&value);
+            return false;
+        }
         c->type = "str";
         string_text(v->text, &value);
         break;
