@@ -584,8 +584,12 @@ struct type *sema_check_simd_value(struct checker *c, struct expr *e,
                               sema_check_expr(c, args[i + 1], i64), i64)) {
                 return sema_builtin(c, TYPE_ERROR);
             }
-            if (!sema_eval_const(c, args[i + 1], &v) || v.kind != CONST_INT ||
-                v.as.integer >= want) {
+            /* T315: an index that is no constant has had the message of
+               the constant, as it has in every place that takes one. */
+            if (!sema_eval_const(c, args[i + 1], &v)) {
+                return sema_builtin(c, TYPE_ERROR);
+            }
+            if (v.kind != CONST_INT || v.as.integer >= want) {
                 sema_error_at(c, args[i + 1]->pos, "`" SIMD_SHUFFLE "` takes "
                               "constant lane indexes from 0 to %zu", want - 1);
                 return sema_builtin(c, TYPE_ERROR);
