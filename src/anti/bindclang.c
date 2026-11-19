@@ -757,6 +757,30 @@ static int pack_at(const struct reader *r, size_t header, int64_t line)
 
 static void declare_enum(struct reader *r, const struct json_value *node);
 
+/* Whether the typedef node names the record itself, the record or a
+   qualified form of it, and no pointer or array of it. `typedef struct {
+   int a; } *P;` names a pointer, so the struct has no name of C and is
+   not bound, by T312 of docs/audit/tests-findings.md. */
+static bool names_record(const struct json_value *typedef_node,
+                         const struct json_value *record)
+{
+    const char *id = json_member_string(record, "id");
+    const struct json_value *type = typedef_node;
+    const char *kind;
+    const char *named;
+
+    do {
+        const struct json_value *inner = json_get(type, "inner");
+        if (inner == NULL || inner->count == 0) {
+            return false;
+        }
+        type = inner->items[0];
+        kind = json_member_string(type, "kind");
+    } while (kind != NULL && strcmp(kind, "QualType") == 0);
+    named = json_member_string(json_get(type, "decl"), "id");
+    return id != NULL && named != NULL && strcmp(named, id) == 0;
+}
+
 static struct bind_record *declare_record(struct reader *r,
                                           const struct json_value *node,
                                           const char *name);
@@ -1843,13 +1867,13 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
                 declare_record(&r, node, name);
             } else if (strcmp(kind, "RecordDecl") == 0) {
                 /* An anonymous record takes its name from the typedef
-                   after it. */
+                   after it, when that typedef names the record itself. */
                 const struct json_value *next =
                     i + 1 < inner->count ? inner->items[i + 1] : NULL;
                 const char *next_kind = json_member_string(next, "kind");
                 const char *tname = json_member_string(next, "name");
                 if (next_kind != NULL && strcmp(next_kind, "TypedefDecl") == 0 &&
-                    tname != NULL) {
+                    tname != NULL && names_record(next, node)) {
                     const char *tag_used = json_member_string(node, "tagUsed");
                     hold_name(&r, tag_used != NULL &&
                                           strcmp(tag_used, "union") == 0
