@@ -5707,6 +5707,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "plugin_instance_of_a_long_path|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_a_long_path.anti"
         "plugin_instance_of_an_optional_path|--front-end,--runtime,${ANTIC_RUNTIME_DIR},plugin_instance_of_an_optional_path.anti"
         "simd_lanes_compared|--front-end,simd_lanes_compared.anti"
+        "simd_shuffle_of_a_variable|--front-end,simd_shuffle_of_a_variable.anti"
         "switch_refused_returns|--front-end,switch_refused_returns.anti"
         "expression_operands|--front-end,--runtime,${ANTIC_RUNTIME_DIR},expression_operands.anti"
         "generic_arguments_unbound|--front-end,generic_arguments_unbound.anti"

@@ -1,0 +1,1 @@
+simd_shuffle_of_a_variable.anti:9:19: error: a variable is not a constant expression

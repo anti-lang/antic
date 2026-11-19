@@ -83,6 +83,11 @@ pub struct FormsKept
 	i: c_int,
 }
 
+pub struct FormsFixed
+{
+	c: c_int,
+}
+
 pub union FormsEither
 {
 	i: c_int,

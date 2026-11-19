@@ -107,6 +107,9 @@ struct FormsKept
 typedef struct { int a; } *FormsHandle;
 typedef struct { int b; } FormsRow[4];
 
+/* A typedef of a qualified struct without a tag names the struct. */
+typedef const struct { int c; } FormsFixed;
+
 /* A union that a typedef names without a tag. */
 typedef union { int i; float f; } FormsEither;
 

@@ -1,0 +1,15 @@
+//! `shuffle` with a lane index read at run time. The index that is no constant
+//! is the mistake and gets the one message, as a variable gets in every place
+//! that takes a constant.
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+fn pick(v: Vec4, k: int) -> Vec4
+{
+	return v.shuffle(k, 0, 1, 2);
+}
+
+fn main() -> int
+{
+	return 0;
+}
