@@ -975,7 +975,7 @@ anti_message(fault_out_of_memory_in_the_manifest_reader
     FAULT alloc:4:ENOMEM
     STATUS 70
     ARGS build ${tools}
-    ERR "anti: out of memory for 80 bytes")
+    ERR "anti: out of memory for 88 bytes")
 anti_message(fault_out_of_memory_in_the_code_of_antic
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     FAULT alloc:10:ENOMEM

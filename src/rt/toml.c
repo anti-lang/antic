@@ -40,20 +40,20 @@ struct pair {
     int64_t shape;      /* an enum anti_toml_shape */
 };
 
-/* A path that keys stand under, the first length bytes of the key of the
-   pair at pair, and the largest number that follows it and a dot in any
-   key, or -1. */
+/* A path that keys stand under, the first length bytes of key, the key
+   of a pair or the path of an empty array or table, and the largest
+   number that follows it and a dot in any of them, or -1. */
 struct under {
-    size_t pair;
+    const char *key;
     size_t length;
     uint64_t hash;
     int64_t largest;
 };
 
 /* names is a table of open addressing of room slots, a power of two, and
-   holds the paths of the first indexed pairs. A slot of length 0 is
-   free. empties holds the path and the shape of every empty array and
-   table, which no pair stands under. */
+   holds the paths of the first indexed pairs and the first empties_indexed
+   empties. A slot of length 0 is free. empties holds the path and the
+   shape of every empty array and table, which no pair stands under. */
 struct anti_toml {
     struct pair *pairs;
     size_t count;
@@ -65,6 +65,7 @@ struct anti_toml {
     size_t room;
     size_t names_count;
     size_t indexed;
+    size_t empties_indexed;
 };
 
 struct reader {
@@ -223,7 +224,7 @@ static struct under *slot_of(const struct anti_toml *doc, const char *name,
 
     while (doc->names[i].length != 0 &&
            !(doc->names[i].hash == h && doc->names[i].length == length &&
-             memcmp(doc->pairs[doc->names[i].pair].key, name, length) == 0)) {
+             memcmp(doc->names[i].key, name, length) == 0)) {
         i = (i + 1) & mask;
     }
     return &doc->names[i];
@@ -247,21 +248,22 @@ static void grow_names(struct anti_toml *doc)
     }
     for (i = 0; i < old_room; i++) {
         if (old[i].length != 0) {
-            const char *name = doc->pairs[old[i].pair].key;
+            const char *name = old[i].key;
             *slot_of(doc, name, old[i].length, old[i].hash) = old[i];
         }
     }
     free(old);
 }
 
-/* Note the key of the pair at index under each of its paths that ends
-   before a dot, with the number that follows the dot. A `[[name]]` header
-   holds bare bytes and dots alone, so the paths stop at the first other
-   byte. */
-static void index_pair(struct anti_toml *doc, size_t index)
+/* Note the key of a pair, or the path of an empty array or table, under
+   each of its paths that ends before a dot, with the number that follows
+   the dot. A `[[name]]` header holds bare bytes and dots alone, so the
+   paths stop at the first other byte. The key stays where it is until the
+   document is freed. */
+static void index_key(struct anti_toml *doc, const struct pair *pair)
 {
-    const char *key = doc->pairs[index].key;
-    size_t length = (size_t)doc->pairs[index].key_length;
+    const char *key = pair->key;
+    size_t length = (size_t)pair->key_length;
     uint64_t h = 0xcbf29ce484222325u;
     size_t from = 0;
     size_t p;
@@ -279,7 +281,7 @@ static void index_pair(struct anti_toml *doc, size_t index)
         }
         slot = slot_of(doc, key, p, h);
         if (slot->length == 0) {
-            slot->pair = index;
+            slot->key = key;
             slot->length = p;
             slot->hash = h;
             slot->largest = -1;
@@ -294,8 +296,12 @@ static void index_pair(struct anti_toml *doc, size_t index)
 
 /* The count of `[[name]]` tables seen so far under that name: one past
    the largest number that follows the name and a dot in any key read so
-   far. It is -1 when that number is the limit of `int64_t`, which leaves
-   no next count.
+   far, or in the path of an empty array or table. It is -1 when that
+   number is the limit of `int64_t`, which leaves no next count.
+
+   T308 of docs/audit/tests-findings.md: a table that holds no key, or
+   empty arrays and tables alone, counts as well, so the table after it
+   takes the next number and never the one of that table.
 
    DESIGN: the paths of the keys are indexed once each, at the first
    header after them, so a header costs the same whatever was read before
@@ -306,7 +312,10 @@ static int64_t repeats(struct anti_toml *doc, const char *name, size_t length)
     const struct under *slot;
 
     for (; doc->indexed < doc->count; doc->indexed++) {
-        index_pair(doc, doc->indexed);
+        index_key(doc, &doc->pairs[doc->indexed]);
+    }
+    for (; doc->empties_indexed < doc->empty_count; doc->empties_indexed++) {
+        index_key(doc, &doc->empties[doc->empties_indexed]);
     }
     if (doc->room == 0) {
         return 0;
