@@ -185,8 +185,31 @@ static enum token_kind kind_at(const struct piece_list *l, size_t i)
     return l->items[i].token->kind;
 }
 
+/* Whether a struct literal opens between the pieces from and to: a `{`
+   after a name or after the `>` of type arguments, where the name does
+   not follow `catch`. Without the parentheses around a condition the
+   parser reads such a `{` as the block, by T322 of
+   docs/audit/tests-findings.md. */
+static bool holds_literal(const struct piece_list *l, size_t from, size_t to)
+{
+    size_t k;
+
+    for (k = from; k < to; k++) {
+        enum token_kind before = kind_at(l, k - 1);
+        if (kind_at(l, k) != TOKEN_LBRACE) {
+            continue;
+        }
+        if (before == TOKEN_GT || before == TOKEN_SHR ||
+            (before == TOKEN_IDENT && kind_at(l, k - 2) != TOKEN_CATCH)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* The `}` of every `{`, and the parentheses that stand around a whole
-   condition, which the canonical form drops. */
+   condition, which the canonical form drops unless they hold a struct
+   literal. */
 static void pair_braces(struct piece_list *l)
 {
     size_t *open = files_array(l->count + 1, sizeof *open);
@@ -214,8 +237,9 @@ static void pair_braces(struct piece_list *l)
             nesting += kind_at(l, j) == TOKEN_LPAREN;
             nesting -= kind_at(l, j) == TOKEN_RPAREN;
         }
-        if (nesting > 0 || (kind_at(l, j) != TOKEN_LBRACE &&
-                            kind_at(l, j) != TOKEN_DO)) {
+        if (nesting > 0 ||
+            (kind_at(l, j) != TOKEN_LBRACE && kind_at(l, j) != TOKEN_DO) ||
+            holds_literal(l, i + 2, j - 1)) {
             continue;
         }
         l->items[i + 1].dropped = true;

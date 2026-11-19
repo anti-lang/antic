@@ -17,7 +17,8 @@ of the bytes.
 Every piece carries the line it starts on and the line it ends on. It carries as
 well whether nothing but whitespace stands before it, and whether an empty line
 does. A second pass pairs each `{` with its `}`. It marks the parentheses around
-a whole condition, which the canonical form drops.
+a whole condition, which the canonical form drops unless a struct literal stands
+inside them.
 
 ## The line breaks
 
