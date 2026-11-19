@@ -36,6 +36,9 @@ one, and the rules move the breaks they name:
   opens the next line, at the indent of the statement.
 - An ordinary comment behind the `{` of a body that spans lines stays on the
   line of the brace, which ends after it.
+- A rule that reads the token before a piece reads it past an ordinary
+  comment: the `=` before the `fn` of an anonymous function, the `catch` before
+  the brace of a handler and the `}` before the `while` of a `do` block.
 - Every line ends with LF. The CR of a CRLF stays out of a comment and of a
   string literal, whose value the lexer reads with LF alone.
 

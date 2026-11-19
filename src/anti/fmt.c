@@ -756,6 +756,10 @@ struct emitter {
        T174 of docs/audit/tests-findings.md. */
     const struct piece *tok;
     const struct piece *tok2;
+    /* The last token written, on this line or an earlier one, which a
+       comment after it leaves in place, by T335 of
+       docs/audit/tests-findings.md. */
+    const struct piece *last;
     bool prev_prefix;           /* the last piece is a prefix operator */
     struct frame *frames;
     size_t frame_count;
@@ -1131,6 +1135,7 @@ static void append_piece(struct emitter *e, const struct piece *p, bool space)
     if (p->kind == PIECE_TOKEN) {
         e->tok2 = e->tok;
         e->tok = p;
+        e->last = p;
     }
     e->type_bracket = false;
 }
@@ -1642,27 +1647,30 @@ static void emit_comment(struct emitter *e, const struct piece *p)
 }
 
 /* Whether the `while` of a `do` block follows the brace that closed it,
-   so that the two stand on one line. */
+   so that the two stand on one line. A comment between them stands
+   between two tokens, and the `while` still follows the brace. */
 static bool joins_do(const struct emitter *e, size_t i)
 {
-    return e->after_do && e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
-           e->prev->token->kind == TOKEN_RBRACE && i > 0;
+    return e->after_do && e->last != NULL &&
+           e->last->token->kind == TOKEN_RBRACE && i > 0;
 }
 
 /* Whether the `fn` about to be written opens an anonymous function: one
    that stands where a value starts, inside a statement already open. A
    `fn` after `:`, `->`, `as` or `?` writes a type. A `fn` after the word
-   `snapshot` stands where the word stood. */
+   `snapshot` stands where the word stood. The tokens before it count, and
+   a comment between them and the `fn` changes nothing, by T335 of
+   docs/audit/tests-findings.md. */
 static bool anonymous_fn(const struct emitter *e)
 {
-    const struct piece *before = e->prev;
+    const struct piece *before = e->tok;
 
     if (!e->stmt.open || before == NULL || before->kind != PIECE_TOKEN) {
         return false;
     }
     if (before->token->kind == TOKEN_IDENT && before->length == 8 &&
         memcmp(e->src + before->offset, "snapshot", 8) == 0) {
-        before = e->prev2;
+        before = e->tok2;
         if (before == NULL || before->kind != PIECE_TOKEN) {
             return false;
         }
@@ -1801,9 +1809,9 @@ static void emit_brace_open(struct emitter *e, const struct piece_list *l,
     f.inlined = inlined;
     f.from_do = e->stmt.first == TOKEN_DO;
     f.handler = e->stmt.first != TOKEN_CATCH && e->stmt.first != TOKEN_TRY &&
-                (is_token(e->prev, TOKEN_CATCH) ||
-                 (is_token(e->prev, TOKEN_IDENT) &&
-                  is_token(e->prev2, TOKEN_CATCH)));
+                (is_token(e->tok, TOKEN_CATCH) ||
+                 (is_token(e->tok, TOKEN_IDENT) &&
+                  is_token(e->tok2, TOKEN_CATCH)));
     f.saved = e->stmt;
     append_piece(e, p, space_before(e, p));
     push_frame(e, f);
