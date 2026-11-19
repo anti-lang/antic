@@ -11,4 +11,6 @@
              {"name": "TOO_MANY", "type": "COLOR", "value": "CLITERAL(Pix){ 1, 2, 3 }"},
              {"name": "TOO_FEW", "type": "COLOR", "value": "CLITERAL(Pix){ 1 }"},
              {"name": "NO_NUMBER", "type": "COLOR", "value": "CLITERAL(Pix){ a, b }"},
-             {"name": "PAST_LONG_LONG", "type": "COLOR", "value": "CLITERAL(Pix){ 9223372036854775808, 1 }"}]}
+             {"name": "PAST_LONG_LONG", "type": "COLOR", "value": "CLITERAL(Pix){ 9223372036854775808, 1 }"},
+             {"name": "TABBED", "type": "COLOR", "value": "CLITERAL(Pix){ 5, 6 }\t"},
+             {"name": "MEMBER", "type": "COLOR", "value": "CLITERAL(Pix){ 1, 2 }.r"}]}

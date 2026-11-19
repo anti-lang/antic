@@ -175,10 +175,10 @@ anti_message(clang_packed_to_one_after_show STATUS 0
         "    2 | #pragma pack(show)"
         "      |         ^"
         "1 warning generated.")
-# clang -E writes a pragma as it stands, so the blanks around each
+# clang -E writes a pragma as it stands, so the spaces and tabs around each
 # argument of `#pragma pack` are no part of it.
 anti_message(clang_packed_with_blanks_around_the_arguments STATUS 0
-    FILES api.h "#pragma pack( push , id , 1 )\nstruct PackSpaced { char a; int b; };\n#pragma pack( pop , id )\nvoid take(struct PackSpaced *p);\n"
+    FILES api.h "#pragma pack( push ,\tid , 1\t)\nstruct PackSpaced { char a; int b; };\n#pragma pack( pop , id )\nvoid take(struct PackSpaced *p);\n"
     OUT "bind: anti.api from api.h, 1 functions, 0 warnings"
     ARGS ${clang_bind})
 # clang ignores `#pragma pack` without its parentheses, so the pack before
