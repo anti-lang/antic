@@ -344,6 +344,8 @@ static void doc_check_text(const struct doc_scope *s,
     bool image = false;
     bool html = false;
     bool emphasis = false;
+    bool code = false;
+    size_t span = 0;
     size_t start = 0;
 
     /* An item without a doc comment has no text, and NULL + 0 is
@@ -356,8 +358,6 @@ static void doc_check_text(const struct doc_scope *s,
         size_t end = start;
         size_t lead = 0;
         size_t i;
-        bool code = false;
-        size_t span = 0;
         while (end < doc->length && doc->text[end] != '\n') {
             end++;
         }
@@ -365,7 +365,14 @@ static void doc_check_text(const struct doc_scope *s,
                (line[lead] == ' ' || line[lead] == '\t')) {
             lead++;
         }
+        /* A span runs on over the lines of its paragraph, as the page
+           renders it, and an empty line or a fence ends the paragraph,
+           by T328 of docs/audit/tests-findings.md. */
+        if (lead == end - start) {
+            code = false;
+        }
         if (end - start - lead >= 3 && memcmp(line + lead, "```", 3) == 0) {
+            code = false;
             fenced = !fenced;
             start = end + 1;
             continue;
@@ -397,10 +404,11 @@ static void doc_check_text(const struct doc_scope *s,
         for (i = lead; i < end - start; i++) {
             if (line[i] == '`') {
                 if (code) {
-                    doc_check_span(s, doc, owner, line + span, i - span);
+                    doc_check_span(s, doc, owner, doc->text + span,
+                                   start + i - span);
                 }
                 code = !code;
-                span = i + 1;
+                span = start + i + 1;
                 continue;
             }
             if (code) {
