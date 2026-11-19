@@ -698,7 +698,10 @@ static void page_render(struct text *out, const struct doc_page *p,
    name of the module. Its lines are joined with a space and rendered as
    one text, as doc_html renders a paragraph, so a code span or a link
    cut over two lines reads as on the page, by T327 of
-   docs/audit/tests-findings.md. */
+   docs/audit/tests-findings.md. The paragraph ends where doc_html ends
+   it: at an empty line, at a fence and at a line that opens an item of a
+   list. A text that opens with a fence or an item has no first
+   paragraph, by T337 of the same file. */
 static void first_paragraph(struct text *out, const struct text *doc,
                             const struct doc_page *page, enum doc_form form)
 {
@@ -707,7 +710,11 @@ static void first_paragraph(struct text *out, const struct text *doc,
 
     while (at < doc->length) {
         size_t end = line_of(doc->data, doc->length, at);
-        if (lead_of(doc->data, at, end) == end) {
+        size_t lead = lead_of(doc->data, at, end);
+        if (lead == end ||
+            (end - lead >= 3 && memcmp(doc->data + lead, "```", 3) == 0) ||
+            (end - lead >= 2 && doc->data[lead] == '-' &&
+             doc->data[lead + 1] == ' ')) {
             break;
         }
         text_appendf(&joined, "%s%.*s", at > 0 ? " " : "", (int)(end - at),
