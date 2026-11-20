@@ -114,15 +114,54 @@ static bool reserved(const struct name *name)
            name_among(name, macro_names, sizeof macro_names / sizeof *macro_names);
 }
 
-/* DESIGN: the header keeps the Anti name of a parameter, a field, a
-   constant and a type. A name that C or C++ reserves gets a trailing _, as
-   default_, by "The C view" of docs/anti-object-model.md and item 6 of
-   "Answers of 2026-11-19" in docs/decisions.md. A class keeps its name,
-   since its helpers and its descriptor are symbols that the name spells. */
-static void c_name(struct text *out, const struct name *name)
+/* DESIGN: an export constant of a number or a bool is a macro of the
+   header, which the preprocessor puts in place of every later word of its
+   name. The header write keeps the interfaces it writes here, so a name of
+   a parameter, a field or a type that a macro has gets a trailing _, by
+   T341 of docs/audit/tests-findings.md and item 7 of "Answers of
+   2026-11-19" in docs/decisions.md. The write is one call that ends before
+   another starts, and it sets both back to none at its end. */
+static const struct interface *const *macro_ifaces;
+static size_t macro_iface_count;
+
+/* Whether name is the macro of an export constant of the header. */
+static bool constant_macro(const struct name *name)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < macro_iface_count; i++) {
+        for (j = 0; j < macro_ifaces[i]->item_count; j++) {
+            const struct symbol *sym = macro_ifaces[i]->items[j];
+            if (sym->exported && sym->kind == SYMBOL_CONST &&
+                sym->value != NULL && sym->value->kind != CONST_TEXT &&
+                sym->name.length == name->length &&
+                memcmp(sym->name.text, name->text, name->length) == 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* The name of a constant, which a name that C or C++ reserves alone
+   changes. */
+static void macro_name(struct text *out, const struct name *name)
 {
     text_appendf(out, "%.*s%s", (int)name->length, name->text,
                  reserved(name) ? "_" : "");
+}
+
+/* DESIGN: the header keeps the Anti name of a parameter, a field, a
+   constant and a type. A name that C or C++ reserves gets a trailing _, as
+   default_, by "The C view" of docs/anti-object-model.md and item 6 of
+   "Answers of 2026-11-19" in docs/decisions.md, and so does the name of a
+   macro of the header. A class keeps its name, since its helpers and its
+   descriptor are symbols that the name spells. */
+static void c_name(struct text *out, const struct name *name)
+{
+    text_appendf(out, "%.*s%s", (int)name->length, name->text,
+                 reserved(name) || constant_macro(name) ? "_" : "");
 }
 
 /* DESIGN: `anti.lang.Error` crosses to C as `struct anti_Error *`, the
@@ -1555,7 +1594,7 @@ static void constant(struct text *out, const struct symbol *sym)
     struct text macro = {0};
     size_t i;
 
-    c_name(&macro, &sym->name);
+    macro_name(&macro, &sym->name);
     doc_comment(out, &sym->doc, "");
     switch (v->kind) {
     case CONST_BOOL:
@@ -1890,6 +1929,8 @@ void header_write(struct text *out, const char *name,
     size_t i;
     size_t j;
 
+    macro_ifaces = ifaces;
+    macro_iface_count = count;
     write_preamble(out, name, ifaces, count, bundled);
     write_vector_types(&body, ifaces, count);
     write_error_class(&body, ifaces, count);
@@ -1927,4 +1968,6 @@ void header_write(struct text *out, const char *name,
     text_append(out, "#ifdef __cplusplus\n}\n#endif\n\n#endif\n");
     text_free(&body);
     free((void *)done.items);
+    macro_ifaces = NULL;
+    macro_iface_count = 0;
 }
