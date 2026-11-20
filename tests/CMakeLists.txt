@@ -1877,6 +1877,12 @@ antic_check_test(narrow_surrogate "out of range"
 antic_check_test(narrow_enum "not declared by"
     "narrow_enum\\.anti:[0-9]+: value not declared by Kind: value 7"
     ON)
+antic_check_test(narrow_enum_from_u64 "not declared by"
+    "narrow_enum_from_u64\\.anti:[0-9]+: value not declared by Offset: value 18446744073709551615"
+    ON)
+antic_check_test(narrow_enum_from_negative "not declared by"
+    "narrow_enum_from_negative\\.anti:[0-9]+: value not declared by Mask: value -1"
+    ON)
 antic_check_test(divide "division by zero"
     "divide\\.anti:[0-9]+: division by zero in /: left 10"
     OFF)

@@ -1,0 +1,1 @@
+closures_parameter_in_a_repeated_array.anti:5:11: error: `f` is not marked `keep` and cannot be stored

@@ -1,0 +1,9 @@
+//! A closure by reference is held in a local of its function or passed as an
+//! argument, and a tuple that holds one could carry it past what it captures.
+
+fn main() -> int
+{
+	let n = 0;
+	let t = (fn() { n += 1; }, 2);
+	return t.1;
+}

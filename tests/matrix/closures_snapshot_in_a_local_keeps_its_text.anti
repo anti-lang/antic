@@ -1,0 +1,18 @@
+//! A snapshot copies the bytes of a `str` it captures, so the text it prints
+//! stays when the memory of the text it was made from is freed.
+
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let n = 4;
+	let name = f"report {n}";
+	let s = snapshot fn() { io.println(name); };
+	free(name.ptr);
+	let other = f"xxxxxxxx";
+	name = "draft";
+	s();
+	free(other.ptr);
+	return 0;
+}

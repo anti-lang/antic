@@ -1,0 +1,10 @@
+//! A local that holds a closure by reference does not go into an array, which
+//! could carry the closure past what it captures.
+
+fn main() -> int
+{
+	let n = 0;
+	let g = fn() { n += 1; };
+	let a = [g];
+	return a.len as int;
+}

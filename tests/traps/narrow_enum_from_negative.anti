@@ -1,0 +1,19 @@
+//! A negative value is no value of an enum over `u64`, although its bits are
+//! those of the largest value the enum declares.
+
+enum Mask: u64 { Empty = 0, Full = 18446744073709551615 }
+
+fn opaque(n: i32) -> i32
+{
+	return n;
+}
+
+fn sink(m: Mask)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(-1) as Mask);
+	return 7;
+}

@@ -1,0 +1,17 @@
+//! A parameter of function type that is not `keep` may hold a closure, so the
+//! repeat form of an array does not take it.
+
+fn fill(f: fn()) -> int
+{
+	let a = [f; 2];
+	return a.len as int;
+}
+
+fn nothing()
+{
+}
+
+fn main() -> int
+{
+	return fill(nothing);
+}

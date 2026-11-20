@@ -1,0 +1,19 @@
+//! A `u64` above the largest `i64` is no value of an enum over `i64`, although
+//! its bits are those of the `-1` the enum declares.
+
+enum Offset: i64 { Back = -1, Ahead = 1 }
+
+fn opaque(n: u64) -> u64
+{
+	return n;
+}
+
+fn sink(o: Offset)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(18446744073709551615) as Offset);
+	return 7;
+}
