@@ -38,7 +38,7 @@ extern fn anti_rt_reflect_set(object: ?*byte, d: ?*byte, index: int,
 	value: ?*Value) -> int;
 extern fn anti_rt_reflect_new(name: ?*byte, length: int) -> ?*Object;
 extern fn anti_rt_reflect_call(object: ?*Object, index: int, args: ?*Value,
-	count: int, result: ?*Value) -> int;
+	count: int, result: ?*Value, failed: ?*?*lang.Error) -> int;
 
 /// The type of a field, as its record names it.
 ///
@@ -285,14 +285,19 @@ pub fn of_ptr(v: *byte) -> Value
 /// object as any call does. The result is the value the function returns, which
 /// is of kind `None` for a function without a result. An index out of range
 /// fails with the code `BAD_INDEX`, and a signature with a type that no `Value`
-/// carries with `NOT_CARRIED`, and so do a function that may fail and one with
-/// an `own` parameter. Arguments of another count fail with `WRONG_COUNT`, and
-/// of another kind with `WRONG_KIND`.
+/// carries with `NOT_CARRIED`, and so does one with an `own` parameter. A
+/// function that may fail runs, and an error it fails with makes the call fail
+/// with that error. Arguments of another count fail with `WRONG_COUNT`, and of
+/// another kind with `WRONG_KIND`.
 pub fn call(object: *Object, index: int, args: []Value) -> Value may fail
 {
 	let result = nothing();
+	let failed: ?*lang.Error = none;
 	let reason = anti_rt_reflect_call(object, index, args.ptr, args.len,
-		&result);
+		&result, &failed);
+	if let e = failed {
+		fail e;
+	}
 	if reason == BAD_INDEX {
 		fail lang.Error.new(BAD_INDEX,
 			"the class has no public function at this index");

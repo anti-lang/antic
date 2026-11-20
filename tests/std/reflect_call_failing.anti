@@ -1,6 +1,6 @@
-//! `reflect.call` of a public function that may fail. The table entry of such a
-//! function returns the error and takes an out pointer for its result, which no
-//! `Value` carries, so the call fails with `NOT_CARRIED` and runs nothing.
+//! `reflect.call` of a public function that may fail. The call runs the
+//! function and gives its result, and a function that fails makes the call fail
+//! with its error, by 5 of "Answers of 2026-11-20" in `docs/decisions.md`.
 import anti.lang;
 import anti.reflect;
 
@@ -26,16 +26,23 @@ class Box
 		}
 		self.v = x;
 	}
+
+	pub fn named(self, x: int) -> str may fail
+	{
+		if x < 0 {
+			fail "below zero";
+		}
+		return "named";
+	}
 }
 
-/// Call the function at `index` of `o` with `x`, and print the code of the
+/// Call the function at `index` of `o` with `x`, and print the message of the
 /// error or the kind of the result.
 fn show(o: *Object, index: int, x: int)
 {
 	let args = [reflect.of_int(x)];
 	let v = reflect.call(o, index, args[0..1]) catch e {
-		printf("refused %d %.*s\n".ptr, e.code as c_int, e.message.len as c_int,
-			e.message.ptr);
+		printf("failed %.*s\n".ptr, e.message.len as c_int, e.message.ptr);
 		return;
 	};
 	printf("kind %d\n".ptr, v.kind as c_int);
@@ -45,13 +52,21 @@ fn main() -> int
 {
 	let b = alloc Box { };
 	let o: *Object = b;
+	let args = [reflect.of_int(8)];
 
 	/* The seven functions of the root and its nine hooks come first,
 	   then those of the class. */
 	show(o, 16, 10);
-	show(o, 17, 10);
+	show(o, 16, -1);
+	show(o, 17, 4);
 	show(o, 17, -1);
+	show(o, 18, 1);
+	show(o, 18, -1);
 	printf("%d\n".ptr, b.v as c_int);
+	let half = reflect.call(o, 16, args[0..1]) catch fatal;
+	printf("half %d\n".ptr, half.data.i as c_int);
+	let named = reflect.call(o, 18, args[0..1]) catch fatal;
+	printf("%.*s\n".ptr, named.data.s.len as c_int, named.data.s.ptr);
 	delete(b);
 	return 0;
 }

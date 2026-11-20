@@ -1168,10 +1168,38 @@ static bool takes_owned(const struct symbol *sym)
     return false;
 }
 
+/* The text of the function fn that may fail: `!`, the result it declares
+   and its parameters after self, without the out pointer. */
+static bool failing_code(const struct type *fn, struct text *code)
+{
+    size_t count = fn->has_out ? fn->param_count - 1 : fn->param_count;
+    size_t i;
+
+    text_append(code, "!");
+    if (!fn->has_out) {
+        text_append(code, "void");
+    } else if (fn->params[count]->kind != TYPE_POINTER ||
+               !append_type_name(code, fn->params[count]->element,
+                                 SPELL_CALL)) {
+        return false;
+    }
+    for (i = 1; i < count; i++) {
+        text_append(code, ".");
+        if (fn->params[i]->kind == TYPE_VOID ||
+            !append_type_name(code, fn->params[i], SPELL_CALL)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* DESIGN: the table entry of a function that may fail returns the error
-   and takes an out pointer for its result, which no Value carries, so the
-   function has no text and reflect.call refuses it with NOT_CARRIED, by
-   T347 of docs/audit/tests-findings.md. */
+   and takes an out pointer for its result. Its text is `!` and the
+   signature it declares, as `!i64.i32`, by 5 of "Answers of 2026-11-20"
+   in docs/decisions.md. Its trampoline passes the out pointer, reads the
+   error and passes it on, and reflect.call fails with that error. A
+   function with an `own` parameter has no text, by T348 of
+   docs/audit/tests-findings.md. */
 static const struct ir_global *signature_text(struct lowerer *l,
                                               const struct symbol *sym)
 {
@@ -1179,9 +1207,15 @@ static const struct ir_global *signature_text(struct lowerer *l,
     struct token_text text;
     struct text code = {0};
     const struct ir_global *g;
+    bool coded;
 
-    if (fn == NULL || (fn->kind == TYPE_FN && fn->may_fail) ||
-        takes_owned(sym) || !signature_code(fn, SPELL_CALL, &code)) {
+    if (fn == NULL || takes_owned(sym)) {
+        return NULL;
+    }
+    coded = fn->kind == TYPE_FN && fn->may_fail
+                ? failing_code(fn, &code)
+                : signature_code(fn, SPELL_CALL, &code);
+    if (!coded) {
         text_free(&code);
         return NULL;
     }

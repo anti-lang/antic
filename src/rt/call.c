@@ -9,7 +9,8 @@
    comes next. The trampoline checks the kind of each argument last, and
    a refusal there is a wrong kind. */
 int64_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
-                             int64_t count, void *result)
+                             int64_t count, void *result,
+                             struct anti_object **failed)
 {
     struct anti_object *o = anti_rt_object_of(object);
     const struct anti_descriptor *d = anti_rt_descriptor(o);
@@ -36,9 +37,18 @@ int64_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
         const struct anti_trampoline *t = &anti_rt_trampolines.items[i];
         if (anti_rt_same_bytes(t->signature, t->signature_length,
                                f->signature, f->signature_length)) {
-            return t->call(entry, o, args, count, result)
-                       ? ANTI_REFLECT_DONE
-                       : ANTI_REFLECT_WRONG_KIND;
+            int8_t done = t->call(entry, o, args, count, result);
+            /* A function that may fail gave its error as the pointer of
+               the result, which the caller fails with, by 5 of "Answers
+               of 2026-11-20" in docs/decisions.md. */
+            if (done == 2) {
+                struct anti_value *v = result;
+                *failed = v->data.p;
+                v->kind = ANTI_VALUE_NONE;
+                v->data.p = NULL;
+                return ANTI_REFLECT_FAILED;
+            }
+            return done != 0 ? ANTI_REFLECT_DONE : ANTI_REFLECT_WRONG_KIND;
         }
     }
     return ANTI_REFLECT_NOT_CARRIED;

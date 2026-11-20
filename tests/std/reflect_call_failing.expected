@@ -1,5 +1,10 @@
 exit 0
-refused 2 no Value carries a type of this function
-refused 2 no Value carries a type of this function
-refused 2 no Value carries a type of this function
-3
+kind 1
+failed below zero
+kind 0
+failed below zero
+kind 6
+failed below zero
+4
+half 4
+named

@@ -303,20 +303,72 @@ static void pack(struct ir_function *f, struct ir_block *b,
     ir_store(f, b, t->wide, ir_temp_op(f, wide), at);
 }
 
+/* The call of the entry of a function that may fail, from block b of
+   the trampoline f: the out pointer of the result after the args, then
+   the result as a Value and 1, or the error as the pointer of the Value
+   and 2. Returns the index of f. */
+static uint32_t failing_call(struct ir_module *m, struct ir_function *f,
+                             struct ir_block *b, const struct value_type *t,
+                             uint32_t str_agg, uint32_t data,
+                             struct ir_operand entry,
+                             struct ir_function *signature,
+                             struct ir_operand *args, size_t count,
+                             struct ir_operand result)
+{
+    struct ir_block *done = ir_block_add(f);
+    struct ir_block *failed = ir_block_add(f);
+    struct ir_operand payload =
+        ir_temp_op(f, ir_ptradd(f, b, result, ir_sym_operand(m, data)));
+    struct ir_operand out = ir_int_op(IR_PTR, 0);
+    struct ir_operand err;
+    size_t n = count;
+
+    if (t->type != IR_VOID) {
+        out = ir_temp_op(f, ir_entry_slot(f, t->type == IR_AGG
+                                                 ? ir_aggregate(str_agg)
+                                                 : ir_scalar(t->type)));
+        args[n++] = out;
+    }
+    err = ir_temp_op(f, ir_call_indirect(f, b, IR_PTR, entry, signature,
+                                         args, n));
+    ir_branch(f, b,
+              ir_temp_op(f, ir_binary(f, b, IR_EQ, IR_I8, err,
+                                      ir_int_op(IR_PTR, 0))),
+              done, failed);
+    ir_store(f, failed, IR_I8, ir_int_op(IR_I8, (uint64_t)ANTI_VALUE_PTR),
+             result);
+    ir_store(f, failed, IR_PTR, err, payload);
+    ir_ret(f, failed, IR_I8, ir_int_op(IR_I8, 2));
+    ir_store(f, done, IR_I8, ir_int_op(IR_I8, (uint64_t)t->kind), result);
+    if (t->type == IR_AGG) {
+        pack(f, done, t, str_agg, out, payload);
+    } else if (t->type != IR_VOID) {
+        pack(f, done, t, str_agg,
+             ir_temp_op(f, ir_load(f, done, t->type, out)), payload);
+    }
+    ir_ret(f, done, IR_I8, ir_int_op(IR_I8, 1));
+    return f->index;
+}
+
 /* DESIGN: a trampoline takes the entry of a table, the object, the
    Values of the arguments, their count and the Value of the result. It
    checks the count and the kind of every Value first, and gives 0 when
    one does not fit. It then reads each argument at the type of its
    parameter, calls the entry, writes the result as a Value and gives 1.
    The layout of a Value is the aggregate of anti.reflect, so the IR
-   holds no size. */
+   holds no size. The trampoline of a text after `!`, of a function that
+   may fail, passes a slot of its frame as the out pointer of the result
+   and reads the error the entry returns. It gives 2 with the error as
+   the pointer of the Value of the result when there is one, by 5 of
+   "Answers of 2026-11-20" in docs/decisions.md. */
 static uint32_t write_trampoline(struct ir_module *m, const char *text,
                                  uint32_t value_agg, uint32_t str_agg)
 {
     const struct value_type *types[SIGNATURE_MAX];
-    struct ir_operand args[SIGNATURE_MAX];
+    struct ir_operand args[SIGNATURE_MAX + 1];
     struct ir_operand at[SIGNATURE_MAX];
-    size_t count = read_signature(text, types);
+    bool failing = text[0] == '!';
+    size_t count = read_signature(failing ? text + 1 : text, types);
     size_t params = count > 0 ? count - 1 : 0;
     uint32_t stride = ir_sym_size_of(m, ir_aggregate(value_agg));
     uint32_t data = ir_sym_offset_of(m, value_agg, 1);
@@ -339,15 +391,18 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
         return IR_NO_INDEX;
     }
     text_appendf(&name, "signature.%s", text);
-    signature = ir_declare_add(m, RUNTIME_MODULE, text_cstr(&name),
-                               types[0]->type,
-                               types[0]->type == IR_AGG ? str_agg
-                                                        : IR_NO_AGG);
+    signature = ir_declare_add(
+        m, RUNTIME_MODULE, text_cstr(&name),
+        failing ? IR_PTR : types[0]->type,
+        !failing && types[0]->type == IR_AGG ? str_agg : IR_NO_AGG);
     ir_param_add(signature, IR_PTR, IR_NO_AGG);
     for (k = 1; k < count; k++) {
         ir_param_add(signature, types[k]->type,
                      types[k]->type == IR_AGG ? str_agg : IR_NO_AGG);
         signature->params[k].ext = types[k]->ext;
+    }
+    if (failing && types[0]->type != IR_VOID) {
+        ir_param_add(signature, IR_PTR, IR_NO_AGG);
     }
     name.length = 0;
     text_appendf(&name, "trampoline.%s", text);
@@ -391,6 +446,10 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
     for (k = 0; k < params; k++) {
         uint32_t payload = ir_ptradd(f, b, at[k], ir_sym_operand(m, data));
         args[k + 1] = unpack(f, b, types[k + 1], ir_temp_op(f, payload));
+    }
+    if (failing) {
+        return failing_call(m, f, b, types[0], str_agg, data, entry,
+                            signature, args, count, result);
     }
     r = ir_call_indirect(f, b, types[0]->type, entry, signature, args,
                          count);

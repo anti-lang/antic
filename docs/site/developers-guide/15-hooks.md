@@ -525,13 +525,13 @@ A traced function holds one call of `anti_rt_hook_call` before its first stateme
 ```llvm excerpt=traced target=linux-x86_64 mode=release option=trace
 define internal noundef range(i64 0, -1) i64 @traced.Renderer.draw(ptr noundef nonnull dereferenceable(16) %p0, i64 noundef %p1)
 b0:
-  tail call void @anti_rt_hook_call(ptr nonnull %p0, i64 5, ptr nonnull @traced.58, i64 20)
+  tail call void @anti_rt_hook_call(ptr nonnull %p0, i64 5, ptr nonnull @traced.59, i64 20)
   %v3 = getelementptr inbounds nuw i8, ptr %p0, i64 8
   %v5 = load i64, ptr %v3, align 8
   %v8 = add i64 %v5, %p1
   store i64 %v8, ptr %v3, align 8
   %v2.i = shl i64 %v8, 1
-  tail call void @anti_rt_hook_call(ptr nonnull %p0, i64 6, ptr nonnull @traced.58, i64 20)
+  tail call void @anti_rt_hook_call(ptr nonnull %p0, i64 6, ptr nonnull @traced.59, i64 20)
   ret i64 %v2.i
 ```
 

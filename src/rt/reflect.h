@@ -44,7 +44,10 @@ enum anti_reflect_reason {
     ANTI_REFLECT_BAD_INDEX,
     ANTI_REFLECT_NOT_CARRIED,
     ANTI_REFLECT_WRONG_KIND,
-    ANTI_REFLECT_WRONG_COUNT
+    ANTI_REFLECT_WRONG_COUNT,
+    /* The function failed, and its error stands in the failed pointer
+       of anti_rt_reflect_call. */
+    ANTI_REFLECT_FAILED
 };
 
 /* The walks below read the descriptor d of a class. A NULL d gives what
@@ -135,6 +138,7 @@ extern const struct anti_trampolines anti_rt_trampolines;
    Gives the reason, and leaves result alone, when the call cannot be
    made. */
 int64_t anti_rt_reflect_call(void *object, int64_t index, const void *args,
-                             int64_t count, void *result);
+                             int64_t count, void *result,
+                             struct anti_object **failed);
 
 #endif
