@@ -870,7 +870,7 @@ if(NOT CMAKE_HOST_WIN32)
               ../un\"its/anti.toml "${units_manifest}"
               ../un\"its/src/com/example/units.anti "${library_text}"
         ARGS build ${tools}
-        ERR "anti: ./anti.lock cannot hold the path ./../un\"its/dist/${HOST}/dev, which holds a double quote or a control byte")
+        ERR "anti: ./anti.lock cannot hold the path ../un\"its, which holds a double quote or a control byte")
 endif()
 
 # A dependency of a version of the index names its repository by a URL

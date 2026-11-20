@@ -51,8 +51,11 @@
 #   lock_package_without_a_version  a package of the lock file without
 #                           its version reads the lock as none, and the
 #                           build writes it again (T299)
-#   lock_module_without_a_digest    and a module without its digest
+#   lock_package_without_a_name     a package without its name
 #                           (T299)
+#   lock_module_without_a_digest    and a module without its digest
+#                           (T299). Each gives a line that names the key
+#                           it lacks, by G of "Answers of 2026-11-19"
 #   path_chain_mixed        a project of a path whose manifest names a
 #                           dependency of a repository and one of an
 #                           absolute path
@@ -506,7 +509,8 @@ endfunction()
 
 if(CASE STREQUAL "lock_path_moved")
     # T298: the same library at another path holds the same digest, and
-    # the lock file names the path the manifest gives.
+    # the lock file names the path as the manifest gives it, by F of
+    # "Answers of 2026-11-19" in docs/decisions.md.
     string(CONCAT dep_source
            "//! A library of a path.\n\n"
            "/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n")
@@ -523,18 +527,19 @@ if(CASE STREQUAL "lock_path_moved")
                   "com.example.app" "${app_source}")
     anti_passes("the build over ../dep" "${WORK}/app" build ${tools})
     file(READ "${WORK}/app/anti.lock" lock)
-    holds("${lock}" "../dep/dist/" "the first lock file")
+    holds("${lock}" "path = \"../dep\"\n" "the first lock file")
     write_project("${WORK}/app" "com.example.app"
                   "\n[dependencies]\n\"com.example.dep\" = { path = \"../moved\" }\n"
                   "com.example.app" "${app_source}")
     anti_passes("the build over ../moved" "${WORK}/app" build ${tools})
     file(READ "${WORK}/app/anti.lock" lock)
-    holds("${lock}" "../moved/dist/" "the lock file after the move")
+    holds("${lock}" "path = \"../moved\"\n" "the lock file after the move")
     lacks("${lock}" "../dep/" "the lock file after the move")
     return()
 endif()
 
 if(CASE STREQUAL "lock_package_without_a_version" OR
+   CASE STREQUAL "lock_package_without_a_name" OR
    CASE STREQUAL "lock_module_without_a_digest")
     # T299: an entry of the lock file that lacks a key. Three packages of
     # a repository, where a needs c, and a program over a and b. The
@@ -584,11 +589,18 @@ if(CASE STREQUAL "lock_package_without_a_version" OR
         string(REGEX REPLACE
                "(name = \"com.example.c\"\n)version = \"1.0.0\"\n" "\\1"
                damaged "${written}")
+        set(said "anti: ./anti.lock holds the package com.example.c without its `version`, so ./anti.lock is not read")
+    elseif(CASE STREQUAL "lock_package_without_a_name")
+        # The package c loses its name.
+        string(REGEX REPLACE "name = \"com.example.c\"\n" ""
+               damaged "${written}")
+        set(said "anti: ./anti.lock holds a package without its `name`, so ./anti.lock is not read")
     else()
         # The module of a loses its digest.
         string(REGEX REPLACE
                "(path = \"com.example.a\"), sha256 = \"[0-9a-f]+\"" "\\1"
                damaged "${written}")
+        set(said "anti: ./anti.lock holds a module of the package com.example.a without its `sha256`, so ./anti.lock is not read")
     endif()
     if(damaged STREQUAL written)
         message(FATAL_ERROR "the case found no key to drop in:\n${written}")
@@ -597,6 +609,9 @@ if(CASE STREQUAL "lock_package_without_a_version" OR
     file(REMOVE_RECURSE "${WORK}/cache")
     anti_passes("the build over the damaged lock file" "${WORK}/app" build
                 ${tools})
+    # G of "Answers of 2026-11-19" in docs/decisions.md: the damaged entry
+    # gets a line of its own, which names the key it lacks.
+    holds("${anti_text}" "${said}" "the output of the build")
     file(READ "${WORK}/app/anti.lock" lock)
     if(NOT lock STREQUAL written)
         message(FATAL_ERROR "the build left the lock file as\n${lock}\n"

@@ -462,8 +462,12 @@ static bool resolve_from_path(struct resolver *r, const struct requirement *req,
             if (found == 0) {
                 out->version.length = 0;
                 text_append(&out->version, text_cstr(&version));
+                /* F of "Answers of 2026-11-19" in docs/decisions.md: the
+                   lock file records the path as the manifest gives it, and
+                   not the directory of a target and a mode that a project
+                   answers with. */
                 out->path.length = 0;
-                text_append(&out->path, text_cstr(&directory));
+                text_append(&out->path, text_cstr(&req->path));
                 if (!library_header(file, &name, &version, &module, r,
                                     text_cstr(&req->name)) ||
                     !require_project_paths(r, req, text_cstr(&given))) {
@@ -1021,9 +1025,19 @@ static bool lock_read(const char *path, struct dep_graph *out)
         size_t j;
         /* T299 of docs/audit/tests-findings.md: an entry without its
            name or its version ends no list. The lock reads as none, so
-           the build resolves and writes it again. */
+           the build resolves and writes it again. The line names the key
+           the entry lacks, by G of "Answers of 2026-11-19" in
+           docs/decisions.md. */
         if (name == NULL || version == NULL) {
             if (entry_at(doc, "package", i)) {
+                if (name == NULL) {
+                    say_anti("%s holds a package without its `name`, so %s "
+                             "is not read\n", path, path);
+                } else {
+                    say_anti("%s holds the package %s without its "
+                             "`version`, so %s is not read\n", path, name,
+                             path);
+                }
                 deps_free(out);
             }
             break;
@@ -1051,9 +1065,14 @@ static bool lock_read(const char *path, struct dep_graph *out)
             held = entry_at(doc, text_cstr(&head), j);
             text_free(&head);
             /* A module without its path or its digest reads the lock as
-               none as well, by T299. */
+               none as well, by T299, with a line of its own. */
             if (module == NULL || digest == NULL) {
                 valid = !held;
+                if (held) {
+                    say_anti("%s holds a module of the package %s without "
+                             "its `%s`, so %s is not read\n", path, name,
+                             module == NULL ? "path" : "sha256", path);
+                }
                 break;
             }
             if (!lock_module_valid(path, module, digest)) {
