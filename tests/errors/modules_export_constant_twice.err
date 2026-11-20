@@ -1,0 +1,1 @@
+modules_export_constant_twice.anti:6:14: error: export const `EXPORT_LIMIT` has the C name of export const `EXPORT_LIMIT` in module `com.example.exports`

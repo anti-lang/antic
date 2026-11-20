@@ -1,0 +1,20 @@
+//! `append_float` writes every digit of a precision past 100000000, which the
+//! runtime capped without a message, by item 9 of "Answers of 2026-11-19". The
+//! program prints the length of each text and its first digits.
+
+import anti.text;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = text.Builder.new();
+	b.append_float(1.5, 100000001);
+	let t = b.text();
+	printf("length %lld\n".ptr, t.len);
+	printf("first %.6s\n".ptr, t.ptr);
+	b.append_f32(0.25, 100000002, true);
+	let u = b.text();
+	printf("length %lld\n".ptr, u.len - t.len);
+	return 0;
+}

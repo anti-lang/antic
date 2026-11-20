@@ -12,7 +12,8 @@
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
 #             tight, tight_aligned, wide, callbacks, forged_notice,
-#             doc_close, constant_names, tuple_names or levels
+#             doc_close, constant_names, tuple_names, keyword_names or
+#             levels
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -456,11 +457,12 @@ elseif(CASE STREQUAL "callbacks")
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/callbacks${EXE}" "${SOURCES}/callbacks.expected")
 elseif(CASE STREQUAL "doc_close" OR CASE STREQUAL "constant_names" OR
-       CASE STREQUAL "tuple_names")
+       CASE STREQUAL "tuple_names" OR CASE STREQUAL "keyword_names")
     # The header of a library compiles as C11 and as C++17. doc_close
     # holds a doc text with `/*` and `*/`, constant_names a constant whose
-    # name a parameter and a field carry, and tuple_names a struct whose
-    # name spells the elements of a tuple.
+    # name a parameter and a field carry, tuple_names a struct whose name
+    # spells the elements of a tuple, and keyword_names export items named
+    # after keywords of C and C++.
     # The C++ check reads a file of its own suffix, since clang deprecates
     # a `.c` file read as C++ and the warning is an error here.
     library(${CASE} static "${dir}")

@@ -1,0 +1,11 @@
+//! A module exports a constant under the C name of a constant that a library it
+//! imports exports already, by item 5 of "Answers of 2026-11-19".
+
+import com.example.exports;
+
+export const EXPORT_LIMIT: c_int = 9;
+
+fn main() -> int
+{
+	return 0;
+}

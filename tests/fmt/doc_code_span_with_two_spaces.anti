@@ -1,0 +1,12 @@
+//! A code span of a doc comment that holds two spaces, which the fill keeps.
+
+/// The separator is `a  b`, two spaces between the two words.
+pub fn one() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	return one() - 1;
+}

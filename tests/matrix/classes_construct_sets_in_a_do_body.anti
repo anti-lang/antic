@@ -1,0 +1,64 @@
+//! A `construct` sets a field without a default in the body of a `do ...
+//! while`, which runs before its condition. One class sets it on the one path
+//! of the body, one before a `continue` that reaches the condition and one
+//! before the `break` that leaves a `do` whose condition is `true`. The program
+//! prints the field of each.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class ByDo
+{
+	pub a: int,
+
+	fn construct(self, x: int)
+	{
+		let n = 0;
+		do {
+			self.a = x + n;
+			n = n + 1;
+		} while n < 3
+	}
+}
+
+class ByContinue
+{
+	pub a: int,
+
+	fn construct(self, x: int)
+	{
+		let n = 0;
+		do {
+			n = n + 1;
+			self.a = x * n;
+			if n < 2 {
+				continue;
+			}
+		} while n < 3
+	}
+}
+
+class ByBreak
+{
+	pub a: int,
+
+	fn construct(self, x: int)
+	{
+		do {
+			self.a = x - 1;
+			if x > 0 {
+				break;
+			}
+		} while true
+	}
+}
+
+fn main() -> int
+{
+	let by_do = ByDo(4);
+	let by_continue = ByContinue(5);
+	let by_break = ByBreak(6);
+	printf("do %d\n".ptr, by_do.a as c_int);
+	printf("continue %d\n".ptr, by_continue.a as c_int);
+	printf("break %d\n".ptr, by_break.a as c_int);
+	return 0;
+}

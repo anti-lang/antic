@@ -1,0 +1,1 @@
+modules_export_function_named_as_a_keyword_of_cpp.anti:5:11: error: the exported name `template` is a keyword of C or C++, and the name of an export fn is its symbol

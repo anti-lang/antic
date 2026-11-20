@@ -1,0 +1,30 @@
+//! A pattern of `Regex.compile` and of `ByteRegex.compile` stays until the
+//! program exits, as the pattern of a literal does, so `--memory-checks`
+//! reports no leak for one the program no longer holds, by item 8 of "Answers
+//! of 2026-11-19".
+
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn found(text: str) -> bool
+{
+	let r = Regex.compile("a+b") catch fatal;
+	let m = text.matches(r) catch fatal;
+	return m != none;
+}
+
+fn found_bytes(data: []byte) -> bool
+{
+	let r = ByteRegex.compile("c+d") catch fatal;
+	let m = data.matches(r) catch fatal;
+	return m != none;
+}
+
+fn main() -> int
+{
+	printf("text %d %d\n".ptr, found("xaab") as c_int, found("xb") as c_int);
+	let bytes: [3]byte = [0x63, 0x63, 0x64];
+	printf("bytes %d\n".ptr, found_bytes(bytes[0..3]) as c_int);
+	return 0;
+}

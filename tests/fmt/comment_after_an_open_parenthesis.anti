@@ -1,0 +1,11 @@
+//! A comment after the `(` of a call, which follows it with no space.
+
+fn twice(x: int) -> int
+{
+	return x * 2;
+}
+
+fn main() -> int
+{
+	return twice(/* the value */ 0);
+}

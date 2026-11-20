@@ -69,6 +69,24 @@ anti_message(api_enum_value STATUS 0
     OUT "bind: anti.api from api.json, 0 functions, 1 warning"
     ARGS bind api.json -o "${WORK}/out"
     ERR "anti: api.json: warning: a value of the enum `Mode` is no integer")
+# Item 17 of "Answers of 2026-11-19": an enum that `anti bind` leaves out
+# and a value of an enum without its name give a warning each, as R171
+# gives one for a struct without its name.
+anti_message(api_enum_values_no_array STATUS 0
+    FILES api.json "{\"functions\": [], \"enums\": [{\"name\": \"Mode\", \"values\": 3}]}"
+    OUT "bind: anti.api from api.json, 0 functions, 1 warning"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: warning: the enum `Mode` is left out: its values are no array")
+anti_message(api_enum_without_a_name STATUS 0
+    FILES api.json "{\"functions\": [], \"enums\": [{\"values\": [{\"name\": \"MODE_A\", \"value\": 0}]}]}"
+    OUT "bind: anti.api from api.json, 0 functions, 1 warning"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: warning: an enum without a name is left out")
+anti_message(api_enum_value_without_a_name STATUS 0
+    FILES api.json "{\"functions\": [], \"enums\": [{\"name\": \"Mode\", \"values\": [{\"value\": 0}, {\"name\": \"MODE_B\", \"value\": 1}]}]}"
+    OUT "bind: anti.api from api.json, 0 functions, 1 warning"
+    ARGS bind api.json -o "${WORK}/out"
+    ERR "anti: api.json: warning: a value of the enum `Mode` without a name is left out")
 # R170 of "Rules of 2026-10-13" in docs/decisions.md: a type that does not
 # parse gives one warning, which names the type and what is left out.
 anti_message(api_type_does_not_parse STATUS 0

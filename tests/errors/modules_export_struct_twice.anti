@@ -1,0 +1,14 @@
+//! A module exports a struct under the C name of a struct that a library it
+//! imports exports already, by item 5 of "Answers of 2026-11-19".
+
+import com.example.exports;
+
+export struct Vec2
+{
+	a: c_int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

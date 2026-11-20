@@ -1,0 +1,8 @@
+// A struct body that the end of the file cuts after a member it refuses
+// gets one message, as a cut class body does, by item 4 of "Answers
+// of 2026-11-19".
+
+struct Cut
+{
+	x: int,
+	fn

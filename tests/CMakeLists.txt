@@ -2302,6 +2302,18 @@ if(NOT ANTIC_HOST_TARGET STREQUAL "windows-arm64")
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
             -P "${ANTIC_RUNNERS}/run_program.cmake")
     set_tests_properties(std_builder_room_memory_checks PROPERTIES TIMEOUT 120)
+    # A pattern of Regex.compile and of ByteRegex.compile stays until exit,
+    # so a program that drops one gets no leak report.
+    add_test(NAME std_regex_compiled_kept_memory_checks
+        COMMAND "${CMAKE_COMMAND}"
+            ${ANTIC_AND_RUNTIME}
+            "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/std/regex_compiled_kept.anti"
+            "-DOPTIONS=--memory-checks"
+            "-DOBJECTS="
+            "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-memory-checks"
+            -P "${ANTIC_RUNNERS}/run_program.cmake")
+    set_tests_properties(std_regex_compiled_kept_memory_checks PROPERTIES
+        TIMEOUT 120)
     # anti.raylib under --memory-checks, whose link takes the runtime of
     # AddressSanitizer beside raylib, miniaudio and their system libraries.
     add_test(NAME std_raylib_memory_checks
@@ -3225,7 +3237,8 @@ foreach(case static shared exports two loader header bundle classes
         failing tuples flags variants nested simd names handlers ledger
         generics optional forms views never never_cpp ctypes
         ctypes_shared ctypes_bundle tight tight_aligned wide callbacks
-        forged_notice doc_close constant_names tuple_names levels)
+        forged_notice doc_close constant_names tuple_names keyword_names
+        levels)
     # The C program of ledger starts its threads with pthreads.
     if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
         continue()
@@ -4354,7 +4367,11 @@ foreach(case
         "modules_constant_assigned|items|"
         "modules_constraint_with_an_interface_not_met|items|"
         "modules_direct_import_clash|diamond|"
+        "modules_export_constant_twice|exports|"
+        "modules_export_struct_twice|exports|"
+        "modules_export_struct_under_a_constant|exports|"
         "modules_export_symbol_twice|exports|"
+        "modules_export_union_twice|exports|"
         "modules_function_as_a_type|items|"
         "modules_generic_class_built_without_its_argument|items|"
         "modules_generic_function_of_a_class|generic_limits|"
@@ -7794,6 +7811,22 @@ add_expect_test(fmt_doc_dash_at_the_width STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_dash_at_the_width.anti")
 
+# A code span of a doc comment that holds two spaces keeps them, by item
+# 19 of "Answers of 2026-11-19". The source is in the canonical form, and
+# fmt_canonical passes over it until `anti fmt` agrees.
+add_expect_test(fmt_doc_code_span_with_two_spaces STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_code_span_with_two_spaces.anti")
+
+# A comment after the `(` of a call follows it with no space, by item 20
+# of "Answers of 2026-11-19". The source is in the canonical form, and
+# fmt_canonical passes over it until `anti fmt` agrees.
+add_expect_test(fmt_comment_after_an_open_parenthesis STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_after_an_open_parenthesis.anti")
+
 # A fence of a doc comment whose line starts with a tab, which anti doc
 # and anti check read as a fence. The source is in the canonical form, and
 # fmt_canonical passes over it until `anti fmt` agrees.
@@ -8011,7 +8044,7 @@ set(anti_bind_cases header clang headers escaped_path raymath raylib
     api_words words unsigned_bitfield fixed_enum api_typedef_chain
     clang_of_the_tree clang_of_the_tree_relative api_aliases miniaudio
     api_alias_chain_long api_docs enum_declared_first shift_types cast_types
-    struct_literal_ranges clang_sides macro_sides)
+    struct_literal_ranges clang_sides macro_sides tag_beside_function)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # The cases refusals, ast_malformed, clang_typedef_chain, ast_sides and
     # ast_refusals stand a shell script in for clang.

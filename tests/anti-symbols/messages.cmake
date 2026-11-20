@@ -67,6 +67,18 @@ anti_message(inventory_plugins_as_a_text
         "missing ./anti-plugins.toml: no index of plugins"
         "missing ./three/anti-plugins.toml: no index of plugins"
         "wrote symbols.zip with 0 of 5 modules")
+# The text of a deployment of Windows holds its directories with `;`
+# between two, as the runtime of that target splits it, so a `:` stays in
+# a directory, by item 14 of "Answers of 2026-11-19".
+anti_message(inventory_plugins_text_of_windows
+    STATUS 0
+    FILES conf.toml "[runtime]\nplugins = \"one;C:two\"\n"
+          prog.exe "${notice_head}${notice_id}\npackage com.example.app 1.0 MIT\n"
+    ARGS symbols inventory --conf conf.toml
+    OUT "missing ./one/anti-plugins.toml: no index of plugins"
+        "missing ./C:two/anti-plugins.toml: no index of plugins"
+        "missing ./prog.exe ${notice_id}"
+        "wrote symbols.zip with 0 of 3 modules")
 anti_message(inventory_plugins_text_ending_with_a_separator
     STATUS 0
     FILES conf.toml "[runtime]\nplugins = \"one:\"\n"
@@ -533,3 +545,25 @@ anti_message(check_injection_of_an_empty_value
     FILES conf.toml "[injections]\n\"app.Logger\" = \"\"\n"
     ARGS symbols check --conf conf.toml
     OUT "missing the program: . holds no program of Anti")
+# The index of an archive of a deployment holds no name that its TOML
+# cannot hold, a name with both quotes or a line break, as
+# anti-plugins.toml holds none, by item 16 of "Answers of 2026-11-19". The
+# version of the program holds both.
+function(pack_program_archive)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E tar cf
+                            "${PROJECT}/prog-symbols.zip" --format=zip
+                            prog.map
+                    WORKING_DIRECTORY "${PROJECT}/archive"
+                    RESULT_VARIABLE status)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "the archive of the program was not written")
+    endif()
+endfunction()
+anti_message(inventory_version_with_both_quotes
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+          prog.exe "${notice_head}${notice_id}\npackage com.example.app 1'\"0 MIT\n"
+          archive/prog.map "# The map of a symbols archive of Anti.\n# build ${notice_id}\n0000000000001000-0000000000002000 good src/good.anti:7\n"
+    SETUP pack_program_archive
+    ARGS symbols inventory --conf conf.toml
+    OUT "present ./prog.exe ${notice_id}"
+    ERR "anti: index.toml of symbols.zip cannot hold a name with both quotes or a line break: 1'\"0")

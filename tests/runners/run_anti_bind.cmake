@@ -9,7 +9,7 @@
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree,
 #             clang_of_the_tree_relative, enum_declared_first, shift_types,
 #             cast_types, struct_literal_ranges, clang_sides, macro_sides,
-#             ast_sides or ast_refusals
+#             ast_sides, ast_refusals or tag_beside_function
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -1187,6 +1187,20 @@ elseif(CASE STREQUAL "struct_literal_ranges")
             message(FATAL_ERROR "ranges.anti holds no line `${line}`\n${module}")
         endif()
     endforeach()
+elseif(CASE STREQUAL "tag_beside_function")
+    # A struct whose tag a function of the header has as its name binds
+    # with a trailing `_`, so the module declares each name once, by item
+    # 18 of "Answers of 2026-11-19".
+    tool_run("" "${ANTI}" bind --clang "${BIND}/tag.h" --module bindtest.tag
+                -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/tag.anti" module)
+    foreach(line "pub struct stat_\n" "pub extern fn stat(path: ?*byte, out: ?*stat_) -> c_int;")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "tag.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+    compile_binding(tag bindtest.tag)
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()

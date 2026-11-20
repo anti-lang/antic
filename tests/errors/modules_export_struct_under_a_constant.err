@@ -1,0 +1,1 @@
+modules_export_struct_under_a_constant.anti:7:15: error: export struct `EXPORT_RATIO` has the C name of export const `EXPORT_RATIO` in module `com.example.exports`

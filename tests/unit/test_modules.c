@@ -3875,6 +3875,26 @@ static void extern_past_kinds(struct damaged *s)
         (enum symbol_kind)(SYMBOL_CONSTRAINT + 1);
 }
 
+/* Item 1 of "Answers of 2026-11-19": a name of a local stands after a
+   binding of it. `-n` names `sum`, which the `let` after it binds, and
+   then a copy of `sum` that no binding of the tree binds. T350 of
+   docs/audit/tests-findings.md. */
+static struct stmt *tree_let_stmt(struct damaged *s, const char *name);
+
+static void name_bound_later(struct damaged *s)
+{
+    tree_let(s, "neg")->as.unary.operand->symbol =
+        tree_let_stmt(s, "sum")->as.let.symbol;
+}
+
+static void name_never_bound(struct damaged *s)
+{
+    struct symbol *copy = arena_alloc(s->arena, sizeof *copy);
+
+    *copy = *tree_let_stmt(s, "sum")->as.let.symbol;
+    tree_let(s, "neg")->as.unary.operand->symbol = copy;
+}
+
 /* A generic that shuffles the lanes of a simd struct. */
 static const char shuffle_source[] =
     "pub simd struct SV4 { x: f32, y: f32, z: f32, w: f32 }\n"
@@ -4420,7 +4440,8 @@ static void damaged_trees(void)
         callee_literal_without_type, callee_field_without_type,
         copy_without_generic,    fn_twice,
         extern_fn_past_contract, extern_fn_past_visibility,
-        extern_past_kinds};
+        extern_past_kinds,       name_bound_later,
+        name_never_bound};
     size_t i;
 
     tree_file(NULL, true);

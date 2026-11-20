@@ -1,0 +1,1 @@
+types_struct_body_cut_after_a_refused_member.anti:8:2: error: a struct holds fields alone, and a function belongs to a class

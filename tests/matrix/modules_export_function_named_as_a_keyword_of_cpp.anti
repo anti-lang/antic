@@ -1,0 +1,13 @@
+// An export fn is named after a keyword of C++. Its name is its C symbol,
+// so the header cannot rename it, and it is refused as R130 refuses a name
+// of an included header, by item 6 of "Answers of 2026-11-19".
+
+export fn template(x: c_int) -> c_int
+{
+	return x;
+}
+
+fn main() -> int
+{
+	return 0;
+}

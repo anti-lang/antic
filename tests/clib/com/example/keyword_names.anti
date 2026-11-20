@@ -1,0 +1,29 @@
+//! Export items named after keywords of C and C++. The header gives each a
+//! trailing `_`, by item 6 of "Answers of 2026-11-19".
+
+export const volatile: int = 3;
+
+export struct new
+{
+	x: int,
+}
+
+export union template
+{
+	a: c_int,
+	b: f32,
+}
+
+export enum namespace: u8
+{
+	Low,
+	High,
+}
+
+export fn make(n: int, t: template, s: namespace) -> new
+{
+	if s == namespace.High {
+		return new { x: n + t.a as int };
+	}
+	return new { x: volatile };
+}

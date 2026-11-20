@@ -1,0 +1,1 @@
+modules_export_union_twice.anti:6:14: error: export union `Bits` has the C name of export union `Bits` in module `com.example.exports`
