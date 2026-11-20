@@ -19,7 +19,7 @@ b0:
   br i1 %v4, label %b1, label %b2, !prof !3
 
 b1:
-  store ptr @arith.11, ptr %t3, align 8
+  store ptr @arith.17, ptr %t3, align 8
   %v5 = load ptr, ptr %t3, align 8
   %v6 = load i64, ptr %t0, align 8
   %v7 = load i64, ptr %t1, align 8
@@ -376,9 +376,15 @@ b3:
 @arith.Holder.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [32 x i8] }> <{ ptr @arith.7, [48 x i8] c"\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\08\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @arith.Holder.fields, [32 x i8] zeroinitializer, ptr @arith.package.version, [32 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
 @arith.7 = hidden constant <{ [7 x i8] }> <{ [7 x i8] c"Holder\00" }>, align 1
 @arith.8 = hidden constant <{ [5 x i8] }> <{ [5 x i8] c"kind\00" }>, align 1
-@arith.9 = hidden constant <{ [3 x i8] }> <{ [3 x i8] c"on\00" }>, align 1
-@arith.Holder.fields = hidden constant <{ ptr, [40 x i8], ptr, [40 x i8] }> <{ ptr @arith.8, [40 x i8] c"\04\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\17\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00", ptr @arith.9, [40 x i8] c"\02\00\00\00\00\00\00\00\04\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
-@arith.11 = hidden constant <{ [29 x i8] }> <{ [29 x i8] c"arith.anti:38: overflow in +\00" }>, align 1
+@arith.enum.arith.Kind.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [32 x i8] }> <{ ptr @arith.10, [48 x i8] c"\0A\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\04\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\03\00\00\00\00\00\00\00", ptr @arith.enum.arith.Kind.fields, [32 x i8] zeroinitializer, ptr @arith.package.version, [32 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
+@arith.10 = hidden constant <{ [11 x i8] }> <{ [11 x i8] c"arith.Kind\00" }>, align 1
+@arith.11 = hidden constant <{ [7 x i8] }> <{ [7 x i8] c"Circle\00" }>, align 1
+@arith.12 = hidden constant <{ [7 x i8] }> <{ [7 x i8] c"Square\00" }>, align 1
+@arith.13 = hidden constant <{ [5 x i8] }> <{ [5 x i8] c"Line\00" }>, align 1
+@arith.enum.arith.Kind.fields = hidden constant <{ ptr, [40 x i8], ptr, [40 x i8], ptr, [40 x i8] }> <{ ptr @arith.11, [40 x i8] c"\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00", ptr @arith.12, [40 x i8] c"\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\05\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00", ptr @arith.13, [40 x i8] c"\04\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\05\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
+@arith.15 = hidden constant <{ [3 x i8] }> <{ [3 x i8] c"on\00" }>, align 1
+@arith.Holder.fields = hidden constant <{ ptr, [32 x i8], ptr, ptr, [40 x i8] }> <{ ptr @arith.8, [32 x i8] c"\04\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\17\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00", ptr @arith.enum.arith.Kind.descriptor, ptr @arith.15, [40 x i8] c"\02\00\00\00\00\00\00\00\04\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
+@arith.17 = hidden constant <{ [29 x i8] }> <{ [29 x i8] c"arith.anti:38: overflow in +\00" }>, align 1
 
 declare void @anti_rt_check_failed(ptr noundef, i64 noundef, i32 noundef, i64 noundef, i64 noundef) noreturn cold #1
 declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)

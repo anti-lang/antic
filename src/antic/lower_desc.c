@@ -500,15 +500,17 @@ static const struct ir_global *tuple_descriptor(struct lowerer *l,
                                                 const struct type *t);
 static const struct ir_global *array_descriptor(struct lowerer *l,
                                                 const struct type *t);
+static const struct ir_global *enum_descriptor(struct lowerer *l,
+                                               const struct type *t);
 static struct ir_const *field_record(struct lowerer *l, const struct name *name,
                                      uint32_t agg, uint32_t index,
                                      uint64_t type, uint64_t word,
                                      const struct type *reach);
 static const struct ir_global *version_global(struct lowerer *l);
 
-/* The descriptor a field of type t carries. It is the one of its class
-   or struct, or of the class or struct that a pointer or a slice
-   reaches. Every other type gives NULL, as a union and a Job do. */
+/* The descriptor a field of type t carries. It is the one of its class,
+   struct or enum, or of the one that a pointer or a slice reaches.
+   Every other type gives NULL, as a union and a Job do. */
 static const struct ir_global *field_descriptor(struct lowerer *l,
                                                 const struct type *t)
 {
@@ -542,6 +544,9 @@ static const struct ir_global *field_descriptor(struct lowerer *l,
     }
     if (t->kind == TYPE_TUPLE) {
         return tuple_descriptor(l, t);
+    }
+    if (t->kind == TYPE_ENUM) {
+        return enum_descriptor(l, t);
     }
     return t->kind == TYPE_STRUCT ? lower_struct_descriptor(l, t) : NULL;
 }
@@ -812,6 +817,58 @@ static const struct ir_global *tuple_descriptor(struct lowerer *l,
                                            type_id(f->type), 0, f->type);
         }
         text_appendf(&fields, "tuple.%s.fields", text_cstr(&shown));
+        give_fields(l, g, l->module_name, text_cstr(&fields), list,
+                    t->field_count);
+    }
+    text_free(&shown);
+    text_free(&name);
+    text_free(&fields);
+    return g;
+}
+
+/* DESIGN: an enum has a descriptor of its own, with one record per value
+   it declares, in the order of the declaration. A record names the value,
+   holds the type id of the base of the enum and holds the value in its
+   word, as the checker holds it, which is the value that a load of the
+   base gives. The record of a field, an element or a part of the enum
+   carries the descriptor, so a reader of the runtime writes a value there
+   only where a record holds it, by T363 of docs/audit/tests-findings.md.
+   The type id of the enum stays its integer, so every walk keeps the size
+   it reads. No module declares the descriptor, so each module that needs
+   it writes one of its own, named after its type, as for a `?T`. */
+static const struct ir_global *enum_descriptor(struct lowerer *l,
+                                               const struct type *t)
+{
+    struct text shown = {0};
+    struct text name = {0};
+    struct text fields = {0};
+    struct token_text text;
+    struct ir_global *g;
+    struct ir_const *list;
+    size_t i;
+
+    types_name_qualified(&shown, t);
+    text_appendf(&name, "enum.%s.descriptor", text_cstr(&shown));
+    g = lower_find_global(l->m, l->module_name, text_cstr(&name));
+    if (g == NULL) {
+        text.bytes = text_cstr(&shown);
+        text.length = shown.length;
+        g = value_descriptor(l, t, l->module_name, text_cstr(&name), &text);
+        /* An enum without values has no list, and no value fits it. */
+        if (t->field_count == 0) {
+            text_free(&shown);
+            text_free(&name);
+            return g;
+        }
+        list = ir_const_agg(l->m,
+                            ir_aggregate(lower_fields_agg(l, t->field_count)),
+                            t->field_count);
+        for (i = 0; i < t->field_count; i++) {
+            list->items[i] = *field_record(l, &t->fields[i].name, IR_NO_AGG,
+                                           0, type_id(t->base),
+                                           t->fields[i].number, NULL);
+        }
+        text_appendf(&fields, "enum.%s.fields", text_cstr(&shown));
         give_fields(l, g, l->module_name, text_cstr(&fields), list,
                     t->field_count);
     }

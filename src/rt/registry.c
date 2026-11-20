@@ -881,7 +881,9 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         if (anti_rt_type_size(t) == 0) {
             return skip_value(r, depth + 1);
         }
-        return read_integer(r, bytes, t);
+        /* A number that the enum of the field does not declare is
+           outside the range of the field. */
+        return read_integer(r, bytes, t) && anti_rt_enum_holds(d, t, bytes);
     }
 }
 

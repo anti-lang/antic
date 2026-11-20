@@ -125,6 +125,12 @@ size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d);
    no walk there, nor does an element without a size. */
 int anti_rt_element_walked(int64_t type, const struct anti_descriptor *d);
 
+/* Whether the integer at bytes, of the type id type, is a value that the
+   enum of the descriptor d declares. An integer whose record carries no
+   descriptor is no enum, and every value fits it. */
+int anti_rt_enum_holds(const struct anti_descriptor *d, int64_t type,
+                       const void *bytes);
+
 /* The type id of what a pointer or a slice of the type id reaches, as a
    walk reads it. An array there has the descriptor d of the array with
    all its levels, and its id is the one of a field of that array. Every

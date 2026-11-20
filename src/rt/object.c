@@ -494,6 +494,30 @@ int anti_rt_element_walked(int64_t type, const struct anti_descriptor *d)
            anti_rt_pointee_size(type, d) > 0;
 }
 
+/* DESIGN: the record of an integer carries a descriptor where the
+   integer is an enum, and the descriptor holds one record per value the
+   enum declares, the value in the word of `own`, as a load of the base
+   gives it. A reader writes a value there only where a record holds it,
+   by T363 of docs/audit/tests-findings.md, since a release build loads
+   an enum with the range of its values. */
+int anti_rt_enum_holds(const struct anti_descriptor *d, int64_t type,
+                       const void *bytes)
+{
+    uint64_t value;
+    int64_t i;
+
+    if (d == NULL) {
+        return 1;
+    }
+    value = anti_rt_load_integer(bytes, type);
+    for (i = 0; i < d->field_count; i++) {
+        if ((uint64_t)d->fields[i].owned == value) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static void serialize_into(struct anti_builder *b, const void *object,
                            const struct anti_descriptor *d);
 static void serialize_object(struct anti_builder *b, const void *object);

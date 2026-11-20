@@ -737,12 +737,14 @@ static void records_type_ids(void)
          "(none)"},
         {ANTI_TYPE_STRUCT, "Size.descriptor"},
         {ANTI_TYPE_UNION, "(none)"},
-        {ANTI_TYPE_ENUM | ANTI_TYPE_U8 << 8, "(none)"},
+        /* An enum carries a descriptor of its values, by T363 of
+           docs/audit/tests-findings.md. */
+        {ANTI_TYPE_ENUM | ANTI_TYPE_U8 << 8, "enum.main.Mode.descriptor"},
         {ANTI_TYPE_CLASS, "Inner.descriptor:written"},
         {ANTI_TYPE_PTR | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_STRUCT << 8, "Size.descriptor"},
         {ANTI_TYPE_PTR | ANTI_TYPE_CLASS << 8, "Inner.descriptor:written"},
-        {ANTI_TYPE_SLICE | ANTI_TYPE_U8 << 8, "(none)"},
+        {ANTI_TYPE_SLICE | ANTI_TYPE_U8 << 8, "enum.main.Mode.descriptor"},
         {ANTI_TYPE_F16, "(none)"},
         {ANTI_TYPE_SLICE | ANTI_TYPE_F16 << 8, "(none)"},
         /* An array holds its element through every level and their
@@ -768,6 +770,10 @@ static void records_type_ids(void)
         {ANTI_TYPE_I32, "(none)"},
         {ANTI_TYPE_F64, "(none)"},
     };
+    static const struct field_expect mode[] = {
+        {ANTI_TYPE_U8, "(none)"},
+        {ANTI_TYPE_U8, "(none)"},
+    };
     struct lowered l;
     const struct ir_global *d;
 
@@ -792,6 +798,15 @@ static void records_type_ids(void)
                         sizeof holder / sizeof *holder);
     check_field_records(&l.ir, "Size.fields", size,
                         sizeof size / sizeof *size);
+    /* A record of the enum holds its value in the word of `own`. */
+    check_field_records(&l.ir, "enum.main.Mode.fields", mode,
+                        sizeof mode / sizeof *mode);
+    d = global_of(&l.ir, "enum.main.Mode.fields");
+    CHECK(d != NULL && d->value != NULL && d->value->item_count == 2);
+    if (d != NULL && d->value != NULL && d->value->item_count == 2) {
+        CHECK(d->value->items[0].items[4].integer == 0);
+        CHECK(d->value->items[1].items[4].integer == 1);
+    }
     d = global_of(&l.ir, "Size.descriptor");
     CHECK(d != NULL && d->value != NULL);
     if (d != NULL && d->value != NULL) {
