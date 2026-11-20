@@ -1,0 +1,28 @@
+//! A `#` word and a number with `.` or `)` at the width of a doc comment, which
+//! a line does not start with.
+
+/// The value is aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mm #
+/// is no heading.
+pub fn one() -> int
+{
+	return 1;
+}
+
+/// The value is aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll m 1.
+/// is no item.
+pub fn two() -> int
+{
+	return 2;
+}
+
+/// The value is aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll m 2)
+/// is no item either.
+pub fn three() -> int
+{
+	return 3;
+}
+
+fn main() -> int
+{
+	return one() + two() + three() - 6;
+}

@@ -7812,20 +7812,28 @@ add_expect_test(fmt_doc_dash_at_the_width STATUS 0
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_dash_at_the_width.anti")
 
 # A code span of a doc comment that holds two spaces keeps them, by item
-# 19 of "Answers of 2026-11-19". The source is in the canonical form, and
-# fmt_canonical passes over it until `anti fmt` agrees.
+# 19 of "Answers of 2026-11-19". The source is in the canonical
+# form.
 add_expect_test(fmt_doc_code_span_with_two_spaces STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_code_span_with_two_spaces.anti")
 
 # A comment after the `(` of a call follows it with no space, by item 20
-# of "Answers of 2026-11-19". The source is in the canonical form, and
-# fmt_canonical passes over it until `anti fmt` agrees.
+# of "Answers of 2026-11-19". The source is in the canonical
+# form.
 add_expect_test(fmt_comment_after_an_open_parenthesis STATUS 0
     PATTERN "^$"
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/comment_after_an_open_parenthesis.anti")
+
+# A `#` word and a number before `.` or `)` at the width of a doc comment
+# stay at the end of their line, so the fill starts no heading and no
+# numbered list, by I of "Answers of 2026-11-19".
+add_expect_test(fmt_doc_heading_and_number_at_the_width STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_heading_and_number_at_the_width.anti")
 
 # A fence of a doc comment whose line starts with a tab, which anti doc
 # and anti check read as a fence. The source is in the canonical form, and

@@ -1240,18 +1240,57 @@ static size_t columns_of(const char *s, size_t n)
 
 /* Whether a word at the start of a line of doc text opens markup there,
    which `anti doc` renders: a `-` that makes a `- ` item, or three
-   backticks of a fence. */
+   backticks of a fence. The doc warnings read a word of `#` alone as a
+   heading and a word of digits and `.` or `)` as an item of a numbered
+   list, so those open markup as well, by I of "Answers of 2026-11-19" in docs/decisions.md. */
 static bool opens_markup(const char *word, size_t length)
 {
+    size_t digits = 0;
+    size_t hashes = 0;
+
+    while (hashes < length && word[hashes] == '#') {
+        hashes++;
+    }
+    while (digits < length && word[digits] >= '0' && word[digits] <= '9') {
+        digits++;
+    }
     return (length == 1 && word[0] == '-') ||
-           (length >= 3 && memcmp(word, "```", 3) == 0);
+           (length >= 3 && memcmp(word, "```", 3) == 0) ||
+           (hashes > 0 && hashes == length) ||
+           (digits > 0 && digits + 1 == length &&
+            (word[digits] == '.' || word[digits] == ')'));
+}
+
+/* The run of backticks that a code span opened and the n bytes of a word
+   leave open, given the run open before them, or 0 outside a span. A span
+   closes at a run of the same length, as anti doc reads it. */
+static size_t span_after(const char *word, size_t n, size_t open)
+{
+    size_t i = 0;
+
+    while (i < n) {
+        size_t run = 0;
+        while (i < n && word[i] != '`') {
+            i++;
+        }
+        while (i < n && word[i] == '`') {
+            run++;
+            i++;
+        }
+        if (run > 0) {
+            open = open == 0 ? run : open == run ? 0 : open;
+        }
+    }
+    return open;
 }
 
 /* One paragraph of a doc comment, filled to the width. The text of first
    opens its first line and the text of rest opens every line after it. A
    word that would open markup at the start of a line stays at the end of
    the line before it, past the width, by T325 of
-   docs/audit/tests-findings.md. */
+   docs/audit/tests-findings.md. Inside a code span the spaces between two
+   words stand as they are, and a run of more than one never breaks the
+   line, by item 19 of "Answers of 2026-11-19" in docs/decisions.md. */
 static void wrap_paragraph(struct text *out, const char *first,
                            const char *rest, const char *body, size_t length,
                            size_t columns)
@@ -1259,17 +1298,20 @@ static void wrap_paragraph(struct text *out, const char *first,
     const char *open = first;
     size_t column = 0;
     size_t i = 0;
+    size_t span = 0;
     bool fresh = true;
 
     while (i < length) {
         size_t start;
         size_t width;
+        size_t gap = i;
         while (i < length && body[i] == ' ') {
             i++;
         }
         if (i == length) {
             break;
         }
+        gap = i - gap;
         start = i;
         while (i < length && body[i] != ' ') {
             i++;
@@ -1279,6 +1321,9 @@ static void wrap_paragraph(struct text *out, const char *first,
             text_append(out, open);
             column = columns_of(open, strlen(open));
             fresh = false;
+        } else if (span > 0 && gap > 1) {
+            text_append_bytes(out, body + start - gap, gap);
+            column += gap;
         } else if (column + 1 + width <= columns ||
                    opens_markup(body + start, i - start)) {
             text_append(out, " ");
@@ -1290,6 +1335,7 @@ static void wrap_paragraph(struct text *out, const char *first,
         }
         text_append_bytes(out, body + start, i - start);
         column += width;
+        span = span_after(body + start, i - start, span);
         open = rest;
     }
     if (fresh) {
@@ -1615,8 +1661,15 @@ static void emit_comment(struct emitter *e, const struct piece *p)
     const char *s = e->src + p->offset;
     size_t i;
 
+    /* A comment in a line stands after a space, but after `(`, which
+       nothing follows, so a call writes the comment of its first argument
+       against the `(`, by item 20 of "Answers of 2026-11-19" in
+       docs/decisions.md. */
     if (!p->own_line) {
-        append_piece(e, p, e->line.length > 0);
+        append_piece(e, p,
+                     e->line.length > 0 &&
+                         !(e->prev != NULL && e->prev->kind == PIECE_TOKEN &&
+                           e->prev->token->kind == TOKEN_LPAREN));
         return;
     }
     flush(e);

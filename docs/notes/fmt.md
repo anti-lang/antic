@@ -104,9 +104,14 @@ backticks toggles a fence, and a line inside one is written as it stands. An
 empty line is written as it stands and separates two paragraphs. Every other
 line opens a unit. The unit runs on while the lines below it stand at the same
 indent and open no item of their own. A `- ` item carries its continuation two
-columns in, and a line of a deeper indent opens a unit of its own. A `-` or three
-backticks would open markup at the start of a line. Such a word stays at the end
-of the line before it, past the width.
+columns in, and a line of a deeper indent opens a unit of its own. A `-`, three
+backticks, a word of `#` alone and a word of digits and `.` or `)` would open
+markup at the start of a line. Such a word stays at the end of the line before
+it, past the width. Inside a code span the spaces between two words stand as
+written, and a run of more than one never breaks the line.
+
+A comment inside a line stands after one space, but after `(`, which nothing
+follows, as in `twice(/* the value */ 0)`.
 
 Writing the text back at the indent of the item is what makes the pass stable. A
 line form writes one space after the marker, so the lexer reads one common
