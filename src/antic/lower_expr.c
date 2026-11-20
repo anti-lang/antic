@@ -2137,9 +2137,29 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
         /* One object of the literal's type, with the literal written
            into it. The count form multiplies by the element size. */
         if (e->as.alloc.value != NULL) {
+            const struct expr *call = e->as.alloc.value;
             struct ir_operand before;
             v = lower_new_memory(l, e->type->element,
                                  lower_size_operand(l, e->type->element));
+            /* `alloc T(args) catch e { }` as an operand: the pointer lies
+               in a slot of the frame, and the handler may give it another
+               with `yield`, as the slot of a `let` takes one, by T368 of
+               docs/audit/tests-findings.md. */
+            if (call->kind == EXPR_CALL && call->as.call.builds != NULL &&
+                call->as.call.handler.kind != HANDLE_NONE) {
+                struct ir_operand slot = lower_temp(
+                    l, ir_entry_slot(l->f, lower_vtype_of(l, e->type)));
+                struct ir_operand err;
+                ir_store(l->f, l->b, IR_PTR, v, slot);
+                before = lower_build_on_heap(l, v);
+                err = lower_construct(l, call, v);
+                lower_build_on_heap(l, before);
+                if (err.kind == IR_NONE) {
+                    return v;
+                }
+                lower_handle_error(l, call, err, slot, true, v);
+                return lower_temp(l, ir_load(l->f, l->b, IR_PTR, slot));
+            }
             before = lower_build_on_heap(l, v);
             lower_build_into(l, e->as.alloc.value, v);
             lower_build_on_heap(l, before);
