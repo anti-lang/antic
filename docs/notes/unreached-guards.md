@@ -1412,6 +1412,35 @@ callee of its own and one without arguments.
 The fixes of T363 and T364 add the sides of `anti_rt_enum_holds` of
 `src/rt/object.c`, which the tests of the two reach.
 
+## The sides of batch 3ah
+
+Batch 3ah of the third phase read the checks of the closures in
+`src/antic/sema_closure.c`, the lowering of a closure and a snapshot in
+`src/antic/lower_function.c` and the dev checks of
+`src/antic/lower_check.c`. It fixed T369 in `src/antic/sema_closure.c`,
+`src/antic/sema_stmt.c`, `src/antic/sema_expr.c` and `src/antic/types.c`,
+and T372 in `src/antic/lower_check.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `sema_capture`, `sema_note_write` and `sema_note_call` of `src/antic/sema_closure.c` | A chain of enclosing functions that ends before the frame of the captured variable. | A captured variable is a local or a parameter of a function around the one that names it, so the chain meets its frame first. |
+| `sema_note_call` of `src/antic/sema_closure.c` | A captured callee without a type, and one whose type is no function. | The call refuses a callee that is no function before the note, and the checker types every local and parameter it declares. |
+| `place_root` and `sema_check_closure_lifetime` of `src/antic/sema_closure.c` | A base of a place without a type, and a local without a type or without a function of the form of two words among its parts that takes a closure. | The assignment types the place first, and `sema_require` refuses a closure at a local that holds no such function before the lifetime is checked. |
+| `anonymous_type` of `src/antic/sema_closure.c` | A parameter marked `keep`, `concurrent` or `own` that names no type. | The parser takes each mark before a written type alone. |
+| `snapshot_copies` and `check_snapshot` of `src/antic/sema_closure.c` | A kind below `bool`, a capture without a type or of the error type, a steady capture that cannot be `none`, and one whose narrowing proves no type. | A captured variable holds a value of the type the checker gave it. A steady name is the binding of an `if let`, which may be `none`, and a snapshot that names it stands where the narrowing holds. |
+| `lower_bitfield_check` and `lower_bitfield_saturate` of `src/antic/lower_check.c` | A field of no bits or as wide as its type, and a constant that does not fit. | Lowering calls them for a bitfield narrower than its type alone, and the checker refuses a constant that does not fit. |
+| `lower_narrow_check` of `src/antic/lower_check.c` | A conversion to the type of the value. | `as` to the type of the value does nothing, by R059, so lowering asks for no check. |
+
+The sides left unsorted: `sema_refuse_worker_closure` of
+`src/antic/sema_closure.c` for an argument that is no function, which a
+worker given a value of another type reaches after its refusal, and
+`anonymous_type` there for a target that returns `never` where the
+anonymous function writes its result. `types_plain_parts` of
+`src/antic/types.c` for an `own fn` part and an array of a symbolic
+length, `check_for` of `src/antic/sema_stmt.c` for a `for` of more than
+two names over a collection, and `enum_value` of `src/antic/lower_check.c`
+for a signed base of no width.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

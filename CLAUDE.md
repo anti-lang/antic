@@ -902,6 +902,24 @@ not re-open a settled decision without asking Eddie.
   the trampolines. It ran each sanitizer suite in the six parts of
   `asan`, the last up to test 7994: `asan` 252 s, 184 s, 261 s, 162 s,
   121 s and 594 s, `ubsan` 256 s, 186 s, 263 s, 171 s, 126 s and 631 s.
+  Batch 3ah of the third phase of coverage measured `host` in the same
+  three parts: 378 s, 275 s and 429 s before the commit of T369 to T372,
+  up to test 8007, where `fmt_canonical` failed on the six new programs,
+  which ran again alone once they stood in their canonical form, 381 s,
+  275 s and 352 s before the fix of T372, where `guide_examples` failed
+  on the excerpt of the check of `n as Mode`, and 380 s, 273 s and 425 s
+  once the test of the sign stood for an enum with a value of the top
+  bit alone, 345 s for the first part before the fix of T369, where
+  `program_eq_hash_agree` failed on a refusal of every closure in a
+  tuple, 381 s, 275 s and 435 s once it was narrowed, where
+  `error_expression_conversions` failed on a snapshot in a tuple, and
+  380 s, 274 s and 404 s once the refusal held what outlives a capture
+  alone, up to test 8010, 377 s, 274 s and 433 s before the commit of
+  the tests of the calls through a capture, up to test 8016, and 379 s,
+  274 s and 431 s before the commit of the tests of two more sides. It
+  ran each sanitizer suite in the six parts of `asan`, the last up to
+  test 8014: `asan` 248 s, 181 s, 263 s, 166 s, 122 s and 623 s, `ubsan`
+  255 s, 183 s, 263 s, 173 s, 128 s and 635 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1512,12 +1530,12 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7996 ctest tests pass on the development Mac, and two of them, the
+- 8016 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
-  carry `host=windows`, the line of T365 and the two lines of T366, which
-  wait for Eddie's choice.
-  The ASan and the UBSan builds run 7994 each
+  carry `host=windows`, the line of T365, the two lines of T366 and the
+  three lines each of T370 and T371, which wait for Eddie's choice.
+  The ASan and the UBSan builds run 8014 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
