@@ -1374,6 +1374,15 @@ void antl_read_items(struct reader *r)
         if (sym->exported && kind == SYMBOL_STRUCT && sym->type != NULL) {
             sym->type->item_exported = true;
         }
+        /* The copy an `export type` names has the name of the `type` in
+           C, as the checker gives it to a copy of its own module, by 3 of
+           "Answers of 2026-11-20" in docs/decisions.md. */
+        if (sym->exported && sym->alias && kind == SYMBOL_STRUCT &&
+            sym->type != NULL && sym->type->generic != NULL &&
+            sym->type->c_name.length == 0) {
+            sym->type->c_name = sym->name;
+            sym->type->c_name_read = true;
+        }
         sym->kind = (enum symbol_kind)kind;
         sym->state = EVAL_DONE;
         sym->home = iface;

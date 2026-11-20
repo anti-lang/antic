@@ -12,8 +12,8 @@
 #             nested, names, handlers, generics, optional, forms, views,
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
 #             tight, tight_aligned, wide, callbacks, forged_notice,
-#             doc_close, constant_names, tuple_names, keyword_names or
-#             levels
+#             doc_close, constant_names, tuple_names, keyword_names,
+#             levels or copy_header
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -283,6 +283,22 @@ elseif(CASE STREQUAL "generics")
     configure_file("${SOURCES}/stacks.c" "${dir}/stacks.cpp" COPYONLY)
     tool_run("" ${CXX} -std=c++17 -fsyntax-only -I "${dir}" -I "${SOURCES}"
                 "${dir}/stacks.cpp")
+elseif(CASE STREQUAL "copy_header")
+    # The header of a library writes the copy that the library file of an
+    # import names with `export type` by its C name, as it writes one of
+    # its own source, by 3 of "Answers of 2026-11-20" in
+    # docs/decisions.md. The header compiles as C11 and as C++17.
+    file(MAKE_DIRECTORY "${dir}/files/com/example")
+    antic_build(COMMAND -c --runtime "${RUNTIME}" -I "${SOURCES}"
+                -o "${dir}/files/com/example/stacks.antl"
+                "${SOURCES}/com/example/stacks.anti")
+    library(stacker static "${dir}" -I "${dir}/files")
+    expect_header("${dir}/stacker.h" stacker.h)
+    file(WRITE "${dir}/stacker.c" "#include \"stacker.h\"\n")
+    tool_run("" ${CC} -std=c11 -fsyntax-only -I "${dir}" "${dir}/stacker.c")
+    configure_file("${dir}/stacker.c" "${dir}/stacker.cpp" COPYONLY)
+    tool_run("" ${CXX} -std=c++17 -fsyntax-only -I "${dir}"
+                "${dir}/stacker.cpp")
 elseif(CASE STREQUAL "tuples")
     # A tuple of an exported signature crosses as the struct the header
     # writes for it, one per distinct tuple, and C builds one of its own.

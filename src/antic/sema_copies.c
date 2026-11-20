@@ -470,7 +470,7 @@ static struct item *type_item(struct copies *k, struct type *copy)
        to C, which the module of that `type` defines. */
     made->pub = false;
     made->vis = VIS_PRIVATE;
-    made->exported = copy->c_name.length > 0;
+    made->exported = copy->c_name.length > 0 && !copy->c_name_read;
     if (made->exported) {
         made->home_module = NULL;
     }

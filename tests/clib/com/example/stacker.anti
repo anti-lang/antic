@@ -1,0 +1,11 @@
+//! A library over the stacks. Its header holds the copy that the library file
+//! of `com.example.stacks` names with `export type`, under the name C knows it
+//! by.
+
+import com.example.stacks;
+
+/// The number of values of a stack, which C passes by pointer.
+export fn count_of(s: *stacks.Ints) -> c_int
+{
+	return s.count;
+}

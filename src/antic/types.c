@@ -1438,6 +1438,11 @@ struct name types_c_name(const struct type *t)
     return t->c_name.length > 0 ? t->c_name : t->name;
 }
 
+struct name types_symbol_c_name(const struct type *t)
+{
+    return t->c_name.length > 0 && !t->c_name_read ? t->c_name : t->name;
+}
+
 struct type *types_param(struct types *types, struct name name)
 {
     struct type *t = arena_alloc(types->arena, sizeof *t);

@@ -311,6 +311,14 @@ struct type {
        in their C symbols, and the header writes it. Empty for every
        other type, whose C name is its name. */
     struct name c_name;
+    /* DESIGN: a copy whose C name the reader of a library file gave, from
+       an `export type` of another module, by 3 of "Answers of 2026-11-20"
+       in docs/decisions.md. The header writes the copy by that name. The
+       module of that `type` defines the symbols of the name, so a module
+       that uses the copy keeps the symbols of its generic, and the
+       program holds two copies, as the entry on the symbols of a named
+       copy in docs/decisions.md says. */
+    bool c_name_read;
     bool generic_ready;             /* a generic: its fields are known */
     /* A copy whose generic has not given it its fields yet. types_nest
        measures it as empty and keeps no height of a type that holds it,
@@ -865,6 +873,9 @@ struct type *types_param(struct types *types, struct name name);
 /* The name of t in C: the name an `export type` gives a copy, and the
    name of any other type. */
 struct name types_c_name(const struct type *t);
+/* The name the C symbols of t spell: the C name the module gave it, or
+   its name, which a C name of another module does not replace. */
+struct name types_symbol_c_name(const struct type *t);
 
 /* The tuple of the element types, interned. Its fields are `_0`, `_1`
    and on, in the order the elements were written. */

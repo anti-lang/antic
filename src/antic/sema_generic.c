@@ -652,8 +652,9 @@ void sema_resolve_generics(struct checker *c)
         /* The copy an `export type` names is an export class or struct
            to C, under the name of the `type`. The checks of what crosses
            to C read that. */
-        if (t->c_name.length == 0) {
+        if (t->c_name.length == 0 || t->c_name_read) {
             t->c_name = it->name;
+            t->c_name_read = false;
             t->item_exported = true;
         }
     }
