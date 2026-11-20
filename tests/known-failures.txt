@@ -31,5 +31,3 @@ matrix_closures_snapshot_made_in_a_loop_kept_past_its_turn_memory_checks T370 A 
 matrix_closures_snapshot_in_a_local_keeps_its_text_dev T371 A snapshot in a local holds the str it captures and not its bytes, so it reads the freed text.
 matrix_closures_snapshot_in_a_local_keeps_its_text_release T371 A snapshot in a local holds the str it captures and not its bytes, so it reads the freed text.
 matrix_closures_snapshot_in_a_local_keeps_its_text_memory_checks T371 A snapshot in a local holds the str it captures and not its bytes, so it reads the freed text.
-check_narrow_enum_from_u64 T372 A u64 above the largest i64 passes the check of an enum over i64 that declares -1.
-check_narrow_enum_from_negative T372 A negative value passes the check of an enum over u64 that declares the largest u64.

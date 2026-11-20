@@ -438,19 +438,35 @@ static void scalar_check(struct lowerer *l, const struct expr *e,
    block of its own. */
 static void enum_check(struct lowerer *l, const struct expr *e,
                        const struct type *from, const struct type *to,
-                       struct ir_operand wide, const char *operation,
-                       enum check_kind kind, struct ir_operand v)
+                       struct ir_operand wide, bool sign_changes,
+                       const char *operation, enum check_kind kind,
+                       struct ir_operand v)
 {
     struct ir_operand ok = lower_none();
+    bool top_bit = false;
     size_t i;
 
     for (i = 0; i < to->field_count; i++) {
         struct ir_operand is =
             lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, wide,
                                     ir_int_op(IR_I64, enum_value(to, i))));
+        top_bit = top_bit || (enum_value(to, i) >> 63) != 0;
         ok = ok.kind == IR_NONE
                  ? is
                  : lower_temp(l, ir_binary(l->f, l->b, IR_OR, IR_I8, ok, is));
+    }
+    /* A source of the other sign meets a declared value in the bits of
+       i64 alone where the top bit is set: a negative value and an enum
+       over an unsigned base, or a u64 above the largest i64 and an enum
+       over a signed one. The enum declares neither, so the widened value
+       is held at or above zero as well, by T372 of
+       docs/audit/tests-findings.md. An enum whose values all leave the
+       top bit clear needs no such test. */
+    if (sign_changes && top_bit) {
+        struct ir_operand held =
+            lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, wide,
+                                    ir_int_op(IR_I64, 0)));
+        ok = lower_temp(l, ir_binary(l->f, l->b, IR_AND, IR_I8, ok, held));
     }
     lower_check_branch(l, ok, false,
                        lower_check_text(l, e->pos.line, operation), kind, v,
@@ -493,7 +509,8 @@ void lower_narrow_check(struct lowerer *l, const struct expr *e,
         if (to->kind == TYPE_CHAR) {
             scalar_check(l, e, from, wide, text_cstr(&operation), kind, v);
         } else if (to->field_count > 0) {
-            enum_check(l, e, from, to, wide, text_cstr(&operation), kind, v);
+            enum_check(l, e, from, to, wide, sign_changes,
+                       text_cstr(&operation), kind, v);
         }
         goto done;
     }
