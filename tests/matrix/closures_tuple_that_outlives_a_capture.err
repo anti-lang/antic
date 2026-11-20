@@ -1,0 +1,1 @@
+closures_tuple_that_outlives_a_capture.anti:11:7: error: `t` outlives `inner`, which the closure captures, so a `snapshot fn` takes its value instead

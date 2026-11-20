@@ -394,6 +394,13 @@ struct type *types_lent(struct types *types, struct type *t);
 /* The pointer or slice t without `lent`, and t itself for any other
    type. */
 struct type *types_unlent(struct types *types, struct type *t);
+/* t with every function of the form of two words that a tuple or an
+   array of it holds as its part in the plain form. A bound function and
+   an `own fn` keep their form. A type argument is a type that stands
+   where a type is kept, so the parts of a tuple that holds a closure are
+   held to the rules of `keep` as the closure is, by T369 of
+   docs/audit/tests-findings.md. */
+struct type *types_plain_parts(struct types *types, struct type *t);
 /* Whether t is a `lent` pointer or slice. A NULL t and every other type
    are not. */
 bool types_is_lent(const struct type *t);

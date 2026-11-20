@@ -1,0 +1,1 @@
+closures_destructured_closure_that_outlives_a_capture.anti:11:7: error: `g` outlives `inner`, which the closure captures, so a `snapshot fn` takes its value instead

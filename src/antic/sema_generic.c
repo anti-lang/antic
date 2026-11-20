@@ -1983,6 +1983,7 @@ static void unify(struct type *param, struct type *arg,
         if (arg->kind == TYPE_FN && arg->context) {
             arg = types_fn_form(map->types, arg, false, false);
         }
+        arg = types_plain_parts(map->types, arg);
         /* A type argument is never `lent`, so a lent pointer at a
            parameter of a type parameter meets the rule of `lent` there.
            So does a tuple that holds one. */

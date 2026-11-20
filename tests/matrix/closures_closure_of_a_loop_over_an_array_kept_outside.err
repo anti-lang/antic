@@ -1,0 +1,1 @@
+closures_closure_of_a_loop_over_an_array_kept_outside.anti:12:8: error: `g` outlives `inner`, which the closure captures, so a `snapshot fn` takes its value instead

@@ -686,6 +686,30 @@ static bool take_owned_part(struct checker *c, struct expr *e,
     return require_owned(c, e, got);
 }
 
+/* Refuse the value e of a tuple or an array whose parts hold a function
+   of the form of two words where its context keeps the plain form, a
+   type argument among them. A literal names its first such element, by
+   T369 of docs/audit/tests-findings.md. */
+static void refuse_unkept_parts(struct checker *c, const struct expr *e)
+{
+    size_t count = e->kind == EXPR_TUPLE       ? e->as.tuple.count
+                   : e->kind == EXPR_ARRAY_LIT ? e->as.array_lit.count
+                                               : 0;
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        const struct expr *part = e->kind == EXPR_TUPLE
+                                      ? e->as.tuple.elements[i]
+                                      : e->as.array_lit.elements[i];
+        if (part->type != NULL &&
+            types_plain_parts(c->types, part->type) != part->type) {
+            refuse_unkept_parts(c, part);
+            return;
+        }
+    }
+    refuse_kept(c, e);
+}
+
 /* Refuse a function that is not `concurrent` at a `concurrent`
    parameter. The message names the variable a closure changes. */
 static void refuse_not_concurrent(struct checker *c, const struct expr *e)
@@ -786,6 +810,12 @@ bool sema_require(struct checker *c, struct expr *e, struct type *got,
     /* The result of `operator fn value` takes the tuple it declares. */
     if (types_holds_lent(got) && got != expected) {
         sema_refuse_lent_tuple(c, e);
+        return false;
+    }
+    if (got != expected &&
+        (got->kind == TYPE_TUPLE || got->kind == TYPE_ARRAY) &&
+        types_plain_parts(c->types, got) == expected) {
+        refuse_unkept_parts(c, e);
         return false;
     }
     /* DESIGN: the one exit of a lent pointer or slice is an argument of an

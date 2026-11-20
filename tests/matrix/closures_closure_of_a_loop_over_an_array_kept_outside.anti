@@ -1,0 +1,17 @@
+//! The variable of a loop over an array literal holds the closures of its
+//! elements, so a local declared outside the block of what they capture does
+//! not take it.
+
+fn main() -> int
+{
+	let n = 0;
+	let g = fn() { n += 1; };
+	{
+		let inner = 5;
+		for h in[fn() { n += inner; }] {
+			g = h;
+		}
+	}
+	g();
+	return n;
+}

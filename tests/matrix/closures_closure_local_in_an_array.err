@@ -1,1 +1,0 @@
-closures_closure_local_in_an_array.anti:7:11: error: `g` holds a function that is not kept and cannot be stored

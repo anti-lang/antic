@@ -150,8 +150,17 @@ void sema_refuse_worker_closure(struct checker *c, const struct expr *arg,
     }
 }
 
+/* The deeper of two captured variables, either of which may be NULL. */
+static const struct symbol *deeper_of(const struct symbol *a,
+                                      const struct symbol *b)
+{
+    return a == NULL || (b != NULL && b->depth > a->depth) ? b : a;
+}
+
 /* The captured variable declared deepest of the closure that the value e
-   gives, or NULL when e gives none or one that captures nothing. */
+   gives, or NULL when e gives none or one that captures nothing. A
+   tuple or an array gives the closures of its elements, and so does an
+   element of one, by T369 of docs/audit/tests-findings.md. */
 const struct symbol *sema_held_deepest(const struct expr *e)
 {
     const struct symbol *deepest = NULL;
@@ -160,17 +169,52 @@ const struct symbol *sema_held_deepest(const struct expr *e)
     if (e->kind == EXPR_NAME && e->symbol != NULL) {
         return e->symbol->holds;
     }
+    if (e->kind == EXPR_FIELD || e->kind == EXPR_INDEX) {
+        const struct expr *base = e->kind == EXPR_FIELD ? e->as.field.base
+                                                        : e->as.index.base;
+        return base->type != NULL && base->type->kind != TYPE_POINTER &&
+                       base->type->kind != TYPE_SLICE
+                   ? sema_held_deepest(base)
+                   : NULL;
+    }
+    if (e->kind == EXPR_TUPLE || e->kind == EXPR_ARRAY_LIT) {
+        size_t count = e->kind == EXPR_TUPLE ? e->as.tuple.count
+                                             : e->as.array_lit.count;
+        for (i = 0; i < count; i++) {
+            deepest = deeper_of(
+                deepest, sema_held_deepest(e->kind == EXPR_TUPLE
+                                               ? e->as.tuple.elements[i]
+                                               : e->as.array_lit.elements[i]));
+        }
+        return deepest;
+    }
+    if (e->kind == EXPR_ARRAY_REPEAT) {
+        return sema_held_deepest(e->as.array_repeat.value);
+    }
     /* A snapshot holds copies and depends on no variable. */
     if (e->kind != EXPR_FN || e->as.fn->snapshot) {
         return NULL;
     }
     for (i = 0; i < e->as.fn->capture_count; i++) {
-        const struct symbol *sym = e->as.fn->captures[i].symbol;
-        if (deepest == NULL || sym->depth > deepest->depth) {
-            deepest = sym;
-        }
+        deepest = deeper_of(deepest, e->as.fn->captures[i].symbol);
     }
     return deepest;
+}
+
+/* The local at the root of the place e, through the fields and the
+   elements a value holds in place, or NULL. */
+static struct symbol *place_root(const struct expr *e)
+{
+    while (e->kind == EXPR_INDEX || e->kind == EXPR_FIELD) {
+        const struct expr *base = e->kind == EXPR_INDEX ? e->as.index.base
+                                                        : e->as.field.base;
+        if (base->type == NULL || base->type->kind == TYPE_POINTER ||
+            base->type->kind == TYPE_SLICE) {
+            return NULL;
+        }
+        e = base;
+    }
+    return e->kind == EXPR_NAME ? e->symbol : NULL;
 }
 
 /* DESIGN: a closure never outlives the variables it captures. A local of
@@ -182,10 +226,13 @@ void sema_check_closure_lifetime(struct checker *c,
                                  const struct expr *value)
 {
     const struct symbol *deepest = sema_held_deepest(value);
-    struct symbol *sym = target->kind == EXPR_NAME ? target->symbol : NULL;
+    struct symbol *sym = place_root(target);
 
+    /* A tuple or an array local, and an element of one, holds a closure
+       as a local of function type does, by T369 of
+       docs/audit/tests-findings.md. */
     if (sym == NULL || deepest == NULL || sym->type == NULL ||
-        sym->type->kind != TYPE_FN || !sym->type->context) {
+        types_plain_parts(c->types, sym->type) == sym->type) {
         return;
     }
     if (deepest->depth > sym->depth) {
@@ -199,7 +246,7 @@ void sema_check_closure_lifetime(struct checker *c,
     if (sym->holds == NULL || deepest->depth > sym->holds->depth) {
         sym->holds = deepest;
     }
-    if (value->kind == EXPR_FN) {
+    if (value->kind == EXPR_FN && target->kind == EXPR_NAME) {
         sym->closure = value->as.fn;
     }
 }

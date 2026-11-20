@@ -1,0 +1,15 @@
+//! A tuple declared outside the block of a variable that a closure captures
+//! does not take the closure, which it would hold after the variable is gone.
+
+fn main() -> int
+{
+	let n = 0;
+	let g = fn() { n += 1; };
+	let t = (g, 1);
+	{
+		let inner = 5;
+		t = (fn() { n += inner; }, 2);
+	}
+	t.0();
+	return n;
+}

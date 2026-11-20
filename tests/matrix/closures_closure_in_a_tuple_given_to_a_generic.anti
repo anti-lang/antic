@@ -1,0 +1,13 @@
+//! A type argument is the plain form of a function, so a tuple that holds a
+//! closure by reference is no argument of a type parameter.
+
+fn peek<T>(x: T) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let n = 0;
+	return peek((fn() { n += 1; }, 1));
+}

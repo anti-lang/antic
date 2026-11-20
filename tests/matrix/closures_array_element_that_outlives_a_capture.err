@@ -1,0 +1,1 @@
+closures_array_element_that_outlives_a_capture.anti:11:10: error: `a` outlives `inner`, which the closure captures, so a `snapshot fn` takes its value instead

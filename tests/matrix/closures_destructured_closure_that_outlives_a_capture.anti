@@ -1,0 +1,15 @@
+//! A name of a destructuring holds the closure of its tuple, so a local
+//! declared outside the block of what the closure captures does not take it.
+
+fn main() -> int
+{
+	let n = 0;
+	let g = fn() { n += 1; };
+	{
+		let inner = 5;
+		let (h, k) = (fn() { n += inner; }, 2);
+		g = h;
+	}
+	g();
+	return n;
+}

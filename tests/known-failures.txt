@@ -22,9 +22,6 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 std_reflect_call_enum T365 reflect.call passes a number that the enum of the parameter does not declare.
 program_own_param_alias T366 The own pointer parameter is noalias, so a write through a plain pointer to the same object is lost.
 program_own_param_alias_macos-x86_64 T366 The own pointer parameter is noalias, so a write through a plain pointer to the same object is lost.
-matrix_closures_closure_in_a_tuple_refused T369 A tuple literal takes a closure by reference, which a tuple can carry past what it captures.
-matrix_closures_closure_local_in_an_array_refused T369 An array literal takes a local that holds a closure by reference.
-matrix_closures_parameter_in_a_repeated_array_refused T369 The repeat form of an array takes a parameter of function type that is not keep.
 matrix_closures_snapshot_made_in_a_loop_kept_past_its_turn_dev T370 A snapshot in the frame is one record per expression, so a later turn of the loop writes over the one a local keeps.
 matrix_closures_snapshot_made_in_a_loop_kept_past_its_turn_release T370 A snapshot in the frame is one record per expression, so a later turn of the loop writes over the one a local keeps.
 matrix_closures_snapshot_made_in_a_loop_kept_past_its_turn_memory_checks T370 A snapshot in the frame is one record per expression, so a later turn of the loop writes over the one a local keeps.

@@ -1,0 +1,15 @@
+//! An element of an array declared outside the block of a variable that a
+//! closure captures does not take the closure.
+
+fn main() -> int
+{
+	let n = 0;
+	let g = fn() { n += 1; };
+	let a = [g];
+	{
+		let inner = 5;
+		a[0] = fn() { n += inner; };
+	}
+	a[0]();
+	return n;
+}

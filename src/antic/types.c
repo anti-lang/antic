@@ -195,6 +195,31 @@ struct type *types_unlent_parts(struct types *types, struct type *t)
     return types_tuple(types, parts, t->param_count);
 }
 
+struct type *types_plain_parts(struct types *types, struct type *t)
+{
+    struct type **parts;
+    bool changed = false;
+    size_t i;
+
+    if (t->kind == TYPE_FN && t->context && !t->owned && !t->bound) {
+        return types_fn_form(types, t, false, false);
+    }
+    if (t->kind == TYPE_ARRAY && t->length_of == NULL) {
+        struct type *element = types_plain_parts(types, t->element);
+        return element == t->element ? t
+                                     : types_array(types, element, t->length);
+    }
+    if (t->kind != TYPE_TUPLE) {
+        return t;
+    }
+    parts = types_alloc_array(types->arena, t->param_count, sizeof *parts);
+    for (i = 0; i < t->param_count; i++) {
+        parts[i] = types_plain_parts(types, t->params[i]);
+        changed = changed || parts[i] != t->params[i];
+    }
+    return changed ? types_tuple(types, parts, t->param_count) : t;
+}
+
 bool types_is_lent(const struct type *t)
 {
     return t != NULL && (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) &&

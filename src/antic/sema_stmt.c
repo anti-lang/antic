@@ -1547,6 +1547,7 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
     struct symbol *value;
     struct context sized;
     struct type *t;
+    size_t i;
     bool flags_shape = s->as.let.name_count == 2 &&
                        s->as.let.guard.kind == HANDLE_NONE &&
                        (s->as.let.value->kind == EXPR_BINARY ||
@@ -1590,6 +1591,14 @@ static void check_destructuring_let(struct checker *c, struct stmt *s)
     s->as.let.symbol = value;
     bind_elements(c, s->as.let.names, s->as.let.name_count, t,
                   s->as.let.name_pos, false);
+    /* Each name holds a closure that the tuple holds, by T369 of
+       docs/audit/tests-findings.md. */
+    for (i = 0; i < s->as.let.name_count; i++) {
+        if (s->as.let.names[i].symbol != NULL) {
+            s->as.let.names[i].symbol->holds =
+                sema_held_deepest(s->as.let.value);
+        }
+    }
 }
 
 static void check_stmt(struct checker *c, struct stmt *s);
@@ -2272,6 +2281,11 @@ static void check_for(struct checker *c, struct stmt *s)
                           : types_tuple(c->types, pair, 2),
                       s->pos, true);
         mark_walked(s, s->as.for_loop.names[names - 1].symbol);
+        if (names == 2 && s->as.for_loop.over != NULL &&
+            s->as.for_loop.names[1].symbol != NULL) {
+            s->as.for_loop.names[1].symbol->holds =
+                sema_held_deepest(s->as.for_loop.over);
+        }
     } else if (names == 1) {
         loop_var = sema_declare(c, SYMBOL_LOCAL,
                                 &s->as.for_loop.names[0].name,
@@ -2280,6 +2294,10 @@ static void check_for(struct checker *c, struct stmt *s)
         if (loop_var != NULL) {
             loop_var->type = element;
             loop_var->read_only = true;
+            /* The element holds a closure that the collection holds. */
+            loop_var->holds = s->as.for_loop.over != NULL
+                                  ? sema_held_deepest(s->as.for_loop.over)
+                                  : NULL;
             s->as.for_loop.names[0].symbol = loop_var;
             mark_walked(s, loop_var);
         }

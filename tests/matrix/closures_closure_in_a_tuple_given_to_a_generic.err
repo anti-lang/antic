@@ -1,0 +1,1 @@
+closures_closure_in_a_tuple_given_to_a_generic.anti:12:15: error: a closure is never kept, and this one captures `n`, so a `snapshot fn` at a `keep own` parameter or an `own` field takes its value
