@@ -30,11 +30,15 @@ static size_t closing_brace(const struct parser *p)
    parse is left past its closing brace at close, so the rest of it never
    reads as items of the module, as a class body is. One mistake in a body
    gives one message, by T295 of docs/audit/tests-findings.md. A body that
-   the end of the source cuts has no closing brace, and the recovery of
-   the module goes on where the body failed. */
+   the end of the source cuts has no closing brace and is left at the end
+   of the source, as class_item leaves a cut class body. It then gives one
+   message too, by item 4 of "Answers of 2026-11-19" in docs/decisions.md
+   and T352. */
 static void leave_body(struct parser *p, size_t close)
 {
-    if (close > p->pos && close < p->last) {
+    if (close >= p->last) {
+        p->pos = p->last;
+    } else if (close > p->pos) {
         p->pos = close + 1;
     }
 }
