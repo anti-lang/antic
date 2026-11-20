@@ -1,5 +1,6 @@
 //! A type argument is the plain form of a function, so a tuple that holds a
-//! closure by reference is no argument of a type parameter.
+//! closure by reference is no argument of a type parameter, whatever element
+//! holds it.
 
 fn peek<T>(x: T) -> int
 {
@@ -9,5 +10,5 @@ fn peek<T>(x: T) -> int
 fn main() -> int
 {
 	let n = 0;
-	return peek((fn() { n += 1; }, 1));
+	return peek((1, fn() { n += 1; }));
 }

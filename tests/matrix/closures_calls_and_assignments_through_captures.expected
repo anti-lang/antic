@@ -6,3 +6,4 @@ a local of a parameter takes a closure 1
 a local takes a local that holds a closure 2
 a worker takes a closure at a concurrent parameter 4
 a closure at a parameter that may fail runs 3
+an element of an array takes a closure 13, a generic a bound function 5

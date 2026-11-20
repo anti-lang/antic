@@ -3,7 +3,9 @@
 //! captured struct. A local of a parameter takes a closure, a local takes the
 //! local that holds one, and a worker takes a closure at a `concurrent`
 //! parameter. An anonymous function at a parameter that may fail may fail by
-//! that type alone, so it never warns that it never fails.
+//! that type alone, so it never warns that it never fails. An element of an
+//! array of its block takes a closure, and a generic takes a tuple of a bound
+//! function.
 
 import anti.io;
 import anti.lang;
@@ -12,6 +14,19 @@ import anti.text;
 struct Holder
 {
 	f: fn(),
+}
+
+class Square
+{
+	pub fn area(self) -> int
+	{
+		return 9;
+	}
+}
+
+fn first<T>(x: (T, int)) -> int
+{
+	return x.1;
 }
 
 fn plain()
@@ -94,5 +109,13 @@ fn main() -> int
 	let fourth = f"a closure at a parameter that may fail runs {n}";
 	io.println(fourth);
 	free(fourth.ptr);
+	let a = [g];
+	a[0] = fn() { n += 10; };
+	a[0]();
+	let sq = Square { };
+	let kept = first((sq.area, 5));
+	let fifth = f"an element of an array takes a closure {n}, a generic a bound function {kept}";
+	io.println(fifth);
+	free(fifth.ptr);
 	return 0;
 }
