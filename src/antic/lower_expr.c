@@ -2035,7 +2035,7 @@ static struct ir_operand lower_converted(struct lowerer *l,
                  lower_context_word(l, e->type, v));
         return copy;
     }
-    if (e->to_iface == NULL) {
+    if (e->to_iface == NULL || lower_converts_in_place(e)) {
         return v;
     }
     return lower_to_interface(l, e, v, types_is_nullable(e->type));
@@ -2157,7 +2157,7 @@ static struct ir_operand lower_expr_value(struct lowerer *l,
                 if (err.kind == IR_NONE) {
                     return v;
                 }
-                lower_handle_error(l, call, err, slot, true, v);
+                lower_handle_converted(l, call, err, slot, true, v, e);
                 return lower_temp(l, ir_load(l->f, l->b, IR_PTR, slot));
             }
             before = lower_build_on_heap(l, v);

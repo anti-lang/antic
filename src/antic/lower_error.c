@@ -31,7 +31,7 @@ struct ir_operand lower_handled_operand(struct lowerer *l,
     }
     l->out_address = out;
     err = lower_call(l, e);
-    lower_handle_error(l, e, err, out, has_out, lower_none());
+    lower_handle_converted(l, e, err, out, has_out, lower_none(), e);
     if (!has_out || lower_is_aggregate(e->type)) {
         return out;
     }
@@ -99,6 +99,39 @@ static void forward_to_try_block(struct lowerer *l, struct ir_operand err)
     }
 }
 
+/* DESIGN: `alloc T(args)` and a call whose error a handler takes write
+   their pointer into the slot of a `let`, an assignment or an operand,
+   and the handler yields a value of the type of the binding, by D of
+   "Answers of 2026-11-19" in docs/decisions.md. Where the binding names
+   an interface of the class, the success path moves the pointer in the
+   slot to its sub-object before the join, and a value the handler
+   yields stays as it is. The pointer of a success is never `none`, so
+   the move needs no test of it. */
+void lower_convert_in_place(struct lowerer *l, const struct expr *value,
+                            struct ir_operand slot)
+{
+    struct ir_operand held;
+    struct ir_operand moved;
+
+    if (value == NULL || value->to_iface == NULL || l->b == NULL) {
+        return;
+    }
+    held = lower_temp(l, ir_load(l->f, l->b, IR_PTR, slot));
+    moved = lower_to_interface(l, value, held, false);
+    ir_store(l->f, l->b, IR_PTR, moved, slot);
+}
+
+/* Whether the value converts in its slot, so the conversion of an
+   operand to an interface passes over it. */
+bool lower_converts_in_place(const struct expr *e)
+{
+    return (lower_is_handled_call(e) && e->as.call.out != NULL) ||
+           (e->kind == EXPR_ALLOC && e->as.alloc.value != NULL &&
+            e->as.alloc.value->kind == EXPR_CALL &&
+            e->as.alloc.value->as.call.builds != NULL &&
+            e->as.alloc.value->as.call.handler.kind != HANDLE_NONE);
+}
+
 /* DESIGN: a call that can fail gives a pointer. A pointer of `none` is
    success, so the branch after the call is the whole of the error
    machinery. It is one compare and one branch, and nothing unwinds. */
@@ -106,9 +139,18 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
                         struct ir_operand err, struct ir_operand out,
                         bool has_out, struct ir_operand release)
 {
+    lower_handle_converted(l, call, err, out, has_out, release, NULL);
+}
+
+void lower_handle_converted(struct lowerer *l, const struct expr *call,
+                            struct ir_operand err, struct ir_operand out,
+                            bool has_out, struct ir_operand release,
+                            const struct expr *converts)
+{
     const struct handler *h = &call->as.call.handler;
     struct ir_block *bad = lower_new_block(l);
     struct ir_block *join = lower_new_block(l);
+    struct ir_block *ok = join;
     struct handling scope;
     struct ir_operand succeeded =
         lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, err,
@@ -124,7 +166,10 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
         ir_assign(l->f, l->b, l->base_built, succeeded);
         l->base_stage = BASE_FAILED;
     }
-    ir_branch(l->f, l->b, succeeded, join, bad);
+    if (converts != NULL && converts->to_iface != NULL && has_out) {
+        ok = lower_new_block(l);
+    }
+    ir_branch(l->f, l->b, succeeded, ok, bad);
     l->b = bad;
     /* A `construct` that fails leaves no object behind, so the memory
        it was given goes back before the handler runs. */
@@ -173,6 +218,11 @@ void lower_handle_error(struct lowerer *l, const struct expr *call,
             ir_jump(l->f, l->b, join);
         }
         break;
+    }
+    if (ok != join) {
+        l->b = ok;
+        lower_convert_in_place(l, converts, out);
+        ir_jump(l->f, l->b, join);
     }
     l->b = join;
 }

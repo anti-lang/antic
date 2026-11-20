@@ -677,6 +677,18 @@ struct ir_operand lower_handled_operand(struct lowerer *l,
 void lower_handle_error(struct lowerer *l, const struct expr *call,
                         struct ir_operand err, struct ir_operand out,
                         bool has_out, struct ir_operand release);
+/* lower_handle_error, and where converts moves to an interface, the
+   move of the pointer in out on the success path alone. */
+void lower_handle_converted(struct lowerer *l, const struct expr *call,
+                            struct ir_operand err, struct ir_operand out,
+                            bool has_out, struct ir_operand release,
+                            const struct expr *converts);
+/* Move the pointer in slot to the sub-object of the interface value
+   converts to. */
+void lower_convert_in_place(struct lowerer *l, const struct expr *value,
+                            struct ir_operand slot);
+/* Whether e converts to its interface in its slot. */
+bool lower_converts_in_place(const struct expr *e);
 bool lower_is_handled_call(const struct expr *e);
 void lower_handler(struct lowerer *l, const struct handler *h,
                    uint32_t error, const struct type *error_type,

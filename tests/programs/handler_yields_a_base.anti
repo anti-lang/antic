@@ -1,0 +1,135 @@
+//! The handler of a call whose `*Kid` a `let` or an assignment of a `?*Base`
+//! takes yields any `?*Base`, another class below `Base` among them, by D of
+//! "Answers of 2026-11-19" in `docs/decisions.md`. One whose `*Kid` a place of
+//! a `?*Counter` of an interface takes yields any `?*Counter`. The call that
+//! succeeds moves to the sub-object of the interface, and the pointer the
+//! handler yields stays as it is.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Counter
+{
+	abstract fn add(self, n: int) -> int;
+}
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Kid inherits Base
+{
+	implements counter: Counter,
+
+	fn construct(self, k: int) may fail
+	{
+		if k < 0 {
+			fail "below";
+		}
+		self.n = k;
+	}
+
+	concrete fn Counter::add(self, n: int) -> int
+	{
+		return self.n + n;
+	}
+}
+
+class Other inherits Base
+{
+	pad: int = 0,
+	implements counter: Counter,
+
+	concrete fn Counter::add(self, n: int) -> int
+	{
+		return self.n + n + 100;
+	}
+}
+
+fn make(k: int) -> *Kid may fail
+{
+	if k < 0 {
+		fail "below";
+	}
+	return alloc Kid(k) catch fatal;
+}
+
+/// An `Other` with the number `n`.
+fn other(n: int) -> *Other
+{
+	let o = alloc Other { };
+	o.n = n;
+	return o;
+}
+
+/// Print the number of the base and delete it.
+fn show(name: str, b: ?*Base)
+{
+	if let found = b {
+		printf("%.*s %d\n".ptr, name.len as c_int, name.ptr, found.n as c_int);
+		delete(found);
+	} else {
+		printf("%.*s none\n".ptr, name.len as c_int, name.ptr);
+	}
+}
+
+/// Print what the counter adds to 1 and delete it.
+fn count(name: str, c: ?*Counter)
+{
+	if let found = c {
+		printf("%.*s %d\n".ptr, name.len as c_int, name.ptr,
+			found.add(1) as c_int);
+		delete(found);
+	} else {
+		printf("%.*s none\n".ptr, name.len as c_int, name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let a: ?*Base = make(-1) catch e {
+		yield other(5);
+	};
+	show("call", a);
+	let b: ?*Base = alloc Kid(-2) catch e {
+		yield other(6);
+	};
+	show("alloc", b);
+	let c: ?*Counter = make(-3) catch e {
+		yield other(7);
+	};
+	count("interface", c);
+	let d: ?*Counter = make(2) catch e {
+		yield other(7);
+	};
+	count("interface built", d);
+	let f: ?*Counter = alloc Kid(-4) catch e {
+		yield other(8);
+	};
+	count("interface alloc", f);
+	let g: ?*Counter = none;
+	g = make(-5) catch e {
+		yield other(9);
+	};
+	count("assigned", g);
+	g = make(3) catch e {
+		yield other(9);
+	};
+	count("assigned built", g);
+	g = alloc Kid(-6) catch e {
+		yield other(10);
+	};
+	count("assigned alloc", g);
+	g = alloc Kid(4) catch e {
+		yield other(10);
+	};
+	count("assigned alloc built", g);
+	let h: ?*Base = none;
+	h = make(-7) catch e {
+		yield other(11);
+	};
+	show("assigned base", h);
+	return 0;
+}

@@ -1,0 +1,11 @@
+exit 0
+call 5
+alloc 6
+interface 108
+interface built 3
+interface alloc 109
+assigned 110
+assigned built 4
+assigned alloc 111
+assigned alloc built 5
+assigned base 11

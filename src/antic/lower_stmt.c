@@ -1090,26 +1090,6 @@ static void lower_let_unwrap(struct lowerer *l, const struct stmt *s)
     }
 }
 
-/* DESIGN: `alloc T(args)` and a call whose error a handler takes write
-   their pointer into the slot of the `let`, and the handler yields a
-   value of the same type, by T278. Where the `let` names
-   an interface of that class, the slot then moves to the sub-object once
-   every path has left its value there. `none` stays `none`, by T285 of
-   docs/audit/tests-findings.md. */
-static void convert_in_place(struct lowerer *l, const struct expr *value,
-                             struct ir_operand slot)
-{
-    struct ir_operand held;
-    struct ir_operand moved;
-
-    if (value->to_iface == NULL || l->b == NULL) {
-        return;
-    }
-    held = lower_temp(l, ir_load(l->f, l->b, IR_PTR, slot));
-    moved = lower_to_interface(l, value, held, true);
-    ir_store(l->f, l->b, IR_PTR, moved, slot);
-}
-
 static void lower_let_value(struct lowerer *l, const struct stmt *s)
 {
     struct symbol *sym = s->as.let.symbol;
@@ -1137,9 +1117,11 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         err = lower_construct(l, call, object);
         lower_build_on_heap(l, before);
         if (err.kind != IR_NONE) {
-            lower_handle_error(l, call, err, place, true, object);
+            lower_handle_converted(l, call, err, place, true, object,
+                                   s->as.let.value);
+        } else {
+            lower_convert_in_place(l, s->as.let.value, place);
         }
-        convert_in_place(l, s->as.let.value, place);
         return;
     }
     /* `let n = f(args) catch e { }`: the call writes n through the out
@@ -1154,10 +1136,8 @@ static void lower_let_value(struct lowerer *l, const struct stmt *s)
         }
         l->out_address = out;
         err = lower_call(l, s->as.let.value);
-        lower_handle_error(l, s->as.let.value, err, out, has_out, lower_none());
-        if (has_out) {
-            convert_in_place(l, s->as.let.value, out);
-        }
+        lower_handle_converted(l, s->as.let.value, err, out, has_out,
+                               lower_none(), s->as.let.value);
         /* DESIGN: the binding is a local of its type and is torn down at
            the end of its block like any other. It is registered after the
            handler. Every path that reaches this point has a value in the

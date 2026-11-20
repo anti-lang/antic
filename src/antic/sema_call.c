@@ -1431,6 +1431,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
                               ? types_pointer(c->types, provided)
                               : handled_result(c, e, fn);
     const struct symbol *callee = function_symbol(e->as.call.callee);
+    struct type *yields = NULL;
     struct scope scope;
 
     /* DESIGN: `yield` gives the value that takes the place of the
@@ -1449,6 +1450,12 @@ static struct type *check_handled(struct checker *c, struct expr *e,
                (sema_descends_from(result->element, expected->element) ||
                 sema_implemented_in(result->element, expected->element))) {
         result = types_pointer_nullable(c->types, result->element);
+        /* The handler yields any value of the binding, by D of "Answers
+           of 2026-11-19" in docs/decisions.md. */
+        yields = expected;
+    }
+    if (yields == NULL) {
+        yields = result;
     }
 
     if (h->kind == HANDLE_TRY && sema_refuse_in_deferred(c, h->pos, "try")) {
@@ -1518,7 +1525,7 @@ static struct type *check_handled(struct checker *c, struct expr *e,
         sema_declare_caught(c, h, sema_caught_error(c, fn->result));
         /* The value of an expression statement is taken by nothing,
            and its handler may reach its end. */
-        sema_check_handler(c, h, result, false,
+        sema_check_handler(c, h, yields, false,
                            result->kind != TYPE_VOID &&
                                !sema_is_error(result) && c->discarded != e);
         sema_leave_scope(c, &scope);
