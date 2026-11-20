@@ -1323,6 +1323,34 @@ static void settle_functions(struct reader *r)
     }
 }
 
+/* DESIGN: C keeps the tags of structs apart from the names of functions,
+   so `struct stat` stands beside `stat()` of <sys/stat.h>. A module of
+   Anti has one name space, so a record whose name a function of the
+   header has takes a trailing `_`, as `stat_`, by item 18 of "Answers of
+   2026-11-19" in docs/decisions.md. Every type that names the record
+   reaches it through its record, so each spells the new name, and the
+   probe keeps the C name. */
+static void settle_record_names(struct reader *r)
+{
+    struct bind_module *b = r->b;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < b->records.count; i++) {
+        struct bind_record *rec = b->records.items[i];
+        for (j = 0; j < b->functions.count; j++) {
+            const struct bind_function *f = b->functions.items[j];
+            if (strcmp(f->name, rec->name) == 0) {
+                struct text renamed = {0};
+                text_appendf(&renamed, "%s_", rec->name);
+                rec->name = bind_strdup(b, text_cstr(&renamed));
+                text_free(&renamed);
+                break;
+            }
+        }
+    }
+}
+
 /* The macros. */
 
 static struct macro *macro_named(struct reader *r, const char *name)
@@ -1995,6 +2023,7 @@ bool bind_read_clang(struct bind_module *b, const struct bind_clang_request *q)
         track(&r, json_get(node, "inner"));
     }
     settle_functions(&r);
+    settle_record_names(&r);
     settle_enums(&r);
     read_macros(&r);
     ok = !r.failed;

@@ -358,7 +358,16 @@ static bool read_enums(struct api *a)
         const char *name = json_member_string(list->items[i], "name");
         const struct json_value *values = json_get(list->items[i], "values");
         struct bind_enum *e;
-        if (name == NULL || values == NULL || values->kind != JSON_ARRAY) {
+        /* Item 17 of "Answers of 2026-11-19": an enum left out and a value
+           without its name give a warning each, as R171 of "Rules of
+           2026-10-13" gives one for a struct without its name. */
+        if (name == NULL) {
+            bind_warn(a->b, "an enum without a name is left out");
+            continue;
+        }
+        if (values == NULL || values->kind != JSON_ARRAY) {
+            bind_warn(a->b, "the enum `%s` is left out: its values are no "
+                      "array", name);
             continue;
         }
         if (!bind_named(a->b, "enum", name)) {
@@ -373,8 +382,12 @@ static bool read_enums(struct api *a)
         for (j = 0; j < values->count; j++) {
             const char *vname = json_member_string(values->items[j], "name");
             int64_t value;
-            if (vname == NULL ||
-                !json_integer(json_get(values->items[j], "value"), &value)) {
+            if (vname == NULL) {
+                bind_warn(a->b, "a value of the enum `%s` without a name is "
+                          "left out", name);
+                continue;
+            }
+            if (!json_integer(json_get(values->items[j], "value"), &value)) {
                 bind_warn(a->b, "a value of the enum `%s` is no integer", name);
                 continue;
             }
