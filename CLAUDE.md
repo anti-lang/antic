@@ -846,6 +846,28 @@ not re-open a settled decision without asking Eddie.
   parts of `asan`, the last up to test 7945: `asan` 251 s, 187 s, 266 s,
   169 s, 121 s and 632 s, `ubsan` 263 s, 187 s, 267 s, 176 s, 123 s and
   656 s.
+  The step of the answers of 2026-11-19 measured `host` in the same
+  three parts: 396 s, 282 s and 443 s before the fix of T351, up to test
+  7972, 398 s, 282 s and 423 s before that of T352, 391 s, 282 s and
+  447 s before that of T353 and T354, 392 s, 280 s and 429 s before that
+  of T341, 394 s, 278 s and 425 s before that of T342, 383 s, 272 s and
+  405 s before that of T355, where `emit_identity` failed on the texts of
+  the patterns, which ran again alone once the manifest stood written,
+  375 s, 273 s and 414 s before that of T356, 372 s, 273 s and 414 s
+  before that of T350, 375 s, 268 s and 363 s before the commit of item
+  14, 373 s, 267 s and 372 s before the fix of T358, 376 s, 267 s and
+  361 s before that of T359 and T360, 370 s, 271 s and 369 s before that
+  of T361, T362 and I, up to test 7973, 370 s, 268 s and 359 s before
+  that of T316, 366 s, 267 s and 357 s before that of T343 to T345, up
+  to test 7975, 351 s, 267 s and 356 s before that of T338, where
+  `file_headers` failed on a declaration without its comment, and 357 s
+  for the third part once it had one, 373 s, 269 s and 362 s before the
+  commit of C, up to test 7978, 369 s, 270 s and 356 s before that of E,
+  371 s, 268 s and 349 s before that of F and G, up to test 7980, and
+  374 s, 269 s and 359 s before that of H and J, up to test 7984. It ran
+  each sanitizer suite in the six parts of `asan`, the last up to test
+  7982: `asan` 246 s, 179 s, 261 s, 164 s, 120 s and 604 s, `ubsan`
+  256 s, 182 s, 259 s, 171 s, 121 s and 627 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1456,12 +1478,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 7947 ctest tests pass on the development Mac, and two of them, the
+- 7984 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
-  Of the nine lines of `tests/known-failures.txt`, those of T136 and
-  T138 carry `host=windows`, and those of T316, T338 and T341 to T345
-  wait for the step that builds Eddie's answers.
-  The ASan and the UBSan builds run 7945 each
+  `tests/known-failures.txt` holds the two lines of T136 and T138, which
+  carry `host=windows`.
+  The ASan and the UBSan builds run 7982 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
