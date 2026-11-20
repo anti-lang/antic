@@ -1575,10 +1575,15 @@ void sema_generic_defaults(struct checker *c, struct type *generic)
                 copy->fields[i].constant != NULL) {
                 continue;
             }
+            /* A default that names no parameter is the value of the
+               generic itself, which subst_value leaves as it is, by T367
+               of docs/audit/tests-findings.md. */
             v = arena_alloc(c->arena, sizeof *v);
             if (subst_value(c, generic->fields[i].constant, &map, v)) {
                 copy->fields[i].constant = v;
                 copy->fields[i].value = NULL;
+            } else {
+                copy->fields[i].constant = generic->fields[i].constant;
             }
         }
     }
