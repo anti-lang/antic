@@ -213,7 +213,8 @@ static bool type_names_error(const struct type *t)
 }
 
 static void c_type_name(struct text *out, const struct type *t);
-static void element_c_name(struct text *out, const struct type *t);
+static void element_c_name(struct text *out, const struct type *t,
+                           bool tupled);
 
 /* `tuple` and the name of each element of the tuple t after a `_`. */
 static void tuple_elements(struct text *out, const struct type *t)
@@ -223,7 +224,7 @@ static void tuple_elements(struct text *out, const struct type *t)
     text_append(out, "tuple");
     for (i = 0; i < t->param_count; i++) {
         text_append(out, "_");
-        element_c_name(out, t->params[i]);
+        element_c_name(out, t->params[i], true);
     }
 }
 
@@ -238,37 +239,43 @@ static void tuple_elements(struct text *out, const struct type *t)
    `((int, int, int), int)` have two names. A function writes `fn`, its
    parameters, `to` and its result, and ends with `_end` as well:
    `fn_int_to_bool_end`. A named type writes the name C knows it by, the
-   one an `export type` gives a copy of a generic. */
-static void element_c_name(struct text *out, const struct type *t)
+   one an `export type` gives a copy of a generic. Inside the name of a
+   tuple the count of its bytes stands before it, as `7my_type`, so a name
+   that holds `_` never reads as two elements, by T342 of
+   docs/audit/tests-findings.md and B of "Answers of 2026-11-19" in
+   docs/decisions.md. tupled says a tuple holds t. A built-in type keeps
+   its name, and `(int, str)` stays `anti_tuple_int_str`. */
+static void element_c_name(struct text *out, const struct type *t,
+                           bool tupled)
 {
     size_t i;
 
     switch (t->kind) {
     case TYPE_POINTER:
         text_append(out, t->nullable ? "optr_" : "ptr_");
-        element_c_name(out, t->element);
+        element_c_name(out, t->element, tupled);
         return;
     case TYPE_ARRAY:
         text_appendf(out, "a%" PRIu64 "_", t->length);
-        element_c_name(out, t->element);
+        element_c_name(out, t->element, tupled);
         return;
     case TYPE_SLICE:
         text_append(out, "slice_");
-        element_c_name(out, t->element);
+        element_c_name(out, t->element, tupled);
         return;
     case TYPE_FN:
         text_append(out, "fn");
         for (i = 0; i < t->param_count; i++) {
             text_append(out, "_");
-            element_c_name(out, t->params[i]);
+            element_c_name(out, t->params[i], tupled);
         }
         text_append(out, "_to_");
-        element_c_name(out, t->result);
+        element_c_name(out, t->result, tupled);
         text_append(out, "_end");
         return;
     case TYPE_OPTIONAL:
         text_append(out, "opt_");
-        element_c_name(out, t->element);
+        element_c_name(out, t->element, tupled);
         return;
     case TYPE_TUPLE:
         tuple_elements(out, t);
@@ -277,9 +284,16 @@ static void element_c_name(struct text *out, const struct type *t)
     case TYPE_STRUCT:
     case TYPE_CLASS:
     case TYPE_VARIANT:
-    case TYPE_ENUM:
-        c_type_name(out, t);
+    case TYPE_ENUM: {
+        struct text named = {0};
+        c_type_name(&named, t);
+        if (tupled) {
+            text_appendf(out, "%zu", named.length);
+        }
+        text_append(out, text_cstr(&named));
+        text_free(&named);
         return;
+    }
     default:
         types_name(out, t);
         return;
@@ -294,7 +308,7 @@ static void tuple_c_name(struct text *out, const struct type *t)
     if (t->kind == TYPE_TUPLE) {
         tuple_elements(out, t);
     } else {
-        element_c_name(out, t);
+        element_c_name(out, t, false);
     }
 }
 

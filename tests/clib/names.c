@@ -69,7 +69,7 @@ int main(void)
     struct anti_tuple_tuple_i32_i32_i32_end_i32 three = {{1, 2, 3}, 6};
     struct anti_tuple_fn_i32_to_i32_end_i32 one_fn = {add_one, 7};
     struct anti_tuple_fn_i32_i32_to_i32_end_i32 two_fn = {add, 8};
-    struct anti_tuple_IntBox_i32 boxed = {{9}, 1};
+    struct anti_tuple_6IntBox_i32 boxed = {{9}, 1};
     printf("%d %d %d %d %d\n", nest_two(two), nest_three(three),
            apply_one(one_fn), apply_two(two_fn), unbox(boxed));
 

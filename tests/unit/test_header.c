@@ -121,9 +121,9 @@ static void element_names(void)
                     " b: (*Box, i64)) -> i64 { return c.1 + b.1; }\n",
                     false, &out)) {
         CHECK(strstr(text_cstr(&out),
-                     "int64_t pair(struct anti_tuple_Color_int c, "
+                     "int64_t pair(struct anti_tuple_5Color_int c, "
                      "struct anti_opt_Shape s, "
-                     "struct anti_tuple_ptr_Box_int b);\n") != NULL);
+                     "struct anti_tuple_ptr_3Box_int b);\n") != NULL);
     }
     text_free(&out);
 }
@@ -334,14 +334,14 @@ void test_header(void)
               "};\n"
               "\n"
               "/* The tuple (Vec2, f32). */\n"
-              "struct anti_tuple_Vec2_f32 {\n"
+              "struct anti_tuple_4Vec2_f32 {\n"
               "    Vec2 _0;\n"
               "    float _1;\n"
               "};\n"
               "\n"
               "/** Both answers of a division. */\n"
               "struct anti_tuple_int_int divmod(int64_t a, int64_t b);\n"
-              "struct anti_tuple_Vec2_f32 scaled(Vec2 v, float k);\n"
+              "struct anti_tuple_4Vec2_f32 scaled(Vec2 v, float k);\n"
               "int64_t first(struct anti_tuple_int_int p);\n"
               "\n"
               "#ifdef __cplusplus\n"
