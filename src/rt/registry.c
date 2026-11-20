@@ -45,33 +45,22 @@ static const struct anti_class *find_in(const struct anti_registry *r,
     return found;
 }
 
-/* The class named `Class` or `module.Class`, or NULL when the registry
-   holds none or holds two of the bare name. *slot is the slot of the
-   library the class lies in, with one object counted against it, or
-   NULL for a class of the program. The caller gives the count back with
-   given once the object is built or the lookup came to nothing.
-
-   DESIGN: a name without a dot is the name the descriptor holds, which
-   two modules may both declare. It finds a class when one class alone
-   has it. `module.Class` names the class of one module and is never in
-   doubt. */
-static const struct anti_class *registry_find(const unsigned char *name,
-                                             int64_t length,
-                                             struct anti_plugin **slot)
+/* The class whose module is the dot - 1 bytes of name and whose
+   descriptor holds the rest, or of any module where dot is 0, as
+   registry_find reads a name. *two says the bare name named two. */
+static const struct anti_class *find_cut(const unsigned char *name,
+                                         int64_t length, int64_t dot,
+                                         struct anti_plugin **slot,
+                                         bool *two)
 {
     const struct anti_class *found;
     struct anti_plugin *in = NULL;
-    bool two = false;
-    int64_t dot = length;
     int64_t i;
 
-    *slot = NULL;
-    while (dot > 0 && name[dot - 1] != '.') {
-        dot--;
-    }
-    found = find_in(&anti_rt_registry, name, length, dot, &two);
-    if (two || anti_rt_plugin_open() == 0) {
-        return two ? NULL : found;
+    *two = false;
+    found = find_in(&anti_rt_registry, name, length, dot, two);
+    if (*two || anti_rt_plugin_open() == 0) {
+        return *two ? NULL : found;
     }
     /* DESIGN: a loaded library brings classes of its own, and
        `reflect.new` finds one by name as it finds a class of the
@@ -84,13 +73,13 @@ static const struct anti_class *registry_find(const unsigned char *name,
        the code of the class. The `created` hook counts the object once
        `init` has run, and the caller then gives its own count back. */
     anti_rt_plugin_hold();
-    for (i = 0; i < ANTI_PLUGIN_MAX && !two; i++) {
+    for (i = 0; i < ANTI_PLUGIN_MAX && !*two; i++) {
         const struct anti_registry *r = anti_rt_plugin_registry(i);
         const struct anti_class *c;
         if (r == NULL) {
             continue;
         }
-        c = find_in(r, name, length, dot, &two);
+        c = find_in(r, name, length, dot, two);
         if (c == NULL) {
             continue;
         }
@@ -100,18 +89,55 @@ static const struct anti_class *registry_find(const unsigned char *name,
             break;
         }
         if (found != NULL) {
-            two = true;
+            *two = true;
             break;
         }
         found = c;
         in = anti_rt_plugin_at(i);
     }
-    if (!two && in != NULL) {
+    if (!*two && in != NULL) {
         anti_rt_atomic_add(&in->live, (int64_t)sizeof in->live, 1);
         *slot = in;
     }
     anti_rt_plugin_release();
-    return two ? NULL : found;
+    return *two ? NULL : found;
+}
+
+/* The class named `Class`, `Outer.Inner` or `module.Class`, or NULL when
+   the registry holds none or holds two of the bare name. *slot is the
+   slot of the library the class lies in, with one object counted against
+   it, or NULL for a class of the program. The caller gives the count back
+   with given once the object is built or the lookup came to nothing.
+
+   DESIGN: the whole name is read as the name a descriptor holds first,
+   which two modules may both declare. It finds a class when one class
+   alone has it, and `Outer.Inner` names a class nested in a class. A name
+   that names no descriptor is then cut into a module path and the name
+   of a descriptor, at each dot from the last to the first, so a module
+   path of more dots and a nested class both read. `module.Class` names
+   the class of one module and is never in doubt. By T343 of
+   docs/audit/tests-findings.md and item 11 of "Answers of 2026-11-19" in
+   docs/decisions.md. */
+static const struct anti_class *registry_find(const unsigned char *name,
+                                             int64_t length,
+                                             struct anti_plugin **slot)
+{
+    const struct anti_class *found;
+    bool two = false;
+    int64_t dot = length;
+
+    *slot = NULL;
+    found = find_cut(name, length, 0, slot, &two);
+    while (found == NULL && !two && dot > 0) {
+        dot--;
+        while (dot > 0 && name[dot - 1] != '.') {
+            dot--;
+        }
+        if (dot > 0) {
+            found = find_cut(name, length, dot, slot, &two);
+        }
+    }
+    return found;
 }
 
 /* Give back the count registry_find took against the slot. */
@@ -157,8 +183,6 @@ void *anti_rt_reflect_new(const unsigned char *name, int64_t length)
 
 /* Reading JSON */
 
-/* The longest member name or class name the reader keeps. */
-#define NAME_ROOM 256
 /* How deep objects and arrays may nest. */
 #define DEPTH_LIMIT ANTI_JSON_DEPTH
 
@@ -190,10 +214,23 @@ struct made {
     int64_t object_room;
 };
 
+/* DESIGN: a member name and a class name have no length of their own,
+   so the reader keeps the one it reads in room on the heap that grows
+   with it, by T345 of docs/audit/tests-findings.md and item 13 of
+   "Answers of 2026-11-19" in docs/decisions.md. One room serves the whole
+   text: each name is read and looked up before the reader goes on into a
+   value. A copy of the reader shares the room. Memory that runs out
+   there stops the run, as the lists of the reader do. */
+struct name_room {
+    unsigned char *bytes;
+    size_t size;
+};
+
 struct reader {
     struct anti_json scan;
     struct anti_object *from;   /* the anti.mem.Allocator */
     struct made *made;
+    struct name_room *names;
 };
 
 /* size bytes at align from the allocator of the reader, zeroed and
@@ -312,6 +349,30 @@ static bool read_string(struct reader *r, unsigned char *out, size_t room,
 
 /* The bytes of one number, which stay in the input, refused unless they
    follow the grammar of JSON. */
+/* The next string, read into the room of the names of r, which grows to
+   hold it. *length counts its bytes. */
+static bool read_name(struct reader *r, size_t *length)
+{
+    struct anti_json probe = r->scan;
+    struct name_room *room = r->names;
+    size_t need;
+
+    if (!anti_rt_json_string(&probe, NULL, 0, &need)) {
+        return false;
+    }
+    if (need >= room->size) {
+        size_t size = need + 1;
+        unsigned char *grown =
+            ANTI_FAULT(ALLOC, NULL, realloc(room->bytes, size));
+        if (grown == NULL) {
+            anti_rt_out_of_memory((int64_t)size);
+        }
+        room->bytes = grown;
+        room->size = size;
+    }
+    return read_string(r, room->bytes, room->size, length);
+}
+
 static bool number_span(struct reader *r, const unsigned char **start,
                         int64_t *length)
 {
@@ -325,21 +386,20 @@ static bool skip_value(struct reader *r, int depth)
 }
 
 /* The value of the member "type" of the object that r stands before,
-   read without moving r. */
-static bool type_of(struct reader r, unsigned char *out, size_t *length)
+   read without moving r, into the room of its names. */
+static bool type_of(struct reader r, size_t *length)
 {
-    unsigned char name[NAME_ROOM];
     size_t name_length;
 
     if (!take(&r, '{') || take(&r, '}')) {
         return false;
     }
     do {
-        if (!read_string(&r, name, NAME_ROOM, &name_length) || !take(&r, ':')) {
+        if (!read_name(&r, &name_length) || !take(&r, ':')) {
             return false;
         }
-        if (name_length == 4 && memcmp(name, "type", 4) == 0) {
-            return read_string(&r, out, NAME_ROOM, length);
+        if (name_length == 4 && memcmp(r.names->bytes, "type", 4) == 0) {
+            return read_name(&r, length);
         }
         if (!skip_value(&r, 1)) {
             return false;
@@ -627,15 +687,15 @@ static bool read_array(struct reader *r, unsigned char *bytes, int64_t type,
 static bool read_variant(struct reader *r, unsigned char *bytes,
                          const struct anti_descriptor *d, int depth)
 {
-    unsigned char name[NAME_ROOM];
+    const unsigned char *name;
     const struct anti_field *c = NULL;
     size_t length;
     int64_t i;
 
-    if (!take(r, '{') || !read_string(r, name, NAME_ROOM, &length) ||
-        !take(r, ':')) {
+    if (!take(r, '{') || !read_name(r, &length) || !take(r, ':')) {
         return false;
     }
+    name = r->names->bytes;
     for (i = 1; i < d->field_count && c == NULL; i++) {
         if ((size_t)d->fields[i].name_length == length &&
             memcmp(d->fields[i].name, name, length) == 0) {
@@ -797,7 +857,12 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
         return read_variant(r, bytes, d, depth + 1);
     case ANTI_TYPE_OPTIONAL: {
         unsigned char *at = bytes;
-        if (d == NULL || d->field_count < 2) {
+        /* A `?T` of a union is a field that serialize cannot write, as a
+           union is, so it keeps its default, by T344 of
+           docs/audit/tests-findings.md and item 12 of "Answers of
+           2026-11-19" in docs/decisions.md. */
+        if (d == NULL || d->field_count < 2 ||
+            ANTI_TYPE_OF(d->fields[0].type) == ANTI_TYPE_UNION) {
             return skip_value(r, depth + 1);
         }
         if (take_word(r, "null")) {
@@ -830,7 +895,6 @@ static bool read_value(struct reader *r, void *bytes, int64_t type,
 static bool fill(struct reader *r, void *object,
                  const struct anti_descriptor *d, bool typed, int depth)
 {
-    unsigned char name[NAME_ROOM];
     unsigned char *seen = NULL;
     int64_t count = fields_of(d);
     bool ok = false;
@@ -852,12 +916,12 @@ static bool fill(struct reader *r, void *object,
         const struct anti_field *f;
         int64_t index = 0;
         unsigned char bit;
-        if (!read_string(r, name, NAME_ROOM, &length) || !take(r, ':')) {
+        if (!read_name(r, &length) || !take(r, ':')) {
             goto done;
         }
-        f = typed && length == 4 && memcmp(name, "type", 4) == 0
+        f = typed && length == 4 && memcmp(r->names->bytes, "type", 4) == 0
                 ? NULL
-                : field_named(d, name, length, &index);
+                : field_named(d, r->names->bytes, length, &index);
         if (f == NULL) {
             if (!skip_value(r, depth + 1)) {
                 goto done;
@@ -891,16 +955,15 @@ done:
 static void *read_object(struct reader *r,
                          const struct anti_descriptor *expected, int depth)
 {
-    unsigned char name[NAME_ROOM];
     size_t length;
     const struct anti_class *c;
     struct anti_plugin *slot;
     void *object;
 
-    if (!type_of(*r, name, &length)) {
+    if (!type_of(*r, &length)) {
         return NULL;
     }
-    c = registry_find(name, (int64_t)length, &slot);
+    c = registry_find(r->names->bytes, (int64_t)length, &slot);
     if (c == NULL || !descends(c->descriptor, expected) ||
         (c->flags & ANTI_CLASS_REQUIRED) != 0) {
         given(slot);
@@ -924,6 +987,7 @@ void *anti_lang_Object_deserialize(struct anti_text input,
                                    struct anti_object *from)
 {
     struct made made = {NULL, 0, 0, NULL, 0, 0};
+    struct name_room names = {NULL, 0};
     struct reader r;
     void *object;
 
@@ -934,6 +998,7 @@ void *anti_lang_Object_deserialize(struct anti_text input,
     r.scan.end = input.ptr + (input.len > 0 ? input.len : 0);
     r.from = from;
     r.made = &made;
+    r.names = &names;
     object = read_object(&r, NULL, 0);
     skip_space(&r);
     if (object == NULL || r.scan.at != r.scan.end) {
@@ -942,5 +1007,6 @@ void *anti_lang_Object_deserialize(struct anti_text input,
     }
     free(made.blocks);
     free(made.objects);
+    free(names.bytes);
     return object;
 }

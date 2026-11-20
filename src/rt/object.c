@@ -669,8 +669,11 @@ static void put_value(struct anti_builder *b, const void *bytes,
         put_level(b, bytes, &shape, 0);
         return;
     }
+    /* A `?T` of a union is written as `null`, as a union is, whatever it
+       holds, by item 12 of "Answers of 2026-11-19". */
     case ANTI_TYPE_OPTIONAL:
-        if (!optional_has(bytes, d)) {
+        if (!optional_has(bytes, d) ||
+            ANTI_TYPE_OF(d->fields[0].type) == ANTI_TYPE_UNION) {
             put(b, "null");
         } else {
             put_value(b, (const char *)bytes + d->fields[0].offset,
