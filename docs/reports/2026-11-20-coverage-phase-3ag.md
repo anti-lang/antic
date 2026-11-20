@@ -8,8 +8,7 @@ batch read a writer that no batch had read: the facts the LLVM text
 gives opt, in `src/antic/llvm_emit_facts.c`, `src/antic/llvm_emit_nan.c`
 and the attributes of `src/antic/llvm_emit_call.c`. It read them against
 the rules that allow each fact, and then the readers of the runtime that
-write a value the facts describe. Eddie's direction is the Mac alone, so
-the VMs were not touched. The batch found four defects, T363 to T366,
+write a value the facts describe. The batch found four defects, T363 to T366,
 and fixed two. Two stay open for a choice of Eddie. The next free id is
 T367.
 
