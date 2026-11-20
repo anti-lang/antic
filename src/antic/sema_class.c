@@ -1576,12 +1576,25 @@ bool sema_descends_from(const struct type *a, const struct type *b)
    no object behind and needs nothing. It is definite assignment, as a
    local has it, applied to the fields of self. A loop body may not run,
    so what it assigns counts only inside it. */
+/* The paths that leave the body of the `do ... while` the walk is in:
+   those that reach its condition, a `continue` among them, and those of
+   a `break`. Each holds what every such path set, once one has. */
+struct loop_exits {
+    bool *turns;
+    bool turned;
+    bool *breaks;
+    bool broke;
+};
+
 struct required {
     const struct item *fn;
     const struct type *owner;
     const struct struct_field **fields;
     const struct type **levels;
     size_t count;
+    /* The `do ... while` whose body the walk is in, or NULL outside one
+       and inside a `while` or a `for`. */
+    struct loop_exits *loop;
 };
 
 static bool sets_block(struct checker *c, const struct required *r,
@@ -1700,6 +1713,47 @@ static void meet(const struct required *r, bool *into, const bool *path,
     *any = true;
 }
 
+
+/* DESIGN: the body of a `do ... while` runs before its condition, so
+   what it sets counts after the loop as the definite assignment of a
+   local counts it, by item 2 of "Answers of 2026-11-19" in
+   docs/decisions.md. The paths of the body that reach the condition
+   leave the loop where the condition can be false, and every `break`
+   leaves it. What all of them set counts after the loop. A loop that no
+   path leaves ends the path, as sema_ends_path reads it. */
+static bool sets_do(struct checker *c, const struct required *r,
+                    const struct stmt *s, bool *set)
+{
+    const struct expr *cond = s->as.loop.cond;
+    bool forever = cond->kind == EXPR_BOOL && cond->as.boolean;
+    bool *copy = arena_alloc(c->arena, r->count + 1);
+    bool *out = arena_alloc(c->arena, r->count + 1);
+    struct loop_exits exits;
+    struct required inner = *r;
+    bool any = false;
+
+    exits.turns = arena_alloc(c->arena, r->count + 1);
+    exits.turned = false;
+    exits.breaks = arena_alloc(c->arena, r->count + 1);
+    exits.broke = false;
+    inner.loop = &exits;
+    memcpy(copy, set, r->count);
+    if (sets_block(c, &inner, s->as.loop.body, copy)) {
+        meet(r, exits.turns, copy, &exits.turned);
+    }
+    if (!forever && exits.turned) {
+        meet(r, out, exits.turns, &any);
+    }
+    if (exits.broke) {
+        meet(r, out, exits.breaks, &any);
+    }
+    if (!any) {
+        return false;
+    }
+    memcpy(set, out, r->count);
+    return true;
+}
+
 /* Whether a `switch` without `else` runs one of its arms for every
    value, as `switch_ends` of sema_stmt.c reads it: one on an enum or a
    variant, whose every value the checker makes an arm name. T288 of
@@ -1717,6 +1771,7 @@ static bool sets_stmt(struct checker *c, const struct required *r,
 {
     bool *copy = arena_alloc(c->arena, r->count + 1);
     bool *out = arena_alloc(c->arena, r->count + 1);
+    struct required inner;
     bool any = false;
     size_t i;
 
@@ -1798,13 +1853,18 @@ static bool sets_stmt(struct checker *c, const struct required *r,
        it, by R003 of "Rules of 2026-10-13". T287 of
        docs/audit/tests-findings.md. */
     case STMT_WHILE:
-    case STMT_DO_WHILE:
+        inner = *r;
+        inner.loop = NULL;
         memcpy(copy, set, r->count);
-        sets_block(c, r, s->as.loop.body, copy);
+        sets_block(c, &inner, s->as.loop.body, copy);
         return !sema_ends_path(s);
+    case STMT_DO_WHILE:
+        return sets_do(c, r, s, set);
     case STMT_FOR:
+        inner = *r;
+        inner.loop = NULL;
         memcpy(copy, set, r->count);
-        sets_block(c, r, s->as.for_loop.body, copy);
+        sets_block(c, &inner, s->as.for_loop.body, copy);
         return true;
     case STMT_BLOCK:
         return sets_block(c, r, s->as.block, set);
@@ -1824,9 +1884,17 @@ static bool sets_stmt(struct checker *c, const struct required *r,
             require_set(c, r, set, s->pos);
         }
         return false;
-    case STMT_FAIL:
     case STMT_BREAK:
+        if (r->loop != NULL) {
+            meet(r, r->loop->breaks, set, &r->loop->broke);
+        }
+        return false;
     case STMT_CONTINUE:
+        if (r->loop != NULL) {
+            meet(r, r->loop->turns, set, &r->loop->turned);
+        }
+        return false;
+    case STMT_FAIL:
     case STMT_YIELD:
         return false;
     default:
@@ -1875,6 +1943,7 @@ void sema_check_construct_sets(struct checker *c, const struct item *it)
     r.fields = types_alloc_array(c->arena, n + 1, sizeof *r.fields);
     r.levels = types_alloc_array(c->arena, n + 1, sizeof *r.levels);
     r.count = 0;
+    r.loop = NULL;
     for (up = owner; up != NULL && up->kind == TYPE_CLASS; up = up->base) {
         for (i = 0; i < up->field_count; i++) {
             const struct struct_field *f = &up->fields[i];

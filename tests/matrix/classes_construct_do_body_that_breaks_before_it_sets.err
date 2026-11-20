@@ -1,0 +1,1 @@
+classes_construct_do_body_that_breaks_before_it_sets.anti:17:2: error: `construct` of `Box` returns `none` before it sets `a`

@@ -1,0 +1,24 @@
+//! The body of a `do ... while` counts toward the fields a `construct` sets on
+//! every path that leaves the loop, and a `break` before the assignment leaves
+//! it with the field unset.
+
+class Box
+{
+	pub a: int,
+
+	fn construct(self, x: int)
+	{
+		do {
+			if x > 0 {
+				break;
+			}
+			self.a = x;
+		} while x < 0
+	}
+}
+
+fn main() -> int
+{
+	let b = Box(1);
+	return b.a;
+}
