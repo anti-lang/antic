@@ -43,6 +43,13 @@
      its type, the arguments of the copy of a generic against its type
      parameters, and the names of a pattern against its tuple.
    - `break` and `continue` stand inside a loop of their own function.
+   - A name of a local or a parameter of the tree stands after a binding
+     of it in the walk: a parameter, `self`, a `let` and its names, a
+     loop and its names, the error of a handler, the case of an arm, or a
+     hidden local that the checker writes on the expression or statement
+     that reads it. A name of none is refused, by item 1 of "Answers of
+     2026-11-19" in docs/decisions.md and T350 of
+     docs/audit/tests-findings.md.
 
    The symbols of other items that the trees name are held to the rules
    of the tables as well: a function has the type of a function, a
@@ -114,6 +121,8 @@ struct verify {
     struct mark *stmts;
     struct mark *exprs;
     struct mark *typexes;
+    /* One per symbol of the tree: a binding of it stands before. */
+    bool *bound;
     bool failed;
 };
 
@@ -121,6 +130,36 @@ static void need(struct verify *v, bool ok)
 {
     if (!ok) {
         v->failed = true;
+    }
+}
+
+/* Bind sym where it is a symbol of the tree. A symbol of another item
+   stays as it is. */
+static void bind(struct verify *v, const struct symbol *sym)
+{
+    if (sym != NULL && sym >= v->t->syms && sym < v->t->syms + v->t->sym_count) {
+        v->bound[sym - v->t->syms] = true;
+    }
+}
+
+/* Whether the symbol of a name stands after its binding: a local or a
+   parameter of the tree needs one, and any other symbol is not bound in
+   the tree. */
+static bool bound_before(const struct verify *v, const struct symbol *sym)
+{
+    return sym == NULL || sym < v->t->syms ||
+           sym >= v->t->syms + v->t->sym_count ||
+           (sym->kind != SYMBOL_LOCAL && sym->kind != SYMBOL_PARAM) ||
+           v->bound[sym - v->t->syms];
+}
+
+static void bind_list(struct verify *v, const struct binding *list,
+                      size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        bind(v, list[i].symbol);
     }
 }
 
@@ -713,6 +752,7 @@ static struct seen walk_arms(struct verify *v, const struct switch_arm *arms,
                      ? walk_case(v, arms[i].value, depth)
                      : walk_expr(v, arms[i].value, depth));
         join(&s, walk_expr(v, arms[i].test, depth));
+        bind(v, arms[i].bound);
         join(&s, walk_stmt(v, arms[i].body, depth));
     }
     return s;
@@ -738,6 +778,9 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
     }
     check_expr(v, e);
     switch (e->kind) {
+    case EXPR_NAME:
+        need(v, bound_before(v, e->symbol));
+        break;
     case EXPR_UNARY:
         join(&s, walk_expr(v, e->as.unary.operand, d));
         break;
@@ -754,6 +797,7 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
     case EXPR_CALL:
         join(&s, walk_at(v, e->as.call.callee, d, AS_CALLEE));
         join(&s, walk_list(v, e->as.call.args, e->as.call.arg_count, d));
+        bind(v, e->as.call.handler.symbol);
         join(&s, walk_block(v, e->as.call.handler.body, d));
         /* The call that writes its result through itself names itself
            as out, which the copy pass keeps. */
@@ -833,6 +877,10 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
         join(&s, walk_expr(v, e->as.join.job, d));
         break;
     case EXPR_FORMAT:
+        bind(v, e->as.format.builder);
+        for (i = 0; i < e->as.format.count; i++) {
+            bind(v, e->as.format.parts[i].bound);
+        }
         for (i = 0; i < e->as.format.count; i++) {
             const struct format_part *p = &e->as.format.parts[i];
             join(&s, walk_expr(v, p->value, d));
@@ -843,12 +891,14 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
         join(&s, walk_expr(v, e->as.format.take, d));
         break;
     case EXPR_IN:
+        bind(v, e->as.in.bound);
         join(&s, walk_expr(v, e->as.in.value, d));
         join(&s, walk_expr(v, e->as.in.low, d));
         join(&s, walk_expr(v, e->as.in.high, d));
         join(&s, walk_expr(v, e->as.in.test, d));
         break;
     case EXPR_OPTIONAL:
+        bind(v, e->as.optional.bound);
         join(&s, walk_expr(v, e->as.optional.base, d));
         join(&s, walk_expr(v, e->as.optional.access, d));
         break;
@@ -864,6 +914,7 @@ static struct seen walk_at(struct verify *v, const struct expr *e,
         join(&s, walk_expr(v, e->as.take, d));
         break;
     case EXPR_COLLECT:
+        bind(v, e->as.collect.cursor);
         join(&s, walk_iteration(v, &e->as.collect, d));
         break;
     case EXPR_FN:
@@ -899,11 +950,16 @@ static struct seen walk_stmt(struct verify *v, const struct stmt *s,
         return r;
     }
     switch (s->kind) {
+    /* The value of a `let` may write into the slot of the `let`, which a
+       call names as its out, so the binding stands before the value. */
     case STMT_LET:
     case STMT_CONST:
+        bind(v, s->as.let.symbol);
+        bind_list(v, s->as.let.names, s->as.let.name_count);
         join(&r, walk_typex(v, s->as.let.type, d));
         join(&r, walk_expr(v, s->as.let.value, d));
         join(&r, walk_block(v, s->as.let.otherwise, d));
+        bind(v, s->as.let.guard.symbol);
         join(&r, walk_block(v, s->as.let.guard.body, d));
         break;
     case STMT_EXPR:
@@ -927,6 +983,9 @@ static struct seen walk_stmt(struct verify *v, const struct stmt *s,
         r.height = loop.height;
         break;
     case STMT_FOR:
+        bind(v, s->as.for_loop.element);
+        bind_list(v, s->as.for_loop.names, s->as.for_loop.name_count);
+        bind(v, s->as.for_loop.hooks.cursor);
         join(&r, walk_expr(v, s->as.for_loop.low, d));
         join(&r, walk_expr(v, s->as.for_loop.high, d));
         join(&r, walk_expr(v, s->as.for_loop.over, d));
@@ -944,6 +1003,7 @@ static struct seen walk_stmt(struct verify *v, const struct stmt *s,
         join(&r, walk_expr(v, s->as.fail.value, d));
         break;
     case STMT_SWITCH:
+        bind(v, s->as.switch_stmt.bound);
         join(&r, walk_expr(v, s->as.switch_stmt.value, d));
         join(&r, walk_arms(v, s->as.switch_stmt.arms, s->as.switch_stmt.count,
                            d));
@@ -960,6 +1020,7 @@ static struct seen walk_stmt(struct verify *v, const struct stmt *s,
         break;
     case STMT_TRY:
         join(&r, walk_block(v, s->as.try_block.body, d));
+        bind(v, s->as.try_block.handler.symbol);
         join(&r, walk_block(v, s->as.try_block.handler.body, d));
         break;
     case STMT_BLOCK:
@@ -1039,7 +1100,9 @@ static struct seen walk_body(struct verify *v, const struct item *it,
     if (v->failed) {
         return s;
     }
+    bind(v, it->self);
     for (i = 0; i < it->param_count; i++) {
+        bind(v, it->params[i].symbol);
         join(&s, walk_typex(v, it->params[i].type, depth));
     }
     join(&s, walk_typex(v, it->result, depth));
@@ -1161,6 +1224,7 @@ bool antl_verify_tree(struct reader *r, const struct antl_tree *t)
     v.stmts = antl_allocate(r, t->stmt_count, sizeof *v.stmts);
     v.exprs = antl_allocate(r, t->expr_count, sizeof *v.exprs);
     v.typexes = antl_allocate(r, t->typex_count, sizeof *v.typexes);
+    v.bound = antl_allocate(r, t->sym_count, sizeof *v.bound);
     v.failed = false;
     /* A local and a parameter have a type, which lowering lays out. */
     for (i = 0; i < t->sym_count; i++) {
