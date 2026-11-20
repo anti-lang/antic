@@ -1,0 +1,98 @@
+//! A closure at a `concurrent` parameter calls a captured function that needs
+//! no mark: a plain function, a `concurrent` parameter and the field of a
+//! captured struct. A local of a parameter takes a closure, a local takes the
+//! local that holds one, and a worker takes a closure at a `concurrent`
+//! parameter. An anonymous function at a parameter that may fail may fail by
+//! that type alone, so it never warns that it never fails.
+
+import anti.io;
+import anti.lang;
+import anti.text;
+
+struct Holder
+{
+	f: fn(),
+}
+
+fn plain()
+{
+	io.println("a captured plain function called");
+}
+
+fn in_field()
+{
+	io.println("the field of a captured struct called");
+}
+
+fn run_concurrent(concurrent f: fn())
+{
+	f();
+}
+
+fn pass_on(concurrent f: fn())
+{
+	run_concurrent(fn() { f(); });
+}
+
+worker fn apply_all(chunk: []int, concurrent f: fn(int) -> int) -> int
+{
+	return f(chunk.len as int);
+}
+
+fn from_parameter(f: fn())
+{
+	let n = 0;
+	let g = f;
+	g = fn() { n += 1; };
+	g();
+	let first = f"a local of a parameter takes a closure {n}";
+	io.println(first);
+	free(first.ptr);
+}
+
+fn nothing()
+{
+}
+
+fn run_failing(f: fn() may fail) may fail
+{
+	try f();
+}
+
+fn main() -> int
+{
+	let p = plain;
+	run_concurrent(fn() { p(); });
+	pass_on(fn() { io.println("a captured concurrent parameter called"); });
+	let s = Holder { f: in_field };
+	run_concurrent(fn() { s.f(); });
+	from_parameter(nothing);
+	let n = 0;
+	let h = fn() { n += 2; };
+	let g = fn() { n += 1; };
+	g = h;
+	g();
+	let second = f"a local takes a local that holds a closure {n}";
+	io.println(second);
+	free(second.ptr);
+	let items = [1, 2, 3, 4];
+	let base = 3;
+	let parts = parallel items[0..4] -> apply_all(fn(k) {
+		return k + base - base;
+	});
+	let total = 0;
+	for part in parts {
+		total += part;
+	}
+	free(parts.ptr);
+	let third = f"a worker takes a closure at a concurrent parameter {total}";
+	io.println(third);
+	free(third.ptr);
+	run_failing(fn() { n += 1; }) catch e {
+		return 1;
+	};
+	let fourth = f"a closure at a parameter that may fail runs {n}";
+	io.println(fourth);
+	free(fourth.ptr);
+	return 0;
+}

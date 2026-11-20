@@ -1,0 +1,1 @@
+closures_anonymous_function_with_a_parameter_named_twice.anti:10:12: error: `a` is already declared in this block

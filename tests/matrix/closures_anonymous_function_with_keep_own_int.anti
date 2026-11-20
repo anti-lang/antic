@@ -1,0 +1,13 @@
+//! `keep own` marks a parameter of function type in an anonymous function as in
+//! a named one.
+
+fn run(f: fn(int))
+{
+	f(1);
+}
+
+fn main() -> int
+{
+	run(fn(keep own x: int) { });
+	return 0;
+}

@@ -1,0 +1,1 @@
+closures_anonymous_function_with_keep_own_int.anti:11:18: error: `keep` marks a parameter of function type, and this one is `int`

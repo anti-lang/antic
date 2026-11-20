@@ -1,0 +1,8 @@
+exit 0
+a captured plain function called
+a captured concurrent parameter called
+the field of a captured struct called
+a local of a parameter takes a closure 1
+a local takes a local that holds a closure 2
+a worker takes a closure at a concurrent parameter 4
+a closure at a parameter that may fail runs 3

@@ -1,0 +1,12 @@
+//! Two parameters of an anonymous function take two names.
+
+fn run(f: fn(int, int))
+{
+	f(1, 2);
+}
+
+fn main() -> int
+{
+	run(fn(a, a) { });
+	return 0;
+}

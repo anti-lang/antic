@@ -1,0 +1,1 @@
+closures_anonymous_function_given_to_a_bound_function_local.anti:16:6: error: expected `bound fn() -> int`, found `fn() -> int`
