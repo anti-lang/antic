@@ -1,0 +1,44 @@
+//! `reflect.set` of an enum field. A value that becomes an enum must be one the
+//! enum declares, so `set` takes a declared value and fails with `WRONG_KIND`
+//! for any other, and writes nothing then. The bytes of the object show what
+//! the field holds, without a load of the enum.
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+enum Mode: u8 { Off, Slow, Fast }
+
+class Holder
+{
+	pub mode: Mode = Mode.Slow,
+}
+
+/// The byte of the field of h, read through a view of bytes.
+fn held(h: *Holder, d: *byte) -> int
+{
+	let f = reflect.field(d, 0);
+	return (h as *byte)[f.offset] as int;
+}
+
+/// Set the field of h to the unsigned value v and print what it holds.
+fn put(h: *Holder, d: *byte, v: uint)
+{
+	reflect.set(h as *byte, d, 0, reflect.of_uint(v)) catch e {
+		printf("%llu: refused %d, holds %lld\n".ptr, v, e.code as c_int,
+			held(h, d));
+		return;
+	};
+	printf("%llu: holds %lld\n".ptr, v, held(h, d));
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { };
+	let d = reflect.describe(h as *byte) else { return 1; };
+	put(h, d, 2);
+	put(h, d, 3);
+	put(h, d, 200);
+	put(h, d, 0);
+	delete(h);
+	return 0;
+}

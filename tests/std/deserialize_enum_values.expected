@@ -1,0 +1,9 @@
+exit 0
+declared: 2 1 2 1 2 5
+field: refused
+element: refused
+optional: refused
+struct field: refused
+between: refused
+zero: refused
+negative: 0 0 0 -1 0 -1

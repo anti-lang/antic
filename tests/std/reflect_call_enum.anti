@@ -1,0 +1,42 @@
+//! `reflect.call` of a public function whose parameter is an enum, with an
+//! argument that the enum does not declare. A value that becomes an enum must
+//! be one the enum declares, so the call fails with `WRONG_KIND`, as `set` of
+//! an enum field does, and the function does not run. A declared value calls
+//! it.
+import anti.lang;
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+enum Mode: u8 { Off, Slow, Fast }
+
+class Box
+{
+	pub fn number(self, m: Mode) -> int
+	{
+		printf("number runs with %d\n".ptr, m as c_int);
+		return m as int;
+	}
+}
+
+/// Call `number` of `o` with v, and print its result or the code of the error.
+fn call(o: *Object, v: uint)
+{
+	let args = [reflect.of_uint(v)];
+	let r = reflect.call(o, 16, args[0..1]) catch e {
+		printf("%llu: refused %d\n".ptr, v, e.code as c_int);
+		return;
+	};
+	printf("%llu: gives %lld\n".ptr, v, r.data.i);
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let o: *Object = b;
+	call(o, 2);
+	call(o, 3);
+	call(o, 200);
+	delete(b);
+	return 0;
+}

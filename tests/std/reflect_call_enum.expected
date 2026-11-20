@@ -1,0 +1,5 @@
+exit 0
+number runs with 2
+2: gives 2
+3: refused 3
+200: refused 3

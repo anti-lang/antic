@@ -1,0 +1,31 @@
+//! An `own` parameter beside a plain pointer to the same object. A plain
+//! pointer owns nothing, and no rule of the language keeps it from naming the
+//! object that the call takes over, so `adopt` writes the node through the
+//! plain pointer and reads it through the owner. The read gives the value of
+//! the last write, in every build.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub v: int = 0,
+}
+
+/// Write 1 through the owner and 2 through the plain pointer, then read the
+/// node through the owner and delete it.
+fn adopt(own n: *Node, plain: *Node) -> int
+{
+	n.v = 1;
+	plain.v = 2;
+	let r = n.v;
+	delete(n);
+	return r;
+}
+
+fn main() -> int
+{
+	let n = alloc Node { };
+	let plain: *Node = n;
+	printf("read %lld\n".ptr, adopt(n, plain));
+	return 0;
+}
