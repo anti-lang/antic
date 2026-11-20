@@ -340,14 +340,19 @@ static void element_c_name(struct text *out, const struct type *t,
 }
 
 /* The name of the struct of the tuple or `?T` t. The outermost tuple
-   writes no `_end`. */
+   writes no `_end`.
+   DESIGN: the name of a `?T` writes the count of the bytes of a user
+   type name before it, as the name of a tuple does, so `?S` of a struct
+   named `slice_int` is `anti_opt_9slice_int` and never the
+   `anti_opt_slice_int` of `?[]int`, by 4 of "Answers of 2026-11-20" in
+   docs/decisions.md. A built-in name keeps its form, `anti_opt_int`. */
 static void tuple_c_name(struct text *out, const struct type *t)
 {
     text_append(out, "anti_");
     if (t->kind == TYPE_TUPLE) {
         tuple_elements(out, t);
     } else {
-        element_c_name(out, t, false);
+        element_c_name(out, t, true);
     }
 }
 

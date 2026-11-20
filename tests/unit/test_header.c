@@ -122,8 +122,29 @@ static void element_names(void)
                     false, &out)) {
         CHECK(strstr(text_cstr(&out),
                      "int64_t pair(struct anti_tuple_5Color_int c, "
-                     "struct anti_opt_Shape s, "
+                     "struct anti_opt_5Shape s, "
                      "struct anti_tuple_ptr_3Box_int b);\n") != NULL);
+    }
+    text_free(&out);
+}
+
+/* The name of a `?T` writes the length before a user type name, as the
+   name of a tuple does, so `?slice_int` of a struct and `?[]int` have two
+   names, by 4 of "Answers of 2026-11-20" in docs/decisions.md. A built-in
+   name keeps its form. No header holds a `?[]int`, since C cannot
+   represent a slice, so the struct alone shows the length. */
+static void optional_lengths(void)
+{
+    struct text out = {0};
+
+    if (header_text("com.example.geo",
+                    "export struct slice_int { n: i64 }\n"
+                    "export fn pick(a: ?slice_int, c: ?i32) -> i64"
+                    " { return 0; }\n",
+                    false, &out)) {
+        CHECK(strstr(text_cstr(&out),
+                     "int64_t pick(struct anti_opt_9slice_int a, "
+                     "struct anti_opt_i32 c);\n") != NULL);
     }
     text_free(&out);
 }
@@ -456,6 +477,7 @@ void test_header(void)
     owning_structs();
     simd_bool_lanes();
     element_names();
+    optional_lengths();
     class_functions();
     guard_names();
 }

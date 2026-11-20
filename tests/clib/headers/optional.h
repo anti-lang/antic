@@ -27,7 +27,7 @@ struct anti_opt_int {
 };
 
 /* The optional value ?Spot. */
-struct anti_opt_Spot {
+struct anti_opt_4Spot {
     Spot value;
     bool has;
 };
@@ -37,9 +37,9 @@ struct anti_opt_int optional_even(int64_t want, int64_t limit);
 /** The value `n` holds, or `fallback` where it holds none. */
 int64_t optional_or(struct anti_opt_int n, int64_t fallback);
 /** A spot on the diagonal, or `none` for a negative place. */
-struct anti_opt_Spot optional_spot(int32_t at);
+struct anti_opt_4Spot optional_spot(int32_t at);
 /** The sum of a spot's coordinates, or -1 where there is no spot. */
-int32_t optional_sum(struct anti_opt_Spot s);
+int32_t optional_sum(struct anti_opt_4Spot s);
 
 #ifdef __cplusplus
 }

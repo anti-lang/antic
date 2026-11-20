@@ -13,9 +13,9 @@ int main(void)
     struct anti_opt_int five = optional_even(5, 10);
     struct anti_opt_int given = {7, true};
     struct anti_opt_int missing = {0, false};
-    struct anti_opt_Spot spot = optional_spot(3);
-    struct anti_opt_Spot none = optional_spot(-1);
-    struct anti_opt_Spot built = {{2, 5}, true};
+    struct anti_opt_4Spot spot = optional_spot(3);
+    struct anti_opt_4Spot none = optional_spot(-1);
+    struct anti_opt_4Spot built = {{2, 5}, true};
 
     printf("%d %d\n", four.has, (int)four.value);
     printf("%d\n", five.has);
