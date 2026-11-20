@@ -303,10 +303,14 @@ static void pack(struct ir_function *f, struct ir_block *b,
     ir_store(f, b, t->wide, ir_temp_op(f, wide), at);
 }
 
-/* The call of the entry of a function that may fail, from block b of
-   the trampoline f: the out pointer of the result after the args, then
-   the result as a Value and 1, or the error as the pointer of the Value
-   and 2. Returns the index of f. */
+/* DESIGN: the trampoline of a text after `!`, of a function that may
+   fail, passes a slot of its frame as the out pointer of the result and
+   reads the error the entry returns. It gives 2 with the error as the
+   pointer of the Value of the result where there is one, by 5 of
+   "Answers of 2026-11-20" in docs/decisions.md. This is the call of the
+   entry from block b of the trampoline f: the out pointer of the result
+   after the args, then the result as a Value and 1, or the error as the
+   pointer of the Value and 2. Returns the index of f. */
 static uint32_t failing_call(struct ir_module *m, struct ir_function *f,
                              struct ir_block *b, const struct value_type *t,
                              uint32_t str_agg, uint32_t data,
@@ -356,11 +360,7 @@ static uint32_t failing_call(struct ir_module *m, struct ir_function *f,
    one does not fit. It then reads each argument at the type of its
    parameter, calls the entry, writes the result as a Value and gives 1.
    The layout of a Value is the aggregate of anti.reflect, so the IR
-   holds no size. The trampoline of a text after `!`, of a function that
-   may fail, passes a slot of its frame as the out pointer of the result
-   and reads the error the entry returns. It gives 2 with the error as
-   the pointer of the Value of the result when there is one, by 5 of
-   "Answers of 2026-11-20" in docs/decisions.md. */
+   holds no size. */
 static uint32_t write_trampoline(struct ir_module *m, const char *text,
                                  uint32_t value_agg, uint32_t str_agg)
 {
