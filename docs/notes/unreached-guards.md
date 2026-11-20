@@ -1379,6 +1379,37 @@ for a `c_long`, a `c_ulong` or a `c_wchar` in the structural hash of an
 interface, which a program reaches with an abstract class whose function
 takes one. No test reads that hash against the one a plugin carries.
 
+## The sides of batch 3ag
+
+Batch 3ag of the third phase read the facts that the LLVM text gives
+opt, in `src/antic/llvm_emit_facts.c`, `src/antic/llvm_emit_nan.c` and
+`src/antic/llvm_emit_call.c`, against the rules that allow them, and
+the readers of the runtime that write an enum, `src/rt/registry.c` and
+`src/rt/reflect.c`. It fixed T363 in `src/antic/lower_desc.c` and
+`src/rt/registry.c` and T364 in `src/rt/reflect.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `range_index` of `src/antic/llvm_emit_facts.c` | A load of a range that the list of the module does not hold. | `llvm_emit_collect_ranges` adds the range of every load of the module before the text names one. |
+| `tbaa_field_of` of `src/antic/llvm_emit_facts.c` | An access that names an aggregate past those of the module, a union, a simd struct, a member past the fields, a bitfield, a field of an aggregate type and a field whose scalar type differs from the access. | `type_place` of `src/antic/lower_place.c` names a field only of a plain struct, a class or a tuple, at a field of its own aggregate whose type is the type of the access, and never a bitfield. |
+| `llvm_emit_collect_tbaa` and `llvm_emit_tbaa_fact` of `src/antic/llvm_emit_facts.c` | A typed access whose scalar type has no node of the tree. | `type_place` types an access of `typed_scalar` alone, and each of those types has a node. |
+| `callee_of` and `callees_of` of `src/antic/llvm_emit_facts.c` | A call whose callee is neither a function nor a temporary, and an `addr` of a function without a result. | Lowering calls a function or the temporary that holds its address, and an `addr` always gives one. |
+| `is_temp` of `src/antic/llvm_emit_nan.c` | A temporary past the temporaries of the function. | Each caller passes an operand of an instruction of the function, which numbers its temporaries below its count. |
+
+The sides left unsorted, all in `src/antic/llvm_emit_nan.c`: `use_keeps`
+for a derivation without a result or with two definitions, `find_slots`
+for a result past the temporaries and a slot of two definitions,
+`follow_addresses` for a symbolic offset that the layout does not fold,
+`find_known` for a float load whose address is no temporary and a copy
+of a float of unknown bits or of a constant, `llvm_emit_nan_module` for
+an exported function, one named by `by_name` and a function past those
+of the module, `llvm_emit_nan_value`
+and `llvm_emit_nan_store` for a temporary past the count, and
+`llvm_emit_nan_context` for a call through a context that names a
+callee of its own and one without arguments.
+The fixes of T363 and T364 add the sides of `anti_rt_enum_holds` of
+`src/rt/object.c`, which the tests of the two reach.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
