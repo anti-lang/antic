@@ -188,8 +188,10 @@ static void sysv(struct layouts *l, const struct ir_function *f,
 }
 
 /* A homogeneous floating-point aggregate: one to four members, all f32 or
-   all f64. Returns the number of members, or 0. */
-static size_t hfa_members(const struct layout *agg)
+   all f64, which fill the aggregate. One whose align(N) leaves bytes after
+   them is none, as clang decides for _Alignas, T374 of
+   docs/audit/tests-findings.md. Returns the number of members, or 0. */
+static size_t hfa_members(struct layouts *l, const struct layout *agg)
 {
     size_t i;
 
@@ -201,6 +203,10 @@ static size_t hfa_members(const struct layout *agg)
         if (agg->members[i].type != agg->members[0].type) {
             return 0;
         }
+    }
+    if (agg->size != agg->member_count *
+                         layout_size(l, ir_scalar(agg->members[0].type))) {
+        return 0;
     }
     return agg->member_count;
 }
@@ -214,7 +220,7 @@ static void aapcs64_aggregate(struct layouts *l, const struct layout *agg,
                               bool hfa, enum abi_kind larger,
                               struct abi_param *out)
 {
-    size_t members = hfa ? hfa_members(agg) : 0;
+    size_t members = hfa ? hfa_members(l, agg) : 0;
 
     if (agg->vector && hfa) {
         vector(l, agg, out);

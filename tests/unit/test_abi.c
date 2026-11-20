@@ -409,6 +409,30 @@ static void aapcs64(void)
     }
 }
 
+/* AAPCS64 6.8.2: the members of a homogeneous floating-point aggregate
+   fill it. One whose align(N) leaves bytes after its floats is none, so
+   one of 16 bytes goes as i128 and a larger one as a pointer to a copy,
+   as clang passes a struct of _Alignas, T374 of
+   docs/audit/tests-findings.md. */
+static void aapcs64_padded(void)
+{
+    static const enum ir_type two[] = {IR_F32, IR_F32};
+    static const enum ir_type one[] = {IR_F64};
+    struct fixture x;
+
+    begin(&x, IR_AGG, IR_NO_AGG);
+    x.f->result_agg = record(&x, "main.A16", two, 2, false, 16);
+    param_agg(&x, x.f->result_agg);
+    param_agg(&x, record(&x, "main.D16", one, 1, false, 16));
+    param_agg(&x, record(&x, "main.A32", two, 2, false, 32));
+    run(&x, TARGET_MACOS_ARM64);
+    EXPECT(&x.params[0], ABI_COERCE, 1, "i128", "", 16, 16);
+    EXPECT(&x.params[1], ABI_COERCE, 1, "i128", "", 16, 16);
+    EXPECT(&x.params[2], ABI_INDIRECT, 1, "ptr", "", 32, 32);
+    EXPECT(&x.result, ABI_COERCE, 1, "i128", "", 16, 16);
+    end(&x);
+}
+
 /* AAPCS64 C.10 and C.13: an aggregate that does not fit the integer
    registers left goes on the stack whole. LLVM allocates an array
    argument as one block, so the class does not depend on the registers
@@ -514,6 +538,7 @@ void test_abi(void)
     sysv_registers();
     vectors();
     aapcs64();
+    aapcs64_padded();
     aapcs64_registers();
     windows_arm64_variadic();
     windows_x64();

@@ -30,5 +30,4 @@ matrix_closures_snapshot_in_a_local_keeps_its_text_release T371 A snapshot in a 
 matrix_closures_snapshot_in_a_local_keeps_its_text_memory_checks T371 A snapshot in a local holds the str it captures and not its bytes, so it reads the freed text.
 program_abi_vector_fields T373 A struct of simd structs of 16 bytes passes as the floats or integers of its lanes, where C passes vectors.
 program_abi_vector_fields_macos-x86_64 T373 A struct of simd structs of 16 bytes passes as the floats or integers of its lanes, where C passes vectors.
-program_abi_padded_floats T374 A struct of floats whose align(N) leaves bytes after them passes as a homogeneous float aggregate, which C does not make it.
 program_abi_vector_fields_wide T375 A struct of three or four simd structs of 16 bytes passes as a pointer to a copy, where C passes it in vector registers.
