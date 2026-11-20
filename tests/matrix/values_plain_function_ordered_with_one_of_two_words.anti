@@ -1,0 +1,23 @@
+//! A local that a named function initialises holds the plain form of its type,
+//! and a parameter of function type the form of two words. `<` takes no
+//! function value, and the two forms have the name `fn(int) -> int`, so the
+//! message names the forms as well.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn before(p: fn(int) -> int) -> bool
+{
+	let g: fn(int) -> int = twice;
+	return g < p;
+}
+
+fn main() -> int
+{
+	if before(twice) {
+		return 1;
+	}
+	return 0;
+}

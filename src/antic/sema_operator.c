@@ -569,9 +569,11 @@ static bool same_signature(const struct type *a, const struct type *b,
 static bool comparable_pointers(const struct type *a, const struct type *b)
 {
     /* A function value follows the pointer rule: two of one signature
-       and one form compare whether or not either may hold `none`. */
+       compare whether or not either may hold `none`. The plain form and
+       the form of two words compare too, by their code, by C of "Answers
+       of 2026-11-19" in docs/decisions.md. */
     if (a->kind == TYPE_FN && b->kind == TYPE_FN) {
-        return same_signature(a, b, true);
+        return same_signature(a, b, false);
     }
     if (a->kind != TYPE_POINTER || b->kind != TYPE_POINTER) {
         return false;

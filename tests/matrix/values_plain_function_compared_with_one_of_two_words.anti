@@ -1,11 +1,18 @@
 //! A local that a named function initialises holds the plain form of its type,
-//! and a parameter of function type the form of two words. `==` compares
-//! function values of one form, so the two are refused. Both forms have the
-//! name `fn(int) -> int`, so the message names the forms as well.
+//! and a parameter of function type the form of two words. `==` and `!=`
+//! compare the two by their code, on either side, by C of "Answers of
+//! 2026-11-19".
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn twice(n: int) -> int
 {
 	return n * 2;
+}
+
+fn thrice(n: int) -> int
+{
+	return n * 3;
 }
 
 fn same(p: fn(int) -> int) -> bool
@@ -14,10 +21,15 @@ fn same(p: fn(int) -> int) -> bool
 	return g == p;
 }
 
+fn other(p: fn(int) -> int) -> bool
+{
+	let g: fn(int) -> int = twice;
+	return p != g;
+}
+
 fn main() -> int
 {
-	if same(twice) {
-		return 1;
-	}
+	printf("twice %d %d\n".ptr, same(twice) as c_int, other(twice) as c_int);
+	printf("thrice %d %d\n".ptr, same(thrice) as c_int, other(thrice) as c_int);
 	return 0;
 }
