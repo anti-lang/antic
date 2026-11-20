@@ -67,17 +67,16 @@ anti_message(inventory_plugins_as_a_text
         "missing ./anti-plugins.toml: no index of plugins"
         "missing ./three/anti-plugins.toml: no index of plugins"
         "wrote symbols.zip with 0 of 5 modules")
-# The text of a deployment of Windows holds its directories with `;`
-# between two, as the runtime of that target splits it, so a `:` stays in
-# a directory, by item 14 of "Answers of 2026-11-19".
-anti_message(inventory_plugins_text_of_windows
+# A text of `plugins` splits at `:`, the separator of the runtime of
+# macOS, so a `;` stays in a directory, by item 14 of "Answers of
+# 2026-11-19".
+anti_message(inventory_plugins_text_with_a_semicolon
     STATUS 0
-    FILES conf.toml "[runtime]\nplugins = \"one;C:two\"\n"
-          prog.exe "${notice_head}${notice_id}\npackage com.example.app 1.0 MIT\n"
+    FILES conf.toml "[runtime]\nplugins = \"one;two:three\"\n"
     ARGS symbols inventory --conf conf.toml
-    OUT "missing ./one/anti-plugins.toml: no index of plugins"
-        "missing ./C:two/anti-plugins.toml: no index of plugins"
-        "missing ./prog.exe ${notice_id}"
+    OUT "missing the program: . holds no program of Anti"
+        "missing ./one\;two/anti-plugins.toml: no index of plugins"
+        "missing ./three/anti-plugins.toml: no index of plugins"
         "wrote symbols.zip with 0 of 3 modules")
 anti_message(inventory_plugins_text_ending_with_a_separator
     STATUS 0
