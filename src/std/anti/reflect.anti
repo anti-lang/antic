@@ -162,8 +162,9 @@ pub fn get(object: *byte, d: *byte, index: int) -> Value
 /// carries and a value of another kind each fail with the code that names the
 /// reason, and write nothing. An `own` field fails with `NOT_CARRIED`, since
 /// the pointer of a `Value` stays the caller's and a write would give the
-/// object a second owner. `d` describes the class of `object` or a base of it,
-/// as for `get`.
+/// object a second owner. An enum field takes a value that its enum declares,
+/// and any other fails with `WRONG_KIND`. `d` describes the class of `object`
+/// or a base of it, as for `get`.
 pub fn set(object: *byte, d: *byte, index: int, value: Value) may fail
 {
 	let v = value;

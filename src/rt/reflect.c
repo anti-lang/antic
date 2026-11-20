@@ -245,9 +245,18 @@ int64_t anti_rt_reflect_set(void *object, const struct anti_descriptor *d,
     case ANTI_VALUE_PTR:
         memcpy(at, &value->data.p, sizeof value->data.p);
         break;
-    default:
+    default: {
+        /* An enum field takes a value its enum declares alone, by T364
+           of docs/audit/tests-findings.md, and the test reads the bytes
+           that the narrowing keeps. */
+        unsigned char narrow[sizeof value->data.u];
+        anti_rt_store_integer(narrow, f->type, value->data.u);
+        if (!anti_rt_enum_holds(f->descriptor, f->type, narrow)) {
+            return ANTI_REFLECT_WRONG_KIND;
+        }
         anti_rt_store_integer(at, f->type, value->data.u);
         break;
+    }
     }
     return ANTI_REFLECT_DONE;
 }
