@@ -1,0 +1,24 @@
+//! An arm of `select` that binds no name takes the value of its channel and
+//! drops it, for a channel of values that own nothing. The next `recv` gets the
+//! value after it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let c = chan int(4);
+	let d = chan int(1);
+	send(c, 1);
+	send(c, 2);
+	select {
+		d => printf("from d\n".ptr),
+		c => printf("from c\n".ptr),
+	}
+	let next = recv(c) else {
+		return 1;
+	};
+	printf("next %d\n".ptr, *next as c_int);
+	delete(c);
+	delete(d);
+	return 0;
+}

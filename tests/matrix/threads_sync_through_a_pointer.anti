@@ -1,0 +1,67 @@
+//! `sync p { }` and `sync p, q { }` where `p` and `q` are pointers to
+//! synchronized objects take the hidden locks of the objects they point at.
+//! Each block gives its locks back on every exit, so a worker that takes both
+//! afterwards gets them. The locks of `sync p, p` are one lock, taken once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+synchronized class Tally
+{
+	count: int = 0,
+
+	pub fn add(self, n: int)
+	{
+		self.count += n;
+	}
+
+	pub fn get(self) -> int
+	{
+		return self.count;
+	}
+}
+
+fn one(p: *Tally)
+{
+	sync p {
+		p.add(1);
+	}
+}
+
+fn pair(p: *Tally, q: *Tally) -> int
+{
+	sync q, p {
+		p.add(2);
+		q.add(3);
+		return p.get() + q.get();
+	}
+}
+
+fn same(p: *Tally)
+{
+	sync p, p {
+		p.add(10);
+	}
+}
+
+worker fn both(p: *Tally, q: *Tally) -> int
+{
+	sync p, q {
+		p.add(100);
+		q.add(100);
+	}
+	return p.get() + q.get();
+}
+
+fn main() -> int
+{
+	let a = Tally { };
+	let b = Tally { };
+	one(&a);
+	printf("one %d\n".ptr, a.get() as c_int);
+	printf("pair %d\n".ptr, pair(&a, &b) as c_int);
+	same(&b);
+	printf("same %d\n".ptr, b.get() as c_int);
+	let job = dispatch &a -> both(&b);
+	printf("worker %d\n".ptr, join(job) as c_int);
+	return 0;
+}
