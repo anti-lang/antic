@@ -22,3 +22,5 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 std_reflect_call_enum T365 reflect.call passes a number that the enum of the parameter does not declare.
 program_own_param_alias T366 The own pointer parameter is noalias, so a write through a plain pointer to the same object is lost.
 program_own_param_alias_macos-x86_64 T366 The own pointer parameter is noalias, so a write through a plain pointer to the same object is lost.
+modules_copy_defaults_release T367 A literal of a copy that a library names with export type misses the fields with defaults.
+modules_copy_defaults_dev T367 A literal of a copy that a library names with export type misses the fields with defaults.

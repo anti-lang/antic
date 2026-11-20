@@ -1,0 +1,16 @@
+//! The client of the boxes library. A literal of the copy that the library
+//! names with `export type` leaves out the fields with defaults, which take the
+//! defaults of the generic.
+
+import com.example.boxes;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let b = boxes.Ints { items: [0; 8] };
+	let c = boxes.Box<c_int> { items: [1; 8] };
+	printf("count %d limit %d\n".ptr, b.count, b.limit);
+	printf("count %d limit %d\n".ptr, c.count, c.limit + c.items[0]);
+	return 0;
+}
