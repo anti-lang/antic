@@ -449,12 +449,49 @@ size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d)
     return anti_rt_type_size(element);
 }
 
+/* DESIGN: the field record of a pointer or a slice of arrays carries the
+   descriptor of the array with all its levels, by T338 of
+   docs/audit/tests-findings.md and item 10 of "Answers of 2026-11-19" in
+   docs/decisions.md. The element is then read as a field of that array,
+   whose id the levels give: the length of each, and the id of the element
+   in the last record. */
+int64_t anti_rt_pointee_type(int64_t type, const struct anti_descriptor *d)
+{
+    int64_t inner;
+    int64_t count = 1;
+    int64_t i;
+
+    if (ANTI_TYPE_ELEMENT(type) != ANTI_TYPE_ARRAY) {
+        return ANTI_TYPE_ELEMENT(type);
+    }
+    if (d == NULL || d->field_count == 0 ||
+        d->field_count > ANTI_ARRAY_LEVELS) {
+        return ANTI_TYPE_ARRAY;
+    }
+    for (i = 0; i < d->field_count; i++) {
+        count *= d->fields[i].owned;
+    }
+    inner = d->fields[d->field_count - 1].type;
+    inner = ANTI_TYPE_OF(inner) == ANTI_TYPE_ENUM ? ANTI_TYPE_ELEMENT(inner)
+                                                  : ANTI_TYPE_OF(inner);
+    return ANTI_TYPE_ARRAY | ANTI_TYPE_ARRAY << 8 | inner << 16 |
+           (int64_t)((uint64_t)count << 24);
+}
+
+size_t anti_rt_pointee_size(int64_t type, const struct anti_descriptor *d)
+{
+    if (ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_ARRAY) {
+        return d != NULL ? (size_t)d->size : 0;
+    }
+    return anti_rt_element_size(type, d);
+}
+
 int anti_rt_element_walked(int64_t type, const struct anti_descriptor *d)
 {
     int64_t element = ANTI_TYPE_ELEMENT(type);
 
     return element != ANTI_TYPE_CLASS && element != ANTI_TYPE_SLICE &&
-           anti_rt_element_size(type, d) > 0;
+           anti_rt_pointee_size(type, d) > 0;
 }
 
 static void serialize_into(struct anti_builder *b, const void *object,
@@ -529,7 +566,7 @@ static void put_slice(struct anti_builder *b, const void *bytes,
                       int64_t owned)
 {
     struct anti_text s;
-    size_t size = anti_rt_element_size(type, d);
+    size_t size = anti_rt_pointee_size(type, d);
     int64_t i;
 
     memcpy(&s, bytes, sizeof s);
@@ -540,7 +577,8 @@ static void put_slice(struct anti_builder *b, const void *bytes,
     put(b, "[");
     for (i = 0; i < s.len; i++) {
         put(b, i == 0 ? "" : ",");
-        put_value(b, s.ptr + (size_t)i * size, ANTI_TYPE_ELEMENT(type), d, 0);
+        put_value(b, s.ptr + (size_t)i * size, anti_rt_pointee_type(type, d),
+                  d, 0);
     }
     put(b, "]");
 }
@@ -602,7 +640,7 @@ static void put_value(struct anti_builder *b, const void *bytes,
             serialize_object(b, anti_rt_object_of(value));
         } else if (owned && t == ANTI_TYPE_PTR &&
                    anti_rt_element_walked(type, d)) {
-            put_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
+            put_value(b, value, anti_rt_pointee_type(type, d), d, 0);
         } else {
             /* It refers to something outside the object. */
             put(b, "null");
@@ -928,7 +966,7 @@ static void show_value(struct anti_builder *b, void *bytes, int64_t type,
                    ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS) {
             show_object(b, anti_rt_object_of(value));
         } else if (t == ANTI_TYPE_PTR && anti_rt_element_walked(type, d)) {
-            show_value(b, value, ANTI_TYPE_ELEMENT(type), d, 0);
+            show_value(b, value, anti_rt_pointee_type(type, d), d, 0);
         } else {
             put(b, "?");
         }
@@ -937,10 +975,10 @@ static void show_value(struct anti_builder *b, void *bytes, int64_t type,
     case ANTI_TYPE_SLICE: {
         struct anti_text s;
         memcpy(&s, bytes, sizeof s);
-        if (anti_rt_element_size(type, d) == 0) {
+        if (anti_rt_pointee_size(type, d) == 0) {
             put(b, "?");
         } else {
-            show_row(b, (char *)s.ptr, s.len, ANTI_TYPE_ELEMENT(type), d);
+            show_row(b, (char *)s.ptr, s.len, anti_rt_pointee_type(type, d), d);
         }
         return;
     }

@@ -125,6 +125,17 @@ size_t anti_rt_element_size(int64_t type, const struct anti_descriptor *d);
    no walk there, nor does an element without a size. */
 int anti_rt_element_walked(int64_t type, const struct anti_descriptor *d);
 
+/* The type id of what a pointer or a slice of the type id reaches, as a
+   walk reads it. An array there has the descriptor d of the array with
+   all its levels, and its id is the one of a field of that array. Every
+   other element has the id of the byte above the pointer. */
+int64_t anti_rt_pointee_type(int64_t type, const struct anti_descriptor *d);
+
+/* The bytes of what a pointer or a slice of the type id reaches: the
+   size of the array of d for an array, and anti_rt_element_size for any
+   other element. */
+size_t anti_rt_pointee_size(int64_t type, const struct anti_descriptor *d);
+
 struct anti_descriptor;
 struct anti_object;
 

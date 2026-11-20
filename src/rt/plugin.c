@@ -631,9 +631,10 @@ static int64_t array_width(int64_t type, const struct anti_descriptor *d,
 
 /* The bytes a field takes from its offset, or -1 where the record is
    damaged. A value held inline takes the size of its descriptor, which
-   joins r. So does the descriptor of what a pointer or a slice reaches,
-   apart from the records of the levels of an array, which no walk takes
-   through a pointer or a slice. */
+   joins r. So does the descriptor of what a pointer or a slice reaches.
+   An array there has the records of its levels, which are checked as
+   those of an array field are, since serialize walks them, by T338 of
+   docs/audit/tests-findings.md. */
 static int64_t width_of(const struct anti_field *f, struct anti_reached *r)
 {
     const struct anti_descriptor *d = f->descriptor;
@@ -644,6 +645,10 @@ static int64_t width_of(const struct anti_field *f, struct anti_reached *r)
     }
     if (type == ANTI_TYPE_ARRAY) {
         return array_width(f->type, d, r);
+    }
+    if (d != NULL && ANTI_TYPE_ELEMENT(f->type) == ANTI_TYPE_ARRAY &&
+        array_width(ANTI_TYPE_ARRAY | ANTI_TYPE_ARRAY << 8, d, r) < 0) {
+        return -1;
     }
     if (d != NULL && ANTI_TYPE_ELEMENT(f->type) != ANTI_TYPE_ARRAY) {
         reach(r, d);

@@ -544,7 +544,7 @@ static bool read_elements(struct reader *r, struct anti_text *out,
                           int64_t type, const struct anti_descriptor *d,
                           int depth)
 {
-    size_t size = anti_rt_element_size(type, d);
+    size_t size = anti_rt_pointee_size(type, d);
     struct reader scan;
     unsigned char *items = NULL;
     int64_t count = 0;
@@ -578,8 +578,8 @@ static bool read_elements(struct reader *r, struct anti_text *out,
     }
     for (i = 0; i < count; i++) {
         if ((i > 0 && !take(r, ',')) ||
-            !read_value(r, items + (size_t)i * size, ANTI_TYPE_ELEMENT(type),
-                        d, 0, depth + 1)) {
+            !read_value(r, items + (size_t)i * size,
+                        anti_rt_pointee_type(type, d), d, 0, depth + 1)) {
             return false;
         }
     }
@@ -596,7 +596,7 @@ static bool read_elements(struct reader *r, struct anti_text *out,
 static bool read_owned(struct reader *r, void **out, int64_t type,
                        const struct anti_descriptor *d, int depth)
 {
-    size_t size = anti_rt_element_size(type, d);
+    size_t size = anti_rt_pointee_size(type, d);
     void *value;
 
     if (ANTI_TYPE_ELEMENT(type) == ANTI_TYPE_CLASS) {
@@ -607,7 +607,8 @@ static bool read_owned(struct reader *r, void **out, int64_t type,
     } else {
         value = lend(r, size, OBJECT_ALIGN);
         if (value != NULL &&
-            !read_value(r, value, ANTI_TYPE_ELEMENT(type), d, 0, depth + 1)) {
+            !read_value(r, value, anti_rt_pointee_type(type, d), d, 0,
+                        depth + 1)) {
             value = NULL;
         }
     }

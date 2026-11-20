@@ -512,8 +512,15 @@ static const struct ir_global *version_global(struct lowerer *l);
 static const struct ir_global *field_descriptor(struct lowerer *l,
                                                 const struct type *t)
 {
+    /* An array that a pointer or a slice reaches has the descriptor of
+       the array with all its levels, which a walk reads its elements by,
+       by T338 of docs/audit/tests-findings.md and item 10 of "Answers of
+       2026-11-19" in docs/decisions.md. */
     if (t->kind == TYPE_POINTER || t->kind == TYPE_SLICE) {
         t = t->element;
+        if (t->kind == TYPE_ARRAY) {
+            return array_descriptor(l, t);
+        }
     }
     /* An array of arrays has a descriptor of its own, which holds the
        length of each level. An array of one level reaches the descriptor
