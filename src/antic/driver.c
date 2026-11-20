@@ -1574,9 +1574,16 @@ static int compile(const struct options *o, struct text *source,
         extras->library_count = paths.count;
         note_raylib(extras, libraries, paths.count);
         if (o->lib != LIB_NONE) {
+            struct text twice = {0};
             memcpy((void *)all, (void *)libraries,
                    paths.count * sizeof *all);
             all[paths.count] = &own;
+            if (!header_copy_named_once(all, paths.count + 1, &twice)) {
+                say_antic("%s\n", text_cstr(&twice));
+                text_free(&twice);
+                free((void *)all);
+                goto done;
+            }
             library_name(o, text_cstr(module), &extras->name);
             if (o->bundle_runtime && o->lib == LIB_STATIC &&
                 target_info(o->target)->format == FORMAT_MACHO) {

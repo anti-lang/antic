@@ -779,3 +779,20 @@ if(CMAKE_HOST_APPLE)
         ARGS ${tools} --memory-checks main.anti
         ERR "antic: cannot find the directory of ${RUNTIME}/lib/${HOST}")
 endif()
+
+# E of "Answers of 2026-11-19" in docs/decisions.md: one copy of a generic
+# that two libraries name with `export type` is refused where both land
+# in the header of one library for C. The module imports both.
+function(compile_two_names)
+    foreach(name boxes a b)
+        antic_runs(-c -I . -o lib/${name}.antl lib/${name}.anti)
+    endforeach()
+endfunction()
+anti_message(export_type_of_two_libraries
+    FILES lib/boxes.anti "//! A generic struct.\n\npub struct Box<T>\n{\n\tv: T,\n}\n"
+          lib/a.anti "//! The first name of the copy.\n\nimport lib.boxes;\n\nexport type AB = boxes.Box<c_int>;\n"
+          lib/b.anti "//! The second name of the copy.\n\nimport lib.boxes;\n\nexport type BB = boxes.Box<c_int>;\n"
+          lib/c.anti "//! A library over both.\n\nimport lib.a;\nimport lib.b;\n\nexport fn c_one() -> c_int\n{\n\treturn 1;\n}\n"
+    SETUP compile_two_names
+    ARGS ${tools} --lib static -I . -o libc.a lib/c.anti
+    ERR "antic: `export type BB` of module `lib.b` names `lib.boxes.Box<i32>`, which `export type AB` of module `lib.a` names already, and one header holds both")

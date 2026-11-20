@@ -78,6 +78,45 @@ static bool name_among(const struct name *name, const char *const *list,
     return false;
 }
 
+bool header_copy_named_once(const struct interface *const *ifaces,
+                            size_t count, struct text *out)
+{
+    size_t i;
+    size_t j;
+    size_t k;
+    size_t m;
+
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < ifaces[i]->item_count; j++) {
+            const struct symbol *a = ifaces[i]->items[j];
+            if (!a->alias || !a->exported || a->type == NULL ||
+                a->type->generic == NULL) {
+                continue;
+            }
+            for (k = i + 1; k < count; k++) {
+                for (m = 0; m < ifaces[k]->item_count; m++) {
+                    const struct symbol *b = ifaces[k]->items[m];
+                    struct text shown = {0};
+                    if (!b->alias || !b->exported || b->type != a->type) {
+                        continue;
+                    }
+                    types_name_qualified(&shown, a->type);
+                    text_appendf(out, "`export type %.*s` of module `%s` "
+                                 "names `%s`, which `export type %.*s` of "
+                                 "module `%s` names already, and one header "
+                                 "holds both", (int)b->name.length,
+                                 b->name.text, ifaces[k]->module,
+                                 text_cstr(&shown), (int)a->name.length,
+                                 a->name.text, ifaces[i]->module);
+                    text_free(&shown);
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 bool header_is_keyword(const struct name *name)
 {
     return name_among(name, keywords, sizeof keywords / sizeof *keywords);
