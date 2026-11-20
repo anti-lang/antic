@@ -115,6 +115,10 @@ void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length);
 void *anti_rt_regex_literal_bytes(const unsigned char *bytes,
                                   int64_t length);
 
+/* Mark the pattern that anti_rt_regex_compile or
+   anti_rt_regex_compile_bytes gave as kept until exit, and give it back. */
+void *anti_rt_regex_kept(void *pattern);
+
 /* The layouts of the records of Anti that patterns.c reads, and the
    codes of a search. */
 

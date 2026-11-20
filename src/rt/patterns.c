@@ -64,6 +64,16 @@ static void *literal(const unsigned char *bytes, int64_t length,
     return kept(compiled);
 }
 
+/* DESIGN: a pattern of `Regex.compile` and of `ByteRegex.compile` lives
+   until exit as well, since nothing gives one back. anti.regex marks each
+   as kept once it compiled, so the leak check of a program of
+   --memory-checks leaves it out of its report, by item 8 of "Answers of
+   2026-11-19" in docs/decisions.md. */
+void *anti_rt_regex_kept(void *pattern)
+{
+    return kept(pattern);
+}
+
 void *anti_rt_regex_literal(const unsigned char *bytes, int64_t length)
 {
     return literal(bytes, length, anti_rt_regex_compile, "pattern");

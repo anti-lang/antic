@@ -30,6 +30,7 @@ import anti.lang;
 extern fn anti_rt_regex_compile(bytes: ?*byte, length: int, code: ?*i32,
 	offset: ?*int) -> ?*byte;
 extern fn anti_rt_regex_message(code: i32) -> str;
+extern fn anti_rt_regex_kept(pattern: ?*byte) -> ?*byte;
 extern fn anti_rt_regex_first(pattern: ?*byte, s: ?*byte, length: int,
 	out: ?*?Match) -> int;
 extern fn anti_rt_regex_test(pattern: ?*byte, s: ?*byte, length: int) -> int;
@@ -132,6 +133,7 @@ pub fn compile(text: str) -> Regex may fail
 	let handle = made else {
 		fail bad_pattern(code, offset);
 	};
+	anti_rt_regex_kept(handle);
 	return Regex { handle: handle };
 }
 
@@ -149,6 +151,7 @@ pub fn compile_bytes(text: str) -> ByteRegex may fail
 	let handle = made else {
 		fail bad_pattern(code, offset);
 	};
+	anti_rt_regex_kept(handle);
 	return ByteRegex { handle: handle };
 }
 
