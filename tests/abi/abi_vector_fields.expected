@@ -1,0 +1,8 @@
+exit 0
+one 30
+ints 101 102 103 104
+doubles 6 -10
+two 204
+make 1 2 3 4
+make two 1 4 10 40
+apply 440

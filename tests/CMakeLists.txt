@@ -1034,13 +1034,21 @@ if(ANTIC_EMULATED_TARGET)
         abi_x86_64_object(abi_wchar_x86_64 abi/wchar.c)
         abi_x86_64_object(abi_simd_x86_64 abi/simd.c)
         abi_x86_64_object(abi_nan_x86_64 abi/nan.c)
+        abi_x86_64_object(abi_vector_fields_x86_64 abi/vector_fields.c)
+        abi_x86_64_object(abi_vector_fields_wide_x86_64
+            abi/vector_fields_wide.c)
+        abi_x86_64_object(abi_padded_floats_x86_64 abi/padded_floats.c)
         abi_wchar_expected(abi_wchar_x86_64_expected _X86_64
             ${emulated_c_flags})
         set(abi_structs_x86_64_options "")
         set(abi_simd_x86_64_options "")
         set(abi_nan_x86_64_options "")
+        set(abi_vector_fields_x86_64_options "")
+        set(abi_vector_fields_wide_x86_64_options "")
+        set(abi_padded_floats_x86_64_options "")
         set(abi_wchar_x86_64_options EXPECTED "${abi_wchar_x86_64_expected}")
-        foreach(case structs wchar simd nan)
+        foreach(case structs wchar simd nan vector_fields vector_fields_wide
+                padded_floats)
             antic_program_test(program_abi_${case}_${emulated}
                 "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
                 OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}_x86_64>,,>"
@@ -1617,6 +1625,26 @@ antic_program_test(program_abi_simd
     "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_simd.anti"
     OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_simd>,,>"
     WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
+
+# Structs of simd structs of 16 bytes and structs of floats whose align(N)
+# leaves bytes after them, against C: the functions of
+# tests/abi/vector_fields.c, tests/abi/vector_fields_wide.c and
+# tests/abi/padded_floats.c take and return them by value.
+foreach(case vector_fields vector_fields_wide padded_floats)
+    add_library(abi_${case} OBJECT abi/${case}.c)
+    set_target_properties(abi_${case} PROPERTIES MSVC_RUNTIME_LIBRARY "")
+    target_compile_options(abi_${case} PRIVATE ${ANTIC_REFERENCE_C_FLAGS})
+    if(ANTIC_HOST_OS STREQUAL "macos")
+        target_compile_options(abi_${case} PRIVATE -mmacosx-version-min=11.0)
+    endif()
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(abi_${case} PRIVATE -fno-sanitize=all)
+    endif()
+    antic_program_test(program_abi_${case}
+        "${CMAKE_CURRENT_SOURCE_DIR}/abi/abi_${case}.anti"
+        OBJECTS "$<JOIN:$<TARGET_OBJECTS:abi_${case}>,,>"
+        WORK "${CMAKE_CURRENT_BINARY_DIR}/abi")
+endforeach()
 
 # M302. The message of a SystemError keeps its text after the next error
 # of its thread. tests/abi/system_error.c sets the codes each error reads.

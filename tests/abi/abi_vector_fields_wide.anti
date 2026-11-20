@@ -1,0 +1,49 @@
+//! A struct of three or four simd structs of 16 bytes passes as C passes a
+//! struct of the vector types of C. ARM64 passes it in three or four vector
+//! registers, as a homogeneous vector aggregate, and x86_64 passes it in
+//! memory. The functions of `vector_fields_wide.c` take such structs, return
+//! one and call an Anti function that takes and returns them.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+struct Three
+{
+	a: Vec4,
+	b: Vec4,
+	c: Vec4,
+}
+
+struct Four
+{
+	a: Vec4,
+	b: Vec4,
+	c: Vec4,
+	d: Vec4,
+}
+
+extern fn vector_fields_wide_three(p: Three) -> f32;
+extern fn vector_fields_wide_four(p: Four) -> f32;
+extern fn vector_fields_wide_make(x: f32) -> Four;
+extern fn vector_fields_wide_apply(f: fn(Four) -> Three, x: f32) -> f32;
+
+fn folded(f: Four) -> Three
+{
+	return Three { a: f.a + f.d, b: f.b, c: f.c };
+}
+
+fn main() -> int
+{
+	let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let b = Vec4.splat(1.0);
+	let c = Vec4.splat(2.0);
+	let d = Vec4.splat(-1.0);
+	printf("three %g\n".ptr, vector_fields_wide_three(Three { a: a, b: b, c: c }) as f64);
+	printf("four %g\n".ptr, vector_fields_wide_four(Four { a: a, b: b, c: c, d: d }) as f64);
+	let m = vector_fields_wide_make(1.0);
+	printf("make %g %g %g %g\n".ptr, m.a.y as f64, m.b.z as f64, m.c.w as f64,
+		m.d.x as f64);
+	printf("apply %g\n".ptr, vector_fields_wide_apply(folded, 1.0) as f64);
+	return 0;
+}

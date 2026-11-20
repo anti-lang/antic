@@ -1,0 +1,47 @@
+//! A struct of floats whose `align(N)` leaves bytes after its fields is no
+//! homogeneous float aggregate, as one of `_Alignas` in C is none. ARM64 passes
+//! one of 16 bytes in two integer registers and a larger one as a pointer to a
+//! copy. The functions of `padded_floats.c` take such structs and return one.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+
+struct A16 align(16)
+{
+	a: f32,
+	b: f32,
+}
+
+struct D16 align(16)
+{
+	a: f64,
+}
+
+struct T16 align(16)
+{
+	a: f32,
+	b: f32,
+	c: f32,
+}
+
+struct A32 align(32)
+{
+	a: f32,
+	b: f32,
+}
+
+extern fn padded_floats_a16(p: A16) -> f32;
+extern fn padded_floats_d16(n: i64, p: D16) -> f64;
+extern fn padded_floats_t16(p: T16) -> f32;
+extern fn padded_floats_a32(p: A32) -> f32;
+extern fn padded_floats_make(x: f32) -> A16;
+
+fn main() -> int
+{
+	printf("a16 %g\n".ptr, padded_floats_a16(A16 { a: 1.0, b: 2.0 }) as f64);
+	printf("d16 %g\n".ptr, padded_floats_d16(7, D16 { a: 3.0 }));
+	printf("t16 %g\n".ptr, padded_floats_t16(T16 { a: 1.0, b: 2.0, c: 3.0 }) as f64);
+	printf("a32 %g\n".ptr, padded_floats_a32(A32 { a: 1.0, b: 2.0 }) as f64);
+	let m = padded_floats_make(3.0);
+	printf("make %g %g\n".ptr, m.a as f64, m.b as f64);
+	return 0;
+}

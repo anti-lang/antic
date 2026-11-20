@@ -1,0 +1,66 @@
+//! A struct whose fields are simd structs of 16 bytes passes as C passes a
+//! struct of the vector types of C. ARM64 passes one of one or two fields in
+//! vector registers, as a homogeneous vector aggregate of float, integer or
+//! double lanes, and x86_64 passes one of one field in one vector register. The
+//! functions of `vector_fields.c` take such structs, return them and call an
+//! Anti function that takes and returns them.
+
+extern fn printf(format: ?*byte, ...) -> i32;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+simd struct I32x4 { a: i32, b: i32, c: i32, d: i32 }
+simd struct F64x2 { x: f64, y: f64 }
+
+struct One
+{
+	v: Vec4,
+}
+
+struct Ints
+{
+	v: I32x4,
+}
+
+struct Doubles
+{
+	v: F64x2,
+}
+
+struct Two
+{
+	a: Vec4,
+	b: Vec4,
+}
+
+extern fn vector_fields_one(p: One) -> f32;
+extern fn vector_fields_ints(n: i64, p: Ints) -> Ints;
+extern fn vector_fields_doubles(p: Doubles, s: f64) -> Doubles;
+extern fn vector_fields_two(p: Two) -> f32;
+extern fn vector_fields_make(x: f32) -> One;
+extern fn vector_fields_make_two(x: f32) -> Two;
+extern fn vector_fields_apply(f: fn(Two) -> One, x: f32) -> f32;
+
+fn added(t: Two) -> One
+{
+	return One { v: t.a + t.b };
+}
+
+fn main() -> int
+{
+	let a = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 };
+	let b = Vec4 { x: 5.0, y: 6.0, z: 7.0, w: 8.0 };
+	printf("one %g\n".ptr, vector_fields_one(One { v: a }) as f64);
+	let i = vector_fields_ints(100, Ints { v: I32x4 { a: 1, b: 2, c: 3, d: 4 } });
+	printf("ints %d %d %d %d\n".ptr, i.v.a, i.v.b, i.v.c, i.v.d);
+	let d = vector_fields_doubles(Doubles { v: F64x2 { x: 1.5, y: -2.5 } }, 4.0);
+	printf("doubles %g %g\n".ptr, d.v.x, d.v.y);
+	printf("two %g\n".ptr, vector_fields_two(Two { a: a, b: b }) as f64);
+	let m = vector_fields_make(1.0);
+	printf("make %g %g %g %g\n".ptr, m.v.x as f64, m.v.y as f64, m.v.z as f64,
+		m.v.w as f64);
+	let t = vector_fields_make_two(1.0);
+	printf("make two %g %g %g %g\n".ptr, t.a.x as f64, t.a.w as f64, t.b.x as f64,
+		t.b.w as f64);
+	printf("apply %g\n".ptr, vector_fields_apply(added, 2.0) as f64);
+	return 0;
+}
