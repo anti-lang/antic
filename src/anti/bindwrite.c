@@ -765,8 +765,15 @@ void bind_write_probe_c(const struct bind_module *b, struct text *out)
             const struct bind_field *f = &r->fields[j];
             struct setting s;
             memset(&s, 0, sizeof s);
+            /* The object is declared without the qualifiers of its type,
+               so the probe writes a field of a record of a const type
+               too. A bitfield has no offsetof, so the probe writes the
+               field and reads the bytes of the object, by T316 of
+               docs/audit/tests-findings.md and item 15 of "Answers of
+               2026-11-19" in docs/decisions.md. */
             if (f->name != NULL && settable(b, f->type, f->bits, &s)) {
-                text_appendf(out, "    {\n        %s v;\n        memset(&v, 0, "
+                text_appendf(out, "    {\n        __typeof_unqual__(%s) v;\n"
+                             "        memset(&v, 0, "
                              "sizeof v);\n        v.%s%s = %s;\n        "
                              "dump(\"%s.%s\", &v, sizeof v);\n    }\n",
                              r->c_name, f->name, text_cstr(&s.c_path),
