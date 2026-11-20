@@ -739,19 +739,20 @@ static enum state state_of(const struct binary *b,
    src/antic/driver_index.c writes one. The subset of src/rt/toml.c reads
    the bytes between the quotes as they stand, so a path of Windows keeps
    its backslashes, and a name that holds `'` stands in double quotes, by
-   T336 of docs/audit/tests-findings.md. A byte the subset cannot hold,
-   the other quote beside `'` or the end of a line, is left out. */
-static void toml_literal(struct text *out, const char *key, const char *value)
+   T336 of docs/audit/tests-findings.md. The subset knows no escapes, so
+   a value that holds both quotes or a line break has no form, and the
+   result is false, by item 16 of "Answers of 2026-11-19" in
+   docs/decisions.md. */
+static bool toml_literal(struct text *out, const char *key, const char *value)
 {
     char quote = strchr(value, '\'') != NULL ? '"' : '\'';
 
-    text_appendf(out, "%s = %c", key, quote);
-    for (; *value != '\0'; value++) {
-        if (*value != quote && *value != '\n' && *value != '\r') {
-            text_append_bytes(out, value, 1);
-        }
+    if ((quote == '"' && strchr(value, '"') != NULL) ||
+        strpbrk(value, "\r\n") != NULL) {
+        return false;
     }
-    text_appendf(out, "%c\n", quote);
+    text_appendf(out, "%s = %c%s%c\n", key, quote, value, quote);
+    return true;
 }
 
 int syms_inventory(const char *conf, const char *from, const char *out)
@@ -762,6 +763,7 @@ int syms_inventory(const char *conf, const char *from, const char *out)
     struct zip_entry *entries = NULL;
     size_t entry_count = 0;
     size_t total = 1;
+    const char *unheld = NULL;
     size_t i;
     size_t j;
     bool ok;
@@ -802,13 +804,30 @@ int syms_inventory(const char *conf, const char *from, const char *out)
             }
             total += found->names.count;
             text_append(&index, "\n[[module]]\n");
-            toml_literal(&index, "module", text_cstr(&u->module));
-            toml_literal(&index, "id", text_cstr(&u->id));
-            toml_literal(&index, "version", text_cstr(&u->version));
-            toml_literal(&index, "source", text_cstr(&u->source));
+            if (unheld == NULL) {
+                unheld = !toml_literal(&index, "module", text_cstr(&u->module))
+                             ? text_cstr(&u->module)
+                         : !toml_literal(&index, "id", text_cstr(&u->id))
+                             ? text_cstr(&u->id)
+                         : !toml_literal(&index, "version",
+                                         text_cstr(&u->version))
+                             ? text_cstr(&u->version)
+                         : !toml_literal(&index, "source",
+                                         text_cstr(&u->source))
+                             ? text_cstr(&u->source)
+                             : NULL;
+            }
         }
         symbol_units_free(&units);
         text_free(&archive);
+    }
+    if (unheld != NULL) {
+        say_anti("%s of %s cannot hold a name with both quotes or a line "
+                 "break: %s\n", INDEX_NAME, out, unheld);
+        symbol_units_free(&folded);
+        binaries_free(&binaries);
+        text_free(&index);
+        return 1;
     }
     entries = files_array(total, sizeof *entries);
     entries[entry_count].name = INDEX_NAME;
