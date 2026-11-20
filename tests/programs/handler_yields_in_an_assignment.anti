@@ -1,0 +1,50 @@
+//! An assignment takes `alloc T(args)` whose `construct` fails, and the handler
+//! of the call yields the value the place then holds, as the handler of a `let`
+//! does. A `construct` that succeeds gives the place its object.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Kid
+{
+	pub n: int = 0,
+
+	fn construct(self, k: int) may fail
+	{
+		if k < 0 {
+			fail "below";
+		}
+		self.n = k;
+	}
+}
+
+/// Print what the place holds and delete it.
+fn show(name: str, k: ?*Kid)
+{
+	if let found = k {
+		printf("%.*s %d\n".ptr, name.len as c_int, name.ptr, found.n as c_int);
+		delete(found);
+	} else {
+		printf("%.*s none\n".ptr, name.len as c_int, name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let k: ?*Kid = none;
+	k = alloc Kid(-1) catch e {
+		yield none;
+	};
+	show("failed", k);
+	k = alloc Kid(2) catch e {
+		yield none;
+	};
+	show("built", k);
+	let spare = alloc Kid(7) catch fatal;
+	k = alloc Kid(-3) catch e {
+		yield spare;
+	};
+	show("yielded", k);
+	return 0;
+}
