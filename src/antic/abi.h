@@ -33,7 +33,7 @@ enum abi_kind {
    target. */
 struct abi_param {
     enum abi_kind kind;
-    char types[2][16];      /* LLVM types of the coerced words */
+    char types[2][24];      /* LLVM types of the coerced words */
     size_t word_count;
     uint64_t size;
     uint64_t align;

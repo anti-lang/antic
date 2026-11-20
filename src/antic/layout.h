@@ -12,10 +12,14 @@
 #include "ir.h"
 #include "target.h"
 
-/* One scalar inside an aggregate, for the classification of its ABI. */
+/* One scalar inside an aggregate, for the classification of its ABI. A
+   simd struct of 16 bytes is one member, the vector type of C whose lanes
+   have type type, since C passes a struct of such vectors by the rules of
+   vectors, T373 of docs/audit/tests-findings.md. */
 struct layout_member {
     uint64_t offset;
     enum ir_type type;
+    bool vector;
 };
 
 /* Where a bitfield lies, and the integer that a load or store of it reads

@@ -352,6 +352,84 @@ static void vectors(void)
     end(&x);
 }
 
+/* An aggregate of count fields, each of the aggregate in aggs or, where
+   aggs holds IR_NO_AGG, of the scalar in scalars, a struct or a union. */
+static uint32_t holder(struct fixture *x, const char *name,
+                       enum ir_agg_kind kind, const uint32_t *aggs,
+                       const enum ir_type *scalars, size_t count)
+{
+    struct ir_field fields[4];
+    size_t i;
+
+    memset(fields, 0, sizeof fields);
+    for (i = 0; i < count; i++) {
+        fields[i].name = "f";
+        fields[i].type = aggs[i] != IR_NO_AGG ? ir_aggregate(aggs[i])
+                                               : ir_scalar(scalars[i]);
+    }
+    return ir_struct_add(&x->m, kind, name, fields, count, false, 0);
+}
+
+/* A simd struct of 16 bytes inside an aggregate is the vector type of C,
+   T373 of docs/audit/tests-findings.md. AAPCS64 6.8.2 makes one to four
+   vectors that fill an aggregate a homogeneous vector aggregate, of any
+   lanes, and a union of a vector and a float none. psABI 3.2.3 classes a
+   vector SSE and SSEUP, so one that fills an aggregate of 16 bytes goes in
+   one vector register. A float beside it in the lower eightbyte keeps the
+   class, and an integer there makes the eightbytes INTEGER and SSE. */
+static void vector_fields(void)
+{
+    static const enum ir_type with_float[] = {IR_F32, IR_F32};
+    static const enum ir_type with_int[] = {IR_I32, IR_I32};
+    struct fixture x;
+    uint32_t aggs[2];
+    uint32_t f4;
+    uint32_t i4;
+
+    begin(&x, IR_AGG, IR_NO_AGG);
+    f4 = simd(&x, "main.F4", IR_F32, 4);
+    i4 = simd(&x, "main.I4", IR_I32, 4);
+    aggs[0] = f4;
+    aggs[1] = f4;
+    x.f->result_agg = holder(&x, "main.One", IR_AGG_STRUCT, aggs, NULL, 1);
+    param_agg(&x, x.f->result_agg);
+    param_agg(&x, holder(&x, "main.Two", IR_AGG_STRUCT, aggs, NULL, 2));
+    aggs[1] = i4;
+    param_agg(&x, holder(&x, "main.Mixed", IR_AGG_STRUCT, aggs, NULL, 2));
+    aggs[1] = IR_NO_AGG;
+    param_agg(&x, holder(&x, "main.UF", IR_AGG_UNION, aggs, with_float, 2));
+    run(&x, TARGET_MACOS_ARM64);
+    EXPECT(&x.params[0], ABI_COERCE, 1, "[1 x <4 x float>]", "", 16, 16);
+    EXPECT(&x.params[1], ABI_COERCE, 1, "[2 x <4 x float>]", "", 32, 16);
+    EXPECT(&x.params[2], ABI_COERCE, 1, "[2 x <4 x float>]", "", 32, 16);
+    EXPECT(&x.params[3], ABI_COERCE, 1, "i128", "", 16, 16);
+    EXPECT(&x.result, ABI_COERCE, 1, "[1 x <4 x float>]", "", 16, 16);
+    end(&x);
+
+    begin(&x, IR_AGG, IR_NO_AGG);
+    f4 = simd(&x, "main.F4", IR_F32, 4);
+    i4 = simd(&x, "main.I4", IR_I32, 4);
+    aggs[0] = f4;
+    aggs[1] = f4;
+    x.f->result_agg = holder(&x, "main.One", IR_AGG_STRUCT, aggs, NULL, 1);
+    param_agg(&x, x.f->result_agg);
+    param_agg(&x, holder(&x, "main.Two", IR_AGG_STRUCT, aggs, NULL, 2));
+    aggs[0] = i4;
+    param_agg(&x, holder(&x, "main.Ints", IR_AGG_STRUCT, aggs, NULL, 1));
+    aggs[0] = f4;
+    aggs[1] = IR_NO_AGG;
+    param_agg(&x, holder(&x, "main.UF", IR_AGG_UNION, aggs, with_float, 2));
+    param_agg(&x, holder(&x, "main.UI", IR_AGG_UNION, aggs, with_int, 2));
+    run(&x, TARGET_MACOS_X86_64);
+    EXPECT(&x.params[0], ABI_COERCE, 1, "<4 x float>", "", 16, 16);
+    EXPECT(&x.params[1], ABI_BYVAL, 1, "ptr", "", 32, 16);
+    EXPECT(&x.params[2], ABI_COERCE, 1, "<4 x i32>", "", 16, 16);
+    EXPECT(&x.params[3], ABI_COERCE, 1, "<4 x float>", "", 16, 16);
+    EXPECT(&x.params[4], ABI_COERCE, 2, "i64", "double", 16, 16);
+    EXPECT(&x.result, ABI_COERCE, 1, "<4 x float>", "", 16, 16);
+    end(&x);
+}
+
 /* AAPCS64 6.8.2: a homogeneous floating-point aggregate of one to four
    members of one float type goes in float registers, [N x float] or
    [N x double], at any size. A fifth member ends it. Another aggregate of
@@ -537,6 +615,7 @@ void test_abi(void)
     sysv_memory();
     sysv_registers();
     vectors();
+    vector_fields();
     aapcs64();
     aapcs64_padded();
     aapcs64_registers();

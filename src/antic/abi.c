@@ -64,18 +64,25 @@ static void pointer(enum abi_kind kind, const struct layout *agg,
     out->align = agg->align;
 }
 
-/* A simd struct of 16 bytes as the vector of its lanes. */
+/* The LLVM type of the vector of 16 bytes whose lanes have type lane. */
+static void vector_name(struct layouts *l, enum ir_type lane, char *out,
+                        size_t size)
+{
+    uint64_t bytes = layout_size(l, ir_scalar(lane));
+
+    text_format_name(out, size, "<%llu x %s>",
+                     (unsigned long long)(16 / bytes),
+                     scalar_name(lane, bytes));
+}
+
+/* A simd struct of 16 bytes as the vector of its lanes, its one member. */
 static void vector(struct layouts *l, const struct layout *agg,
                    struct abi_param *out)
 {
-    enum ir_type lane = agg->members[0].type;
-    uint64_t bytes = layout_size(l, ir_scalar(lane));
-
     out->kind = ABI_VECTOR;
     out->word_count = 1;
-    text_format_name(out->types[0], sizeof out->types[0], "<%llu x %s>",
-                     (unsigned long long)(agg->size / bytes),
-                     scalar_name(lane, bytes));
+    vector_name(l, agg->members[0].type, out->types[0],
+                sizeof out->types[0]);
     out->size = agg->size;
     out->align = agg->align;
 }
@@ -90,12 +97,15 @@ static void coerce(const struct layout *agg, struct abi_param *out)
 /* The eightbytes of a System V aggregate of at most 16 bytes. One that
    holds an integer is INTEGER and an i64. One of floats alone is SSE: a
    double for an f64, <2 x float> for two f32 and a float for one. One
-   without a member is NO_CLASS and takes no word. Counts the words of
-   each register class in ints and floats. Returns false for an aggregate
-   of class MEMORY: above 16 bytes, empty, or with a field off its
-   alignment. */
-static bool sysv_words(const struct layout *agg, struct abi_param *out,
-                       size_t *ints, size_t *floats)
+   without a member is NO_CLASS and takes no word. A vector member is SSE
+   in both of its eightbytes, of any lanes. When nothing else stands in the
+   upper one it is SSEUP, and the two are one word of the vector's type in
+   one register, as for the __m128 of a struct in C, T373 of
+   docs/audit/tests-findings.md. Counts the words of each register class
+   in ints and floats. Returns false for an aggregate of class MEMORY:
+   above 16 bytes, empty, or with a field off its alignment. */
+static bool sysv_words(struct layouts *l, const struct layout *agg,
+                       struct abi_param *out, size_t *ints, size_t *floats)
 {
     size_t count = (size_t)(agg->size + 7) / 8;
     size_t k;
@@ -112,21 +122,39 @@ static bool sysv_words(const struct layout *agg, struct abi_param *out,
         bool f64 = false;
         size_t f32 = 0;
         bool used = false;
+        const struct layout_member *low = NULL;
+        bool upper_alone = true;
         for (i = 0; i < agg->member_count; i++) {
-            if (agg->members[i].offset / 8 != k) {
+            const struct layout_member *m = &agg->members[i];
+            if (m->vector && m->offset / 8 == k) {
+                low = m;
+            } else if (m->vector && m->offset / 8 + 1 == k) {
+                f64 = true;
+            } else if (m->offset / 8 == k + 1) {
+                upper_alone = false;
+            }
+            if (m->offset / 8 != k && !(m->vector && m->offset / 8 + 1 == k)) {
                 continue;
             }
             used = true;
-            integer = integer || !is_float(agg->members[i].type);
-            f64 = f64 || agg->members[i].type == IR_F64;
-            f32 += agg->members[i].type == IR_F32;
+            integer = integer || (!m->vector && !is_float(m->type));
+            f64 = f64 || m->type == IR_F64;
+            f32 += !m->vector && m->type == IR_F32;
         }
         if (!used) {
             continue;
         }
+        if (low != NULL && !integer && upper_alone) {
+            vector_name(l, low->type, out->types[out->word_count],
+                        sizeof out->types[out->word_count]);
+            out->word_count++;
+            *floats += 1;
+            k++;
+            continue;
+        }
         set_word(out, out->word_count++,
                  integer ? "i64"
-                 : f64   ? "double"
+                 : f64 || low != NULL ? "double"
                  : f32 > 1 ? "<2 x float>"
                            : "float");
         *ints += integer;
@@ -156,7 +184,7 @@ static void sysv(struct layouts *l, const struct ir_function *f,
         const struct layout *agg = layout_agg(l, f->result_agg);
         if (agg->vector) {
             vector(l, agg, result);
-        } else if (!sysv_words(agg, result, &need_int, &need_fp)) {
+        } else if (!sysv_words(l, agg, result, &need_int, &need_fp)) {
             memset(result, 0, sizeof *result);
             pointer(ABI_SRET, agg, result);
             ints = 1;
@@ -175,7 +203,7 @@ static void sysv(struct layouts *l, const struct ir_function *f,
         if (agg->vector) {
             vector(l, agg, &params[i]);
             floats++;
-        } else if (sysv_words(agg, &params[i], &need_int, &need_fp) &&
+        } else if (sysv_words(l, agg, &params[i], &need_int, &need_fp) &&
                    (need_int == 0 || ints + need_int <= SYSV_INT_ARGS) &&
                    (need_fp == 0 || floats + need_fp <= SYSV_FP_ARGS)) {
             ints += need_int;
@@ -190,22 +218,30 @@ static void sysv(struct layouts *l, const struct ir_function *f,
 /* A homogeneous floating-point aggregate: one to four members, all f32 or
    all f64, which fill the aggregate. One whose align(N) leaves bytes after
    them is none, as clang decides for _Alignas, T374 of
-   docs/audit/tests-findings.md. Returns the number of members, or 0. */
+   docs/audit/tests-findings.md. A homogeneous vector aggregate has one to
+   four vectors of 16 bytes, of any lanes, as clang counts vectors of one
+   size alike, T373 there. Returns the number of members, or 0. */
 static size_t hfa_members(struct layouts *l, const struct layout *agg)
 {
+    const struct layout_member *first;
+    uint64_t base;
     size_t i;
 
-    if (agg->member_count == 0 || agg->member_count > 4 ||
-        !is_float(agg->members[0].type)) {
+    if (agg->member_count == 0 || agg->member_count > 4) {
+        return 0;
+    }
+    first = &agg->members[0];
+    if (!first->vector && !is_float(first->type)) {
         return 0;
     }
     for (i = 1; i < agg->member_count; i++) {
-        if (agg->members[i].type != agg->members[0].type) {
+        if (agg->members[i].vector != first->vector ||
+            (!first->vector && agg->members[i].type != first->type)) {
             return 0;
         }
     }
-    if (agg->size != agg->member_count *
-                         layout_size(l, ir_scalar(agg->members[0].type))) {
+    base = first->vector ? 16 : layout_size(l, ir_scalar(first->type));
+    if (agg->size != agg->member_count * base) {
         return 0;
     }
     return agg->member_count;
@@ -227,11 +263,18 @@ static void aapcs64_aggregate(struct layouts *l, const struct layout *agg,
         return;
     }
     if (members > 0) {
+        char base[16];
+        if (agg->members[0].vector) {
+            vector_name(l, agg->members[0].type, base, sizeof base);
+        } else {
+            text_format_name(base, sizeof base, "%s",
+                             agg->members[0].type == IR_F32 ? "float"
+                                                            : "double");
+        }
         coerce(agg, out);
         out->word_count = 1;
         text_format_name(out->types[0], sizeof out->types[0], "[%zu x %s]",
-                         members,
-                         agg->members[0].type == IR_F32 ? "float" : "double");
+                         members, base);
         return;
     }
     if (agg->size > 16) {

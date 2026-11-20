@@ -136,9 +136,30 @@ struct members {
     size_t count;
 };
 
+/* Record a member of type at offset, a vector when vector is set. Two
+   equal members at one offset are one member. */
+static void add_member(struct layouts *l, enum ir_type type, bool vector,
+                       uint64_t offset, struct members *out)
+{
+    size_t i;
+
+    for (i = 0; i < out->count; i++) {
+        if (out->items[i].offset == offset &&
+            out->items[i].type == target_type(l, type) &&
+            out->items[i].vector == vector) {
+            return;
+        }
+    }
+    if (out->count < LAYOUT_MEMBER_LIMIT) {
+        out->items[out->count].offset = offset;
+        out->items[out->count].type = target_type(l, type);
+        out->items[out->count].vector = vector;
+        out->count++;
+    }
+}
+
 /* The scalars of a value of type v at offset. Every field of a union
-   starts at the union's own offset. Two equal scalars at one offset are
-   one member. */
+   starts at the union's own offset. */
 static void flatten(struct layouts *l, struct ir_vtype v, uint64_t offset,
                     struct members *out)
 {
@@ -148,21 +169,16 @@ static void flatten(struct layouts *l, struct ir_vtype v, uint64_t offset,
     uint64_t i;
 
     if (v.type != IR_AGG) {
-        for (i = 0; i < out->count; i++) {
-            if (out->items[i].offset == offset &&
-                out->items[i].type == target_type(l, v.type)) {
-                return;
-            }
-        }
-        if (out->count < LAYOUT_MEMBER_LIMIT) {
-            out->items[out->count].offset = offset;
-            out->items[out->count].type = target_type(l, v.type);
-            out->count++;
-        }
+        add_member(l, v.type, false, offset, out);
         return;
     }
     t = l->m->aggs[v.agg];
     layout = layout_agg(l, v.agg);
+    /* A simd struct of 16 bytes is one member, the vector of its lanes. */
+    if (layout->vector) {
+        add_member(l, t->fields[0].type.type, true, offset, out);
+        return;
+    }
     if (t->kind == IR_AGG_ARRAY) {
         step = layout_size(l, t->fields[0].type);
         for (i = 0; step > 0 && i < layout->size / step; i++) {
