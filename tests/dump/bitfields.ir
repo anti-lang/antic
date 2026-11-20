@@ -1,7 +1,7 @@
 type bitfields.Flags = struct { visible: i32 : 1 zeroext, layer: i32 : 4 zeroext, level: i8 : 3 signext, pad: i16 : 9 zeroext }
 type [4]anti.rt.Field = array 4 of anti.rt.Field
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
-global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @bitfields.package.version, i64 5, ptr 0, i64 0, ptr 0 }
+global bitfields.Flags.descriptor anti.rt.Descriptor { @bitfields.1, i64 5, ptr 0, size_of bitfields.Flags, i64 0, ptr 0, i64 4, @bitfields.Flags.fields, ptr 0, i64 0, i64 0, ptr 0, @bitfields.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }
 global bitfields.1 size 6 align 1 bytes 46 6c 61 67 73 00
 global bitfields.2 size 8 align 1 bytes 76 69 73 69 62 6c 65 00
 global bitfields.3 size 6 align 1 bytes 6c 61 79 65 72 00

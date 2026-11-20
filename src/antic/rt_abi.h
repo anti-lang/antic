@@ -52,6 +52,10 @@
    its descriptor and its ancestors under this C prefix. */
 #define RUNTIME_ROOT "anti_lang_Object_"
 
+/* The runtime defines the descriptor of the module anti.lang beside the
+   descriptor of the root, under this name. */
+#define RUNTIME_LANG_MODULE "anti_rt_lang_module"
+
 /* DESIGN: the slot of an injectable interface is one global per
    interface, of the runtime module. Its name is this prefix and the
    path of the interface. The passes over the whole program write data
@@ -351,7 +355,13 @@ bool rt_without_effects(const char *name, size_t length);
     F(RT_DESCRIPTOR_VERSION_LENGTH, version_length, I64)                   \
     F(RT_DESCRIPTOR_VERSIONS, versions, PTR)                               \
     F(RT_DESCRIPTOR_TYPE_ARG_COUNT, type_arg_count, I64)                   \
-    F(RT_DESCRIPTOR_TYPE_ARGS, type_args, PTR)
+    F(RT_DESCRIPTOR_TYPE_ARGS, type_args, PTR)                             \
+    F(RT_DESCRIPTOR_MODULE, module, PTR)
+
+/* struct anti_module of src/rt/object.h, the descriptor of a module. */
+#define RT_MODULE_RECORD(F)                                                \
+    F(RT_MODULE_PATH, path, PTR)                                           \
+    F(RT_MODULE_PATH_LENGTH, path_length, I64)
 
 /* struct anti_field of src/rt/object.h, one field of a descriptor. */
 #define RT_FIELD_RECORD(F)                                                 \
@@ -473,6 +483,8 @@ bool rt_without_effects(const char *name, size_t length);
 #define RT_RECORDS(R)                                                      \
     R(RT_RECORD_DESCRIPTOR, "anti.rt.Descriptor", anti_descriptor,         \
       RT_DESCRIPTOR_RECORD, RT_DESCRIPTOR_ITEM_COUNT)                      \
+    R(RT_RECORD_MODULE, "anti.rt.Module", anti_module, RT_MODULE_RECORD,   \
+      RT_MODULE_ITEM_COUNT)                                                \
     R(RT_RECORD_FIELD, "anti.rt.Field", anti_field, RT_FIELD_RECORD,       \
       RT_FIELD_ITEM_COUNT)                                                 \
     R(RT_RECORD_FUNCTION, "anti.rt.Function", anti_function,               \

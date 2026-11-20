@@ -45,13 +45,13 @@ EXPORTED struct anti_field anti_bad_part_fields[1] = {
 EXPORTED struct anti_descriptor anti_bad_part = {
     (const unsigned char *)"Part", 4, NULL, 8, 0, NULL, 1,
     anti_bad_part_fields, NULL, 0, 0, NULL, (const unsigned char *)"1.0.0", 5,
-    NULL, 0, NULL
+    NULL, 0, NULL, NULL
 };
 
 EXPORTED struct anti_descriptor anti_bad_class = {
     (const unsigned char *)"Impl", 4, NULL, 32, 0, NULL, 1, anti_bad_fields,
     NULL, 0, 1, anti_bad_functions, (const unsigned char *)"1.0.0", 5, NULL,
-    0, NULL
+    0, NULL, NULL
 };
 
 EXPORTED struct anti_provides anti_bad_entry = {

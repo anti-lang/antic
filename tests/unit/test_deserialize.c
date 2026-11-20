@@ -231,11 +231,11 @@ struct node {
 #define VALUE(name, size, fields)                                         \
     {TEXT(name), NULL, (int64_t)(size), 0, NULL,                          \
      (int64_t)(sizeof(fields) / sizeof(fields)[0]), fields, NULL, 0, 0,   \
-     NULL, NULL, 0, NULL, 0, NULL}
+     NULL, NULL, 0, NULL, 0, NULL, NULL}
 /* A class below the root, at depth 1. */
 #define CLASS(name, size, ancestors, fields, count)                      \
     {TEXT(name), &anti_lang_Object_descriptor, (int64_t)(size), 1,       \
-     ancestors, count, fields, NULL, 0, 0, NULL, NULL, 0, NULL, 0, NULL}
+     ancestors, count, fields, NULL, 0, 0, NULL, NULL, 0, NULL, 0, NULL, NULL}
 
 static const struct anti_field point_fields[] = {
     FIELD("x", struct point, x, ANTI_TYPE_I64, 0, NULL),

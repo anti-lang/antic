@@ -73,7 +73,8 @@ static const struct anti_function asked = {
 };
 static const struct anti_descriptor service = {
     (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 1, &asked, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
+    0, 1, &asked, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL,
+    NULL
 };
 
 /* The table of the sub-object as the library writes it, with the entry
@@ -154,7 +155,7 @@ static struct anti_object *sub_object(void)
    entry needs no stubs. */
 static const struct anti_descriptor whole = {
     (const unsigned char *)"Whole", 5, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL, NULL
 };
 
 /* A load of a table of three entries, the first and the last with

@@ -1,5 +1,5 @@
 exit 0
-{"type":"Parts","c":"q","items":[1,2],"p":3,"t":[4,5],"at":{"x":1,"y":2}}
+{"type":"deserialize_parts.Parts","c":"q","items":[1,2],"p":3,"t":[4,5],"at":{"x":1,"y":2}}
 refused
 refused
 refused
@@ -7,10 +7,10 @@ refused
 refused
 refused
 refused
-{"type":"Parts","c":"a","items":null,"p":null,"t":[0,0],"at":{"x":1,"y":2}}
+{"type":"deserialize_parts.Parts","c":"a","items":null,"p":null,"t":[0,0],"at":{"x":1,"y":2}}
 refused
-{"type":"Parts","c":"a","items":null,"p":null,"t":[0,0],"at":{"x":1,"y":2}}
-{"type":"Node","next":{"type":"Node","next":{"type":"Node","next":null}}}
+{"type":"deserialize_parts.Parts","c":"a","items":null,"p":null,"t":[0,0],"at":{"x":1,"y":2}}
+{"type":"deserialize_parts.Node","next":{"type":"deserialize_parts.Node","next":{"type":"deserialize_parts.Node","next":null}}}
 refused
-{"type":"Holds","tag":{"type":"Tag","n":4}}
+{"type":"deserialize_parts.Holds","tag":{"type":"deserialize_parts.Tag","n":4}}
 refused

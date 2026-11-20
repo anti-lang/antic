@@ -316,7 +316,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 98, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 99, 0, 0, 0,                /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -464,7 +464,7 @@ static void round_trip(void)
                   "extern fn anti_rt_alloc_aligned(i64, i64, i64, i64) -> ptr\n"
                   "global vec.V2.descriptor anti.rt.Descriptor { @vec.1, i64 "
                   "2, ptr 0, size_of vec.V2, i64 0, ptr 0, i64 2, "
-                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
+                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }\n"
                   "global vec.1 size 3 align 1 bytes 56 32 00\n"
                   "global vec.2 size 2 align 1 bytes 78 00\n"
                   "global vec.3 size 2 align 1 bytes 79 00\n"
@@ -474,7 +474,7 @@ static void round_trip(void)
                   "i64 0, ptr 0 } }\n"
                   "global vec.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nglobal vec.Hidden.descriptor anti.rt.Descriptor { @vec.7, "
                   "i64 6, ptr 0, size_of vec.Hidden, i64 0, ptr 0, i64 2, "
-                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
+                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }\n"
                   "global vec.7 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
                   "global vec.8 size 2 align 1 bytes 76 00\n"
                   "global vec.9 size 5 align 1 bytes 6e 65 78 74 00\n"
@@ -1544,7 +1544,7 @@ static void dependencies(void)
                   "extern fn anti_rt_alloc_aligned(i64, i64, i64, i64) -> ptr\n"
                   "global vec.V2.descriptor anti.rt.Descriptor { @vec.1, i64 "
                   "2, ptr 0, size_of vec.V2, i64 0, ptr 0, i64 2, "
-                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
+                  "@vec.V2.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }\n"
                   "global vec.1 size 3 align 1 bytes 56 32 00\n"
                   "global vec.2 size 2 align 1 bytes 78 00\n"
                   "global vec.3 size 2 align 1 bytes 79 00\n"
@@ -1554,7 +1554,7 @@ static void dependencies(void)
                   "i64 0, ptr 0 } }\n"
                   "global vec.package.version size 6 align 1 bytes 30 2e 30 2e 30 00\nglobal vec.Hidden.descriptor anti.rt.Descriptor { @vec.7, "
                   "i64 6, ptr 0, size_of vec.Hidden, i64 0, ptr 0, i64 2, "
-                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
+                  "@vec.Hidden.fields, ptr 0, i64 0, i64 0, ptr 0, @vec.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }\n"
                   "global vec.7 size 7 align 1 bytes 48 69 64 64 65 6e 00\n"
                   "global vec.8 size 2 align 1 bytes 76 00\n"
                   "global vec.9 size 5 align 1 bytes 6e 65 78 74 00\n"
@@ -1565,7 +1565,7 @@ static void dependencies(void)
                   "@vec.Hidden.descriptor } }\n"
                   "global shapes.Box.descriptor anti.rt.Descriptor { "
                   "@shapes.1, i64 3, ptr 0, size_of shapes.Box, i64 0, ptr 0, "
-                  "i64 1, @shapes.Box.fields, ptr 0, i64 0, i64 0, ptr 0, @shapes.package.version, i64 5, ptr 0, i64 0, ptr 0 }\n"
+                  "i64 1, @shapes.Box.fields, ptr 0, i64 0, i64 0, ptr 0, @shapes.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }\n"
                   "global shapes.1 size 4 align 1 bytes 42 6f 78 00\n"
                   "global shapes.2 size 7 align 1 bytes 63 6f 72 6e 65 72 00\n"
                   "global vec.V2.descriptor size 0 align 1 bytes\n"
@@ -1721,9 +1721,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 99;
+    copy[4] = 100;
     refuses_file(copy, sizeof copy,
-                 "has format version 99, and antic reads version 98");
+                 "has format version 100, and antic reads version 99");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");

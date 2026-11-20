@@ -99,7 +99,7 @@ int main(int argc, char **argv)
         static const struct anti_descriptor one = {
             (const unsigned char *)"One", 3, NULL, 24, 0, NULL, 0, NULL,
             NULL, 0, 0, NULL, (const unsigned char *)"0.0.0", 5, NULL, 0,
-            NULL
+            NULL, NULL
         };
         const void *table[ANTI_ENTRY_HOOK] = {0};
         struct anti_object object;

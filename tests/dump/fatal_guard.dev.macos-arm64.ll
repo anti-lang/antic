@@ -84,7 +84,8 @@ b2:
 }
 
 @anti_lang_Object_descriptor = external global [0 x i8], align 1
-@fatal_guard.Cell.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [32 x i8] }> <{ ptr @fatal_guard.1, [48 x i8] c"\04\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\08\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @fatal_guard.Cell.fields, [32 x i8] zeroinitializer, ptr @fatal_guard.package.version, [32 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
+@anti_rt_lang_module = external global [0 x i8], align 1
+@fatal_guard.Cell.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [40 x i8] }> <{ ptr @fatal_guard.1, [48 x i8] c"\04\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\08\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @fatal_guard.Cell.fields, [32 x i8] zeroinitializer, ptr @fatal_guard.package.version, [40 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
 @fatal_guard.1 = hidden constant <{ [5 x i8] }> <{ [5 x i8] c"Cell\00" }>, align 1
 @fatal_guard.2 = hidden constant <{ [2 x i8] }> <{ [2 x i8] c"v\00" }>, align 1
 @fatal_guard.Cell.fields = hidden constant <{ ptr, [40 x i8] }> <{ ptr @fatal_guard.2, [40 x i8] c"\01\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8

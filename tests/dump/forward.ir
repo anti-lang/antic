@@ -1,7 +1,7 @@
 type forward.Point = struct { x: i64, y: i64 }
 type [2]anti.rt.Field = array 2 of anti.rt.Field
 extern fn anti_rt_check_failed(ptr, i64, i32, i64, i64) -> never
-global forward.Point.descriptor anti.rt.Descriptor { @forward.1, i64 5, ptr 0, size_of forward.Point, i64 0, ptr 0, i64 2, @forward.Point.fields, ptr 0, i64 0, i64 0, ptr 0, @forward.package.version, i64 5, ptr 0, i64 0, ptr 0 }
+global forward.Point.descriptor anti.rt.Descriptor { @forward.1, i64 5, ptr 0, size_of forward.Point, i64 0, ptr 0, i64 2, @forward.Point.fields, ptr 0, i64 0, i64 0, ptr 0, @forward.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }
 global forward.1 size 6 align 1 bytes 50 6f 69 6e 74 00
 global forward.2 size 2 align 1 bytes 78 00
 global forward.3 size 2 align 1 bytes 79 00

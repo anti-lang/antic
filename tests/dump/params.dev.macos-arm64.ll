@@ -124,7 +124,7 @@ b0:
   ret ptr %v1
 }
 
-@params.Gap.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [32 x i8] }> <{ ptr @params.1, [48 x i8] c"\03\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\10\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @params.Gap.fields, [32 x i8] zeroinitializer, ptr @params.package.version, [32 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
+@params.Gap.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [40 x i8] }> <{ ptr @params.1, [48 x i8] c"\03\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\10\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\02\00\00\00\00\00\00\00", ptr @params.Gap.fields, [32 x i8] zeroinitializer, ptr @params.package.version, [40 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
 @params.1 = hidden constant <{ [4 x i8] }> <{ [4 x i8] c"Gap\00" }>, align 1
 @params.2 = hidden constant <{ [2 x i8] }> <{ [2 x i8] c"a\00" }>, align 1
 @params.3 = hidden constant <{ [2 x i8] }> <{ [2 x i8] c"b\00" }>, align 1

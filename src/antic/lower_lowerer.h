@@ -544,6 +544,10 @@ void lower_note_table_read(struct lowerer *l, const struct type *t,
 struct ir_operand lower_entry_offset(struct lowerer *l, size_t index);
 uint32_t lower_fields_agg(struct lowerer *l, size_t n);
 uint32_t lower_descriptor_agg(struct lowerer *l);
+/* The descriptor of module, which every module that names it writes and
+   the link keeps once. */
+struct ir_global *lower_module_descriptor(struct lowerer *l,
+                                          const char *module);
 uint32_t lower_class_depth(const struct type *t);
 /* DESIGN: the end of the name of a part the compiler writes for a class,
    `<Class>.<part>:written`. The init of the class, its table, its

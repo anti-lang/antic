@@ -29,6 +29,9 @@
    module of a program refers to this one, so `p is *Object` compares the
    same address wherever it is written, and no two modules define it. */
 static const unsigned char object_name[] = "Object";
+static const unsigned char lang_path[] = "anti.lang";
+
+const struct anti_module anti_rt_lang_module = {lang_path, 9};
 
 const struct anti_descriptor *const anti_lang_Object_ancestors[1] = {
     &anti_lang_Object_descriptor
@@ -36,7 +39,8 @@ const struct anti_descriptor *const anti_lang_Object_ancestors[1] = {
 
 const struct anti_descriptor anti_lang_Object_descriptor = {
     object_name, 6, NULL, (int64_t)sizeof(struct anti_object), 0,
-    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL, NULL, 0, NULL, 0, NULL
+    anti_lang_Object_ancestors, 0, NULL, NULL, 0, 0, NULL, NULL, 0, NULL, 0, NULL,
+    &anti_rt_lang_module
 };
 
 const struct anti_descriptor *anti_rt_descriptor(const void *object)
@@ -376,13 +380,14 @@ static void put_signed(struct anti_builder *b, int64_t value)
                 value < 0);
 }
 
-void anti_rt_json_write_text(struct anti_builder *b,
-                             const unsigned char *bytes, int64_t len)
+/* The len bytes at bytes, with the escapes that JSON requires and
+   without the quotes. */
+static void put_escaped(struct anti_builder *b, const unsigned char *bytes,
+                        int64_t len)
 {
     static const char hex[] = "0123456789abcdef";
     int64_t i;
 
-    put(b, "\"");
     for (i = 0; i < len; i++) {
         unsigned char c = bytes[i];
         if (c == '"' || c == '\\') {
@@ -403,6 +408,13 @@ void anti_rt_json_write_text(struct anti_builder *b,
             anti_rt_builder_append(b, &c, 1);
         }
     }
+}
+
+void anti_rt_json_write_text(struct anti_builder *b,
+                             const unsigned char *bytes, int64_t len)
+{
+    put(b, "\"");
+    put_escaped(b, bytes, len);
     put(b, "\"");
 }
 
@@ -767,8 +779,16 @@ static void serialize_into(struct anti_builder *b, const void *object,
         put(b, "null");
         return;
     }
-    put(b, "{\"type\":");
-    anti_rt_json_write_text(b, d->name, d->name_length);
+    /* `type` names the module and the class, by 1 of "Answers of
+       2026-11-20" in docs/decisions.md. A descriptor of C without a
+       module gives the bare name. */
+    put(b, "{\"type\":\"");
+    if (d->module != NULL) {
+        put_escaped(b, d->module->path, d->module->path_length);
+        put(b, ".");
+    }
+    put_escaped(b, d->name, d->name_length);
+    put(b, "\"");
     /* The ancestor list is indexed by depth, so the root comes first and
        the class itself last. */
     for (depth = 0; depth <= d->depth; depth++) {

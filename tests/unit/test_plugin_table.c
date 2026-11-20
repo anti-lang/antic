@@ -98,7 +98,7 @@ static struct anti_versions versions = {
 };
 static const struct anti_descriptor service = {
     (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL, NULL
 };
 
 /* Bytes without a NUL after them, which a read past a length reaches. */
@@ -237,7 +237,7 @@ static void says(int line, const char *want)
 /* An interface that the library does not provide. */
 static const struct anti_descriptor other = {
     (const unsigned char *)"Other", 5, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &versions, 0, NULL, NULL
 };
 
 /* The table as the library carries it loads, builds and unloads. An
@@ -266,6 +266,11 @@ static void good_table_loads(void)
     says(__LINE__, "the library is not open");
 }
 
+/* The descriptor of a module whose path has a length below zero. */
+static const struct anti_module damaged_module = {
+    (const unsigned char *)"host", -1
+};
+
 static void damaged_texts(void)
 {
     table->version = unterminated;
@@ -287,6 +292,10 @@ static void damaged_texts(void)
     class_of->version_length = -1;
     REFUSED();
     classes->module_length = -1;
+    REFUSED();
+    /* The descriptor of the module of the class, by 1 of "Answers of
+       2026-11-20" in docs/decisions.md. */
+    class_of->module = &damaged_module;
     REFUSED();
 }
 
@@ -985,11 +994,12 @@ static const int64_t no_chain[1] = {1};
 static struct anti_versions empty_versions = {no_chain, 0, NULL, 0};
 static const struct anti_descriptor unversioned = {
     (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 0, NULL, (const unsigned char *)"1.0.0", 5, NULL, 0, NULL
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, NULL, 0, NULL, NULL
 };
 static const struct anti_descriptor chainless = {
     (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
-    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &empty_versions, 0, NULL
+    0, 0, NULL, (const unsigned char *)"1.0.0", 5, &empty_versions, 0, NULL,
+    NULL
 };
 
 /* An interface of the host that carries no version, and one whose size
@@ -1014,7 +1024,7 @@ static const struct anti_function grown_functions[1] = {
 static const struct anti_descriptor grown = {
     (const unsigned char *)"Service", 7, NULL, 16, 0, NULL, 0, NULL, NULL,
     0, 1, grown_functions, (const unsigned char *)"1.0.0", 5, &versions, 0,
-    NULL
+    NULL, NULL
 };
 
 static void slot_without_name(void)

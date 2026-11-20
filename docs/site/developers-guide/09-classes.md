@@ -2568,7 +2568,7 @@ field size at 32, type id 21
 field hits at 48, type id 0
 function grow, slot 18, 2 parameter
 grown 2.5, r 2.5, wrong count true, Value 24 bytes
-{"type":"Circle","r":2.5,"label":"circle","size":{"w":2,"h":3},"hits":null}
+{"type":"mirror.Circle","r":2.5,"label":"circle","size":{"w":2,"h":3},"hits":null}
 read back a Circle, equal true
 new Circle
 ```
@@ -2612,14 +2612,17 @@ fn grow(c: *Circle) -> f64
 The descriptor is a constant record that the module of the class writes once per program, with two lists behind it.
 
 ```ir excerpt=mirror target=linux-x86_64 mode=release
-type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr }
+type anti.rt.Descriptor = struct { name: ptr, name_length: i64, parent: ptr, size: i64, depth: i64, ancestors: ptr, field_count: i64, fields: ptr, destruct: ptr, offset: i64, function_count: i64, functions: ptr, version: ptr, version_length: i64, versions: ptr, type_arg_count: i64, type_args: ptr, module: ptr }
 ...
 type anti.rt.Field = struct { name: ptr, name_length: i64, offset: i64, type: i64, owned: i64, descriptor: ptr }
 ...
 type anti.rt.Function = struct { name: ptr, name_length: i64, slot: i64, param_count: i64, signature: ptr, signature_length: i64 }
+...
+type anti.rt.Module = struct { path: ptr, path_length: i64 }
 ```
 
-- A descriptor has 17 words, 136 bytes. `depth` and `ancestors` serve `is` and `as`. `offset` is the distance from an interface part to its object. `version` and `versions` serve the plugin loader of [chapter 15]({{% relref "15-hooks" %}}).
+- A descriptor has 18 words, 144 bytes. `depth` and `ancestors` serve `is` and `as`. `offset` is the distance from an interface part to its object. `version` and `versions` serve the plugin loader of [chapter 15]({{% relref "15-hooks" %}}). `module` points at the descriptor of the module of the class, whose path `serialize` writes before the name of the class.
+- A module descriptor has 2 words, 16 bytes: the module path and its length. A program holds one per module.
 - A field record has 6 words, 48 bytes: the name, the offset, a type id and the `own` mark. For an inline struct or class it also holds the descriptor of that type.
 - A function record has 6 words, 48 bytes: the name, the slot in the table, the count of parameters and the signature with its length.
 

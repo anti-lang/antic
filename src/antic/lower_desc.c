@@ -1443,6 +1443,54 @@ static struct ir_global *class_versions(struct lowerer *l,
     return g;
 }
 
+/* DESIGN: the descriptor of a module is a record of its own that holds
+   its path, by 1 of "Answers of 2026-11-20" in docs/decisions.md. Every
+   class descriptor points at the one of the module that declares the
+   class. A module writes it where it writes a class descriptor of the
+   module, and the copy of a generic that another module writes under the
+   path of the generic's module writes it too. It is therefore data that
+   each such module defines and the link keeps once, as the data of a
+   copy is, and its name `<module>:written` holds the `<` that
+   ir_is_copy_name reads, a name no item takes. The module anti.lang is
+   the runtime's, which defines its descriptor beside the descriptor of
+   the root. */
+struct ir_global *lower_module_descriptor(struct lowerer *l,
+                                          const char *module)
+{
+    static const char name[] = "<module>" LOWER_WRITTEN;
+    struct ir_const *value;
+    struct ir_global *g;
+    struct ir_global *path;
+    uint8_t *bytes;
+    size_t length;
+
+    if (strcmp(module, LANG_MODULE) == 0) {
+        return runtime_global(l, RUNTIME_LANG_MODULE);
+    }
+    g = lower_find_global(l->m, module, name);
+    if (g != NULL) {
+        return g;
+    }
+    value = ir_const_agg(l->m, ir_aggregate(rt_record_agg(l->m,
+                                                          RT_RECORD_MODULE)),
+                         RT_MODULE_ITEM_COUNT);
+    /* The path has a name of its own rather than a number, as the
+       version of the package has, so adding it moves no literal of the
+       module. */
+    length = strlen(module);
+    bytes = arena_alloc(l->m->arena, length + 1);
+    memcpy(bytes, module, length + 1);
+    path = ir_global_add(l->m, module, "<module>:path" LOWER_WRITTEN, bytes,
+                         length + 1, 1);
+    value->items[RT_MODULE_PATH].kind = IR_CONST_ADDR;
+    value->items[RT_MODULE_PATH].scalar = IR_PTR;
+    value->items[RT_MODULE_PATH].global = path->index;
+    value->items[RT_MODULE_PATH_LENGTH].kind = IR_CONST_INT;
+    value->items[RT_MODULE_PATH_LENGTH].scalar = IR_I64;
+    value->items[RT_MODULE_PATH_LENGTH].integer = length;
+    return ir_global_add_value(l->m, module, name, value);
+}
+
 /* DESIGN: the descriptor of a class is read-only data at entry 0 of its
    table. It names the class and points at the descriptor of its base. It
    holds the size of the class and its depth in the chain, and points at
@@ -1576,6 +1624,14 @@ struct ir_global *lower_class_descriptor(struct lowerer *l,
         value->items[RT_DESCRIPTOR_TYPE_ARG_COUNT].integer = t->generic->type_param_count;
         value->items[RT_DESCRIPTOR_TYPE_ARGS].kind = IR_CONST_ADDR;
         value->items[RT_DESCRIPTOR_TYPE_ARGS].global = class_type_args(l, t)->index;
+    }
+    {
+        char *of = lower_cstr(&t->module);
+        value->items[RT_DESCRIPTOR_MODULE].kind = IR_CONST_ADDR;
+        value->items[RT_DESCRIPTOR_MODULE].scalar = IR_PTR;
+        value->items[RT_DESCRIPTOR_MODULE].global =
+            lower_module_descriptor(l, of)->index;
+        free(of);
     }
     return g;
 }

@@ -1,4 +1,4 @@
 exit 0
-{"type":"Words","w":null,"ow":null}
+{"type":"serialize_optional_union.Words","w":null,"ow":null}
 w 7
 ow 7

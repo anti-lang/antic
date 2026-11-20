@@ -702,7 +702,7 @@ static int fields_sound(const struct anti_field *fields, int64_t count,
 }
 
 /* Whether a descriptor lies in an image of the process, and its name,
-   its version, its size and its lists are ones the loader and the walks
+   its version, its module, its size and its lists are ones the loader and the walks
    of reflection and Object.deserialize may use. The descriptors its
    fields reach join r. The record of a type argument holds the size of
    the argument where a field holds its offset. */
@@ -716,7 +716,10 @@ static int descriptor_sound(const struct anti_descriptor *d,
         !text_sound(d->version, d->version_length) || d->size < 0 ||
         !fields_sound(d->fields, d->field_count, d->size, r) ||
         !records_sound(d->type_args, d->type_arg_count) ||
-        !list_sound(d->functions, d->function_count, sizeof *d->functions)) {
+        !list_sound(d->functions, d->function_count, sizeof *d->functions) ||
+        (d->module != NULL &&
+         (!list_sound(d->module, 1, sizeof *d->module) ||
+          !text_sound(d->module->path, d->module->path_length)))) {
         return 0;
     }
     for (i = 0; i < d->type_arg_count; i++) {

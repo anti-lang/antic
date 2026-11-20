@@ -186,6 +186,15 @@ struct anti_versions {
     int64_t floor_length;
 };
 
+/* DESIGN: the descriptor of a module holds its path, by 1 of "Answers
+   of 2026-11-20" in docs/decisions.md. A program holds one per module,
+   and every class descriptor points at the one of its module, so
+   `serialize` writes `module.Class`. */
+struct anti_module {
+    const unsigned char *path;
+    int64_t path_length;
+};
+
 /* The record at entry 0 of the table of a class. The destruct entry is the
    body the class declares, not the one it inherits. The teardown that the
    compiler writes for a class calls the body of each level. */
@@ -217,6 +226,9 @@ struct anti_descriptor {
        has type id none. None for every other class. */
     int64_t type_arg_count;
     const struct anti_field *type_args;
+    /* The descriptor of the module that declares the class. NULL for a
+       struct, a variant, a tuple and a `?T`. */
+    const struct anti_module *module;
 };
 
 /* DESIGN: the seven functions of the root take the entries after the
@@ -384,6 +396,10 @@ void *anti_rt_copy_buffer(const void *from, int64_t bytes);
    of a program shares. */
 extern const struct anti_descriptor anti_lang_Object_descriptor;
 extern const struct anti_descriptor *const anti_lang_Object_ancestors[1];
+
+/* The descriptor of the module anti.lang, which the root's descriptor
+   and every class of anti.lang point at. */
+extern const struct anti_module anti_rt_lang_module;
 
 /* The start of the object that object points into. A pointer to an
    interface sub-object moves back by the offset its descriptor holds. */

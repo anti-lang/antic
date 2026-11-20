@@ -1211,7 +1211,7 @@ An allocator is an object, and `from.alloc(size, align)` is a dispatch through i
     %4 = eq i8 %3, 0
     branch %4, b1, b2
 b1:
-    %5 = addr @pools.54
+    %5 = addr @pools.56
     call void @anti_rt_table_unset(%5, 9)
     unreachable
 b2:

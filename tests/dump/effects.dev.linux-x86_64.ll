@@ -421,7 +421,7 @@ b0:
   ret void
 }
 
-@effects.Count.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [32 x i8] }> <{ ptr @effects.1, [48 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\08\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @effects.Count.fields, [32 x i8] zeroinitializer, ptr @effects.package.version, [32 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
+@effects.Count.descriptor = hidden constant <{ ptr, [48 x i8], ptr, [32 x i8], ptr, [40 x i8] }> <{ ptr @effects.1, [48 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\08\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\01\00\00\00\00\00\00\00", ptr @effects.Count.fields, [32 x i8] zeroinitializer, ptr @effects.package.version, [40 x i8] c"\05\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
 @effects.1 = hidden constant <{ [6 x i8] }> <{ [6 x i8] c"Count\00" }>, align 1
 @effects.2 = hidden constant <{ [3 x i8] }> <{ [3 x i8] c"at\00" }>, align 1
 @effects.Count.fields = hidden constant <{ ptr, [40 x i8] }> <{ ptr @effects.2, [40 x i8] c"\02\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00" }>, align 8
