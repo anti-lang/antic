@@ -1,0 +1,18 @@
+//! The interface of the program's name, whose `size` takes a `c_ulong` where
+//! the program's takes a `c_long`.
+
+/// The unit of a reading.
+pub enum Unit: i32
+{
+	Metre, Foot
+}
+
+/// A gauge a program reads.
+pub abstract class Gauge
+{
+	/// The reading for `n` samples.
+	pub abstract fn size(self, n: c_ulong) -> int;
+
+	/// The reading in a unit.
+	pub abstract fn unit(self, u: Unit) -> int;
+}

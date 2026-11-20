@@ -1069,14 +1069,23 @@ static struct ir_global *class_ancestors(struct lowerer *l,
     return g;
 }
 
-/* The name a signature gives a type that a reflect.Value carries, or
-   NULL for a type it cannot carry. wide names the C types whose width
-   the target gives and the enums as well, which reflect.call carries
-   since T346 of docs/audit/tests-findings.md.
-   DESIGN: the structural hash of an interface reads the signature
-   without them, as before T346, so the chain of every interface stays
-   the one a plugin built before the fix carries. */
-static const char *value_type_name(const struct type *t, bool wide)
+/* The two spellings of a signature. The text of reflect.call names an
+   enum by its integer, which the trampoline passes. The structural hash
+   names it by its qualified name. The two differ in that alone. */
+enum spelling { SPELL_CALL, SPELL_HASH };
+
+/* Append the name a signature gives a type that a reflect.Value carries
+   to out, or return false for a type it cannot carry. The C types whose
+   width the target gives and the enums are among them, since T346 of
+   docs/audit/tests-findings.md.
+   DESIGN: the structural hash of an interface names `c_long`, `c_ulong`
+   and `c_wchar` by those names and an enum by its qualified name, by 7
+   of "Answers of 2026-11-20" in docs/decisions.md. Each interface with
+   such an entry has a new chain, and a swap of one enum for another of
+   the same width changes it. The text of reflect.call names the enum by
+   its integer, so the two texts differ for an enum alone. */
+static bool append_type_name(struct text *out, const struct type *t,
+                             enum spelling spelling)
 {
     static const char *const names[] = {
         [TYPE_VOID] = "void", [TYPE_BOOL] = "bool", [TYPE_CHAR] = "char",
@@ -1087,27 +1096,36 @@ static const char *value_type_name(const struct type *t, bool wide)
         [TYPE_CLONG] = "c_long", [TYPE_CULONG] = "c_ulong",
         [TYPE_CWCHAR] = "c_wchar",
     };
+    const char *name = NULL;
 
     /* An enum passes as its underlying integer, and a Value carries it
        as that integer, as reflect.get gives a field of it. */
     if (t->kind == TYPE_ENUM) {
-        return wide && t->base != NULL ? value_type_name(t->base, wide)
-                                       : NULL;
-    }
-    if (!wide && (t->kind == TYPE_CLONG || t->kind == TYPE_CULONG ||
-                  t->kind == TYPE_CWCHAR)) {
-        return NULL;
+        if (t->base == NULL) {
+            return false;
+        }
+        if (spelling == SPELL_HASH) {
+            text_appendf(out, "%.*s.%.*s", (int)t->module.length,
+                         t->module.text, (int)t->name.length, t->name.text);
+            return true;
+        }
+        return append_type_name(out, t->base, spelling);
     }
     /* A function with its context is two words, which no Value
        carries, so reflect.call refuses a function that takes one. */
     if (t->kind == TYPE_POINTER ||
         (t->kind == TYPE_FN && !t->bound && !t->context)) {
-        return "ptr";
+        name = "ptr";
+    } else if ((size_t)t->kind < sizeof names / sizeof *names) {
+        /* An enum is signed under the ABI of Windows, so the index
+           converts before the comparison. */
+        name = names[t->kind];
     }
-    /* An enum is signed under the ABI of Windows, so the index converts
-       before the comparison. */
-    return (size_t)t->kind < sizeof names / sizeof *names ? names[t->kind]
-                                                          : NULL;
+    if (name == NULL) {
+        return false;
+    }
+    text_append(out, name);
+    return true;
 }
 
 /* DESIGN: the signature of a function names its result and then each
@@ -1115,23 +1133,21 @@ static const char *value_type_name(const struct type *t, bool wide)
    the whole program writes one trampoline per such text, so equal
    signatures share one. A signature holding a type that a Value cannot
    carry has no text, and reflect.call refuses the function. */
-static bool signature_code(const struct type *fn, bool wide,
+static bool signature_code(const struct type *fn, enum spelling spelling,
                            struct text *code)
 {
-    const char *name;
     size_t i;
 
     if (fn == NULL || fn->kind != TYPE_FN ||
-        (name = value_type_name(fn->result, wide)) == NULL) {
+        !append_type_name(code, fn->result, spelling)) {
         return false;
     }
-    text_append(code, name);
     for (i = 1; i < fn->param_count; i++) {
-        name = value_type_name(fn->params[i], wide);
-        if (name == NULL || strcmp(name, "void") == 0) {
+        text_append(code, ".");
+        if (fn->params[i]->kind == TYPE_VOID ||
+            !append_type_name(code, fn->params[i], spelling)) {
             return false;
         }
-        text_appendf(code, ".%s", name);
     }
     return true;
 }
@@ -1165,7 +1181,7 @@ static const struct ir_global *signature_text(struct lowerer *l,
     const struct ir_global *g;
 
     if (fn == NULL || (fn->kind == TYPE_FN && fn->may_fail) ||
-        takes_owned(sym) || !signature_code(fn, true, &code)) {
+        takes_owned(sym) || !signature_code(fn, SPELL_CALL, &code)) {
         text_free(&code);
         return NULL;
     }
@@ -1326,7 +1342,7 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
                        table.entries[i].name.length);
         h = ir_hash_bytes(h, ":", 1);
         if (fn != NULL && fn->symbol != NULL &&
-            signature_code(fn->symbol->type, false, &code)) {
+            signature_code(fn->symbol->type, SPELL_HASH, &code)) {
             h = ir_hash_bytes(h, text_cstr(&code), code.length);
         } else {
             text_format_name(params, sizeof params, "%zu",

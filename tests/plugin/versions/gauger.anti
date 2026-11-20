@@ -1,0 +1,26 @@
+//! A host that loads the library its first argument names and prints a reading
+//! of its gauge. A refused load prints its reason instead.
+
+import anti.io;
+import anti.text;
+import anti.plugin;
+import net.example.gauge;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let g = lib.instance(gauge.Gauge) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let reading = f"{g.size(7) + g.unit(gauge.Unit.Foot)}";
+	io.println(reading);
+	free(reading.ptr);
+	delete(g);
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}

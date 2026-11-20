@@ -1,0 +1,24 @@
+//! The interface of the program's name, whose `unit` takes an enum of the same
+//! width and another name.
+
+/// The unit of a reading.
+pub enum Unit: i32
+{
+	Metre, Foot
+}
+
+/// The scale of a reading.
+pub enum Scale: i32
+{
+	Small, Large
+}
+
+/// A gauge a program reads.
+pub abstract class Gauge
+{
+	/// The reading for `n` samples.
+	pub abstract fn size(self, n: c_long) -> int;
+
+	/// The reading in a scale.
+	pub abstract fn unit(self, u: Scale) -> int;
+}

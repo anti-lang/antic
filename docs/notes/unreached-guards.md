@@ -1371,13 +1371,14 @@ width and an index below zero.
 | `anti_rt_reflect_class_name`, `anti_rt_reflect_parent`, `anti_rt_reflect_field_count`, `field_at`, `anti_rt_reflect_function_count` and `function_at` of `src/rt/reflect.c` | A descriptor that is `NULL`. | Every function of `anti.reflect` takes the descriptor as `*byte`, which never holds `none`, and C alone could pass one. |
 | `field_at` and `function_at` of `src/rt/reflect.c` | A descriptor without its list of fields or of functions. | `--no-reflect` drops the lists, and antic refuses a call of `anti.reflect` in such a build. |
 | `anti_rt_reflect_get` and `anti_rt_reflect_set` of `src/rt/reflect.c` | An object that is `NULL`. | `get` and `set` take the object as `*byte`, which never holds `none`. |
-| `value_type_name` of `src/antic/lower_desc.c` | An enum without its underlying integer. | The checker gives every enum a base, `int` when it names none. |
+| `append_type_name` of `src/antic/lower_desc.c` | An enum without its underlying integer. | The checker gives every enum a base, `int` when it names none. |
 | `signature_text` of `src/antic/lower_desc.c` | A function without a type, and a type that is no function type. | `class_functions` passes the symbol of a function of the table, which the checker typed. |
 
-The sides left unsorted: `value_type_name` of `src/antic/lower_desc.c`
-for a `c_long`, a `c_ulong` or a `c_wchar` in the structural hash of an
-interface, which a program reaches with an abstract class whose function
-takes one. No test reads that hash against the one a plugin carries.
+The sides left unsorted were those of a `c_long`, a `c_ulong` or a
+`c_wchar` in the structural hash of an interface. By 7 of "Answers of
+2026-11-20" the hash names them, and `append_type_name` of
+`src/antic/lower_desc.c` writes them. `plugin_versions` loads a
+library built against an interface whose entry takes another of them.
 
 ## The sides of batch 3ag
 

@@ -1,8 +1,9 @@
-# Build four hosts and seven libraries of an interface of the same name,
+# Build five hosts and ten libraries of an interface of the same name,
 # each against another version of it, and load each into a host. A newer
 # library and an older one load, and the checks of "Versions" refuse the
 # rest: a field added, a version below the floor, a slot the program
-# calls and the library lacks, and an interface of another structure. A
+# calls and the library lacks, and an interface of another structure,
+# among them one whose entry takes another type of the same width. A
 # host that calls through reflection loads an older library whose class
 # inherits the interface.
 # Run with cmake -P and these values:
@@ -177,3 +178,24 @@ loads(reflector inherits yes
 # gets the table of stubs. The object keeps the table of its class, so
 # the library unloads.
 loads(reflector one yes "^from the older library\nunloaded\n$")
+
+# By 7 of "Answers of 2026-11-20" in docs/decisions.md the structural
+# hash names `c_long`, `c_ulong`, `c_wchar` and an enum by its qualified
+# name. A library built against the interface of the program loads. One
+# built against an interface whose `size` takes a `c_ulong` where the
+# program's takes a `c_long`, or whose `unit` takes another enum of the
+# same width, is another interface, and the chains differ there.
+foreach(name gauge gauge_width gauge_enum)
+    file(MAKE_DIRECTORY "${WORK}/${name}/net/example")
+    antic_build(-c -I "${versions}/${name}"
+                -o "${WORK}/${name}/net/example/gauge.antl"
+                "${versions}/${name}/net/example/gauge.anti")
+    set(root_${name} "${versions}/${name}")
+endforeach()
+antic_build(--runtime "${RUNTIME}" -I "${WORK}/gauge"
+            -o "${WORK}/gauger${EXE}" "${versions}/gauger.anti")
+loads(gauger gauge yes "^8\n$")
+loads(gauger gauge_width no
+      "`net.example.gauge.Gauge` of .* is not the interface this program carries")
+loads(gauger gauge_enum no
+      "`net.example.gauge.Gauge` of .* is not the interface this program carries")

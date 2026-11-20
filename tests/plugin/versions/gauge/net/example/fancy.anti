@@ -1,0 +1,23 @@
+//! A library built against the interface of the program.
+
+import net.example.gauge;
+
+provides net.example.gauge.Gauge as Fancy;
+
+/// The gauge of the library.
+pub class Fancy
+{
+	implements g: gauge.Gauge,
+
+	/// The reading for `n` samples.
+	pub concrete fn size(self, n: c_long) -> int
+	{
+		return n as int;
+	}
+
+	/// The reading in a unit.
+	pub concrete fn unit(self, u: gauge.Unit) -> int
+	{
+		return u as int;
+	}
+}

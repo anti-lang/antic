@@ -1,0 +1,19 @@
+//! An interface whose entries take a `c_long` and an enum. The structural hash
+//! names both types, so a version that takes another type of the same width is
+//! another interface.
+
+/// The unit of a reading.
+pub enum Unit: i32
+{
+	Metre, Foot
+}
+
+/// A gauge a program reads.
+pub abstract class Gauge
+{
+	/// The reading for `n` samples.
+	pub abstract fn size(self, n: c_long) -> int;
+
+	/// The reading in a unit.
+	pub abstract fn unit(self, u: Unit) -> int;
+}
