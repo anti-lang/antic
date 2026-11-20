@@ -27,12 +27,6 @@ std_serialize_nested_class T343 `Object.deserialize` finds no class nested in a 
 std_serialize_optional_union T344 `serialize` writes a `?T` of a union that holds a value as `null`, which reads back as `none`.
 std_serialize_long_name T345 `Object.deserialize` refuses a member name longer than 256 bytes.
 unit_modules T350 The verifier of a library file passes a tree that names a local before its binding or without one.
-error_modules_export_struct_twice T353 Two modules export the same struct name.
-error_modules_export_union_twice T353 Two modules export the same union name.
-error_modules_export_constant_twice T353 Two modules export the same constant name.
-error_modules_export_struct_under_a_constant T353 A module exports a struct under the name of an export constant of another.
-clib_keyword_names T354 The header writes export names that are keywords of C or C++ as they stand.
-matrix_modules_export_function_named_as_a_keyword_of_cpp_refused T354 An export fn named after a keyword of C++ is not refused.
 std_regex_compiled_kept_memory_checks T355 A compiled pattern is reported as a leak.
 std_text_float_long_precision T356 The runtime caps the precision of a float at 100000000.
 anti_symbols_message_inventory_plugins_text_of_windows T357 The text of `plugins` of a Windows deployment is split at `:`.

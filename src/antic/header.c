@@ -41,10 +41,8 @@ static const char *scalar_name(const struct type *t)
     }
 }
 
-/* Names that a parameter or a field cannot take in a header for C11 and
-   C++17. They are the keywords of both and the macros of the included
-   headers. */
-static const char *const reserved_names[] = {
+/* The keywords of C11 and of C++17. */
+static const char *const keywords[] = {
     "_Alignas", "_Alignof", "_Atomic", "_Bool", "_Complex", "_Generic",
     "_Imaginary", "_Noreturn", "_Static_assert", "_Thread_local", "alignas",
     "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool",
@@ -59,8 +57,31 @@ static const char *const reserved_names[] = {
     "static_cast", "struct", "switch", "template", "this", "thread_local",
     "throw", "true", "try", "typedef", "typeid", "typename", "union",
     "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while",
-    "xor", "xor_eq", "NULL", "ANTI_ALIGNAS", "ANTI_ALIGNED",
-    "ANTI_NORETURN"};
+    "xor", "xor_eq"};
+
+/* The macros of the headers the header includes and of the header itself,
+   which no name of the header takes beside the keywords. */
+static const char *const macro_names[] = {"NULL", "offsetof", "ANTI_ALIGNAS",
+                                          "ANTI_ALIGNED", "ANTI_NORETURN"};
+
+static bool name_among(const struct name *name, const char *const *list,
+                       size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (strlen(list[i]) == name->length &&
+            memcmp(list[i], name->text, name->length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool header_is_keyword(const struct name *name)
+{
+    return name_among(name, keywords, sizeof keywords / sizeof *keywords);
+}
 
 /* Whether name is a macro of <stdint.h>: INT8_MAX, UINT64_C, SIZE_MAX and
    the other names of that header that consist of capitals, digits and _. */
@@ -85,20 +106,23 @@ static bool stdint_macro(const struct name *name)
     return false;
 }
 
-/* DESIGN: the header keeps the Anti name of a parameter or a field. A
-   name that C or C++ reserves gets a trailing _, as default_. */
+/* Whether a name of the header is one that C or C++ reserves: a keyword
+   of either or a macro of a header it includes. */
+static bool reserved(const struct name *name)
+{
+    return stdint_macro(name) || header_is_keyword(name) ||
+           name_among(name, macro_names, sizeof macro_names / sizeof *macro_names);
+}
+
+/* DESIGN: the header keeps the Anti name of a parameter, a field, a
+   constant and a type. A name that C or C++ reserves gets a trailing _, as
+   default_, by "The C view" of docs/anti-object-model.md and item 6 of
+   "Answers of 2026-11-19" in docs/decisions.md. A class keeps its name,
+   since its helpers and its descriptor are symbols that the name spells. */
 static void c_name(struct text *out, const struct name *name)
 {
-    size_t i;
-    bool reserved = stdint_macro(name);
-
-    for (i = 0; !reserved && i < sizeof reserved_names / sizeof *reserved_names;
-         i++) {
-        reserved = strlen(reserved_names[i]) == name->length &&
-                   memcmp(reserved_names[i], name->text, name->length) == 0;
-    }
     text_appendf(out, "%.*s%s", (int)name->length, name->text,
-                 reserved ? "_" : "");
+                 reserved(name) ? "_" : "");
 }
 
 /* DESIGN: `anti.lang.Error` crosses to C as `struct anti_Error *`, the
@@ -259,6 +283,10 @@ static void c_type_name(struct text *out, const struct type *t)
     struct name name = types_c_name(t);
     size_t i;
 
+    if (t->kind != TYPE_CLASS && memchr(name.text, '.', name.length) == NULL) {
+        c_name(out, &name);
+        return;
+    }
     for (i = 0; i < name.length; i++) {
         text_appendf(out, "%c", name.text[i] == '.' ? '_' : name.text[i]);
     }
@@ -1020,11 +1048,12 @@ static void aggregate(struct text *out, const struct symbol *sym,
     }
     text_append(out, "typedef ");
     open_aggregate(out, kind, t);
-    text_appendf(out, "%.*s {\n", (int)types_c_name(t).length,
-                 types_c_name(t).text);
+    c_type_name(out, t);
+    text_append(out, " {\n");
     struct_fields(out, t);
-    text_appendf(out, "} %.*s;\n", (int)types_c_name(t).length,
-                 types_c_name(t).text);
+    text_append(out, "} ");
+    c_type_name(out, t);
+    text_append(out, ";\n");
     if (t->packed) {
         text_append(out, "#pragma pack(pop)\n");
     }
@@ -1523,14 +1552,15 @@ static void constant(struct text *out, const struct symbol *sym)
 {
     const struct const_value *v = sym->value;
     const struct type *t = sym->type;
+    struct text macro = {0};
     size_t i;
 
+    c_name(&macro, &sym->name);
     doc_comment(out, &sym->doc, "");
     switch (v->kind) {
     case CONST_BOOL:
-        text_appendf(out, "#define %.*s %s\n", (int)sym->name.length,
-                     sym->name.text, v->as.boolean ? "true" : "false");
-        return;
+        text_appendf(out, "#define %.*s %s\n", (int)macro.length, macro.data, v->as.boolean ? "true" : "false");
+        break;
     /* DESIGN: infinity and NaN have no literal in C. The header writes
        INFINITY and NAN of <math.h>, which it then includes, as the
        float of the type, with the sign of an infinity. A NaN is written
@@ -1539,29 +1569,27 @@ static void constant(struct text *out, const struct symbol *sym)
         struct text digits = {0};
         const char *as_double = t->kind == TYPE_F32 ? "" : "(double)";
         if (isnan(v->as.floating)) {
-            text_appendf(out, "#define %.*s (%sNAN)\n", (int)sym->name.length,
-                         sym->name.text, as_double);
-            return;
+            text_appendf(out, "#define %.*s (%sNAN)\n", (int)macro.length, macro.data, as_double);
+            break;
         }
         if (isinf(v->as.floating)) {
             text_appendf(out, "#define %.*s (%s%sINFINITY)\n",
-                         (int)sym->name.length, sym->name.text,
+                         (int)macro.length, macro.data,
                          v->as.floating < 0 ? "-" : "", as_double);
-            return;
+            break;
         }
         /* A whole value gets `.0`, since C reads `2` as an int and refuses
            `2f`. */
         text_appendf(&digits, "%.17g", v->as.floating);
-        text_appendf(out, "#define %.*s %s%s%s\n", (int)sym->name.length,
-                     sym->name.text, text_cstr(&digits),
+        text_appendf(out, "#define %.*s %s%s%s\n", (int)macro.length, macro.data, text_cstr(&digits),
                      strpbrk(text_cstr(&digits), ".e") == NULL ? ".0" : "",
                      t->kind == TYPE_F32 ? "f" : "");
         text_free(&digits);
-        return;
+        break;
     }
     case CONST_TEXT:
         text_appendf(out, "static const char %.*s[] = \"",
-                     (int)sym->name.length, sym->name.text);
+                     (int)macro.length, macro.data);
         for (i = 0; i < v->as.text.length; i++) {
             unsigned char c = (unsigned char)v->as.text.bytes[i];
             if (c == '"' || c == '\\') {
@@ -1573,14 +1601,14 @@ static void constant(struct text *out, const struct symbol *sym)
             }
         }
         text_append(out, "\";\n");
-        return;
+        break;
     default:
-        text_appendf(out, "#define %.*s ((%s)", (int)sym->name.length,
-                     sym->name.text, scalar_name(t));
+        text_appendf(out, "#define %.*s ((%s)", (int)macro.length, macro.data, scalar_name(t));
         integer_literal(out, v->as.integer, types_is_signed(t));
         text_append(out, ")\n");
-        return;
+        break;
     }
+    text_free(&macro);
 }
 
 /* A prototype names its parameters as the Anti function does. */

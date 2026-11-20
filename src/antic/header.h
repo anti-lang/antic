@@ -17,4 +17,7 @@ void header_write(struct text *out, const char *name,
                   const struct interface *const *ifaces, size_t count,
                   bool bundled);
 
+/* Whether name is a keyword of C11 or of C++17. */
+bool header_is_keyword(const struct name *name);
+
 #endif

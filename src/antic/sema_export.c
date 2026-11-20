@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "header.h"
 #include "rt_abi.h"
 #include "sema_checker.h"
 
@@ -421,12 +422,61 @@ static const char *c_library_header(const struct name *name)
     return stdint_defines(name) ? "<stdint.h>" : NULL;
 }
 
+/* What an export struct, union or constant is called in a message, as
+   `struct`, `union` or `const`, or NULL for any other export symbol. */
+static const char *c_name_kind(const struct symbol *sym)
+{
+    if (sym->kind == SYMBOL_CONST) {
+        return "const";
+    }
+    if (sym->kind == SYMBOL_STRUCT && sym->type != NULL &&
+        sym->type->kind == TYPE_STRUCT) {
+        return sym->type->is_union ? "union" : "struct";
+    }
+    return NULL;
+}
+
+/* DESIGN: an export struct, union or constant is a name of the C header,
+   a tag or a macro, and one header holds the interfaces of every library
+   a module imports. Another module that exports one of the three under
+   the same name gives the header two definitions of it, or a macro that
+   replaces the tag. The item is refused, as an `export fn` that has the
+   symbol of another is, by item 5 of "Answers of 2026-11-19" in
+   docs/decisions.md. */
+static void check_c_name_once(struct checker *c, const struct item *it,
+                              const char *kind)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < c->library_count; i++) {
+        const struct interface *lib = c->libraries[i];
+        for (j = 0; j < lib->item_count; j++) {
+            const struct symbol *other = lib->items[j];
+            const char *other_kind = c_name_kind(other);
+            if (other->exported && other_kind != NULL &&
+                types_same_name(&other->name, &it->name)) {
+                sema_error_at(c, it->name_pos,
+                              "export %s `%.*s` has the C name of export %s "
+                              "`%.*s` in module `%s`",
+                              kind, (int)it->name.length, it->name.text,
+                              other_kind, (int)other->name.length,
+                              other->name.text, lib->module);
+                return;
+            }
+        }
+    }
+}
+
 /* DESIGN: an export item has a C symbol and appears in a C header. Its
    types have a C representation, its name is not main, and no other module
    exports the same name. Its name is none that a header the generated
    header includes defines, by R130 of "Rules of 2026-10-13": `<stdbool.h>`,
    `<stddef.h>` and `<stdint.h>`. A C program that reads the header sees
-   their names before the item's. */
+   their names before the item's. An `export fn` named after a keyword of
+   C or C++ is refused as well, since its name is its symbol, which the
+   header cannot rename as it renames a type, a field or a constant, by
+   item 6 of "Answers of 2026-11-19". */
 void sema_check_export(struct checker *c, struct item *it)
 {
     const struct type *t = it->symbol->type;
@@ -444,6 +494,13 @@ void sema_check_export(struct checker *c, struct item *it)
 
     switch (it->kind) {
     case ITEM_FN:
+        if (header_is_keyword(&it->name)) {
+            sema_error_at(c, it->name_pos,
+                          "the exported name `%.*s` is a keyword of C or "
+                          "C++, and the name of an export fn is its symbol",
+                          (int)it->name.length, it->name.text);
+            return;
+        }
         if (sema_name_is(&it->name, "main")) {
             sema_error_at(c, it->name_pos,
                           "`main` is the entry of the program and "
@@ -533,6 +590,7 @@ void sema_check_export(struct checker *c, struct item *it)
         return;
     case ITEM_STRUCT:
     case ITEM_UNION:
+        check_c_name_once(c, it, it->kind == ITEM_UNION ? "union" : "struct");
         for (i = 0; i < t->field_count; i++) {
             text_format(what, sizeof what,
                         "the field `%.*s` of export %s `%.*s`",
@@ -579,6 +637,7 @@ void sema_check_export(struct checker *c, struct item *it)
         }
         return;
     case ITEM_CONST:
+        check_c_name_once(c, it, "const");
         if (!sema_is_error(t) && !types_is_numeric(t) &&
             t->kind != TYPE_BOOL && t->kind != TYPE_STR) {
             sema_error_at(c, it->type->pos,
