@@ -623,15 +623,20 @@ void anti_rt_builder_float(struct anti_builder *b, double value,
         }
         put_shortest(&s, &v, exponent != 0);
     } else {
-        if (precision > 100000000) {
-            precision = 100000000;
-        }
+        /* DESIGN: every digit a precision asks for is written, by item 9
+           of "Answers of 2026-11-19" in docs/decisions.md. A precision too
+           large for memory ends the run through anti_rt_out_of_memory, as
+           any text does. The count of digits that round_to keeps saturates,
+           since no value holds more digits than a precision past INT64_MAX
+           less its point. */
         exact(p.m, p.e, &v);
         if (exponent != 0) {
-            round_to(&v, precision + 1);
+            round_to(&v, precision < INT64_MAX ? precision + 1 : precision);
             put_scientific(&s, &v, precision);
         } else {
-            round_to(&v, v.point + precision);
+            round_to(&v, v.point > 0 && precision > INT64_MAX - v.point
+                             ? INT64_MAX
+                             : v.point + precision);
             put_fixed(&s, &v, precision);
         }
     }

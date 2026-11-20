@@ -1,5 +1,6 @@
-//! `append_float` writes at most 100000000 digits after the point, whatever
-//! larger precision it is given.
+//! `append_float` writes every digit of a large precision, 200000000 after the
+//! point, by item 9 of "Answers of 2026-11-19", which dropped the bound of
+//! 100000000.
 import anti.io;
 import anti.json;
 import anti.text;

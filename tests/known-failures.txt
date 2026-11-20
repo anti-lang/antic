@@ -25,7 +25,6 @@ std_serialize_nested_class T343 `Object.deserialize` finds no class nested in a 
 std_serialize_optional_union T344 `serialize` writes a `?T` of a union that holds a value as `null`, which reads back as `none`.
 std_serialize_long_name T345 `Object.deserialize` refuses a member name longer than 256 bytes.
 unit_modules T350 The verifier of a library file passes a tree that names a local before its binding or without one.
-std_text_float_long_precision T356 The runtime caps the precision of a float at 100000000.
 anti_symbols_message_inventory_plugins_text_of_windows T357 The text of `plugins` of a Windows deployment is split at `:`.
 anti_symbols_message_inventory_version_with_both_quotes T358 The index of `anti symbols` drops a quote of a name that holds both.
 anti_bind_message_api_enum_values_no_array T359 An enum whose values are no array is left out without a warning.
