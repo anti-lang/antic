@@ -46,6 +46,9 @@
    the lock of its object. */
 #define DOC_LOCKED "Runs under the lock of its object."
 
+/* The name of the index page, before the suffix of its form. */
+#define DOC_INDEX_NAME "index"
+
 /* The suffix of a page and of the index, one per form. */
 #define DOC_HTML_SUFFIX ".html"
 #define DOC_MARKDOWN_SUFFIX ".md"
@@ -920,6 +923,15 @@ int doc_run(const struct doc_request *r)
             status = 1;
             goto done;
         }
+        /* J of "Answers of 2026-11-19" in docs/decisions.md: the page of
+           a module stands under its path, so a module named `index` would
+           take the place of the index. */
+        if (strcmp(text_cstr(&pages[i].module), DOC_INDEX_NAME) == 0) {
+            say_anti("%s names the module %s, whose page would take the "
+                     "place of the index\n", r->sources[i], DOC_INDEX_NAME);
+            status = 1;
+            goto done;
+        }
     }
     for (i = 0; i < r->source_count; i++) {
         body.length = 0;
@@ -935,7 +947,7 @@ int doc_run(const struct doc_request *r)
     body.length = 0;
     path.length = 0;
     index_render(&body, pages, r->source_count, r->form);
-    text_appendf(&path, "%s/index%s", r->out, suffix_of(r->form));
+    text_appendf(&path, "%s/%s%s", r->out, DOC_INDEX_NAME, suffix_of(r->form));
     if (!files_write(text_cstr(&path), &body)) {
         status = 1;
         goto done;

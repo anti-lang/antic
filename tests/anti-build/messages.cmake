@@ -68,6 +68,21 @@ anti_message(manifest_publish_number
     FILES anti.toml "${manifest_package}publish = 3\n"
     ARGS build
     ERR "anti: ./anti.toml: [package] publish needs a string, the publication target, as publish = \"ff\"")
+# H of "Answers of 2026-11-19" in docs/decisions.md: a value of the wrong
+# shape is refused with one message that names the key and the shape, as
+# publish is refused.
+anti_message(manifest_targets_default_as_a_string
+    FILES anti.toml "${manifest_package}\n[targets]\ndefault = \"macos-arm64\"\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [targets] default needs an array of strings")
+anti_message(manifest_layout_src_as_an_array
+    FILES anti.toml "${manifest_package}\n[layout]\nsrc = [\"src\"]\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [layout] src needs a string")
+anti_message(manifest_version_as_a_number
+    FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = 1\n"
+    ARGS build
+    ERR "anti: ./anti.toml: [package] version needs a string")
 anti_message(manifest_version
     FILES anti.toml "[package]\nname = \"com.example.app\"\nversion = \"1.x\"\n"
     ARGS build

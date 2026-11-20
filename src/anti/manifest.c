@@ -271,6 +271,50 @@ static const char *value_of(const struct anti_toml *doc, const char *key)
 static void text_of_key(const struct anti_toml *doc, const char *key,
                         struct text *out);
 
+/* DESIGN: a key of the manifest that anti reads as a string or as an
+   array of strings refuses a value of another shape, with one message
+   that names the key and the shape, as `publish` of [package] refuses
+   one, by H of "Answers of 2026-11-19" in docs/decisions.md. A value of
+   the wrong shape read as no value before, so the build went on without
+   a line. */
+static bool shapes_valid(const char *path, const struct anti_toml *doc)
+{
+    static const struct {
+        const char *key;
+        int64_t shape;
+    } keys[] = {
+        {"package.name", ANTI_TOML_STRING},
+        {"package.program", ANTI_TOML_STRING},
+        {"package.version", ANTI_TOML_STRING},
+        {"package.antic", ANTI_TOML_STRING},
+        {"package.license", ANTI_TOML_STRING},
+        {"package.license_text", ANTI_TOML_STRING},
+        {"package.attribution", ANTI_TOML_ARRAY},
+        {"layout.src", ANTI_TOML_STRING},
+        {"layout.test", ANTI_TOML_STRING},
+        {"layout.build", ANTI_TOML_STRING},
+        {"layout.dist", ANTI_TOML_STRING},
+        {"targets.default", ANTI_TOML_ARRAY},
+        {"targets.all", ANTI_TOML_ARRAY},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof keys / sizeof *keys; i++) {
+        const char *key = keys[i].key;
+        const char *dot = strchr(key, '.');
+        int64_t shape = anti_rt_toml_shape(doc, (const unsigned char *)key,
+                                           (int64_t)strlen(key));
+        if (shape != ANTI_TOML_NONE && shape != keys[i].shape) {
+            say_anti("%s: [%.*s] %s needs %s\n", path, (int)(dot - key), key,
+                     dot + 1,
+                     keys[i].shape == ANTI_TOML_STRING ? "a string"
+                                                       : "an array of strings");
+            return false;
+        }
+    }
+    return true;
+}
+
 /* The source, the test and the build directory of doc, or of the default
    layout where doc is NULL or names none. */
 static void layout_of(const struct anti_toml *doc, struct text *src,
@@ -467,7 +511,7 @@ bool manifest_read(const char *path, bool tests, struct manifest *out)
         say_anti("%s: no manifest here, so there is no project. "
                  "`anti new <name>` writes one\n", path);
     }
-    if (opened != OPENED) {
+    if (opened != OPENED || !shapes_valid(path, doc)) {
         goto done;
     }
     layout_of(doc, &out->src, &out->test, &out->build);

@@ -33,6 +33,13 @@ anti_message(source_named_by_its_suffix
     FILES .anti "//! One.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
     ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" .anti
     ERR "anti: .anti: the file has no name, only its suffix")
+# J of "Answers of 2026-11-19" in docs/decisions.md: the page of a module
+# stands under its path, so a module named `index` is refused, whose page
+# would take the place of the index.
+anti_message(module_named_index
+    FILES index.anti "//! One.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    ARGS doc -o "${WORK}/pages" --runtime "${RUNTIME}" index.anti
+    ERR "anti: index.anti names the module index, whose page would take the place of the index")
 # A file of any other suffix is neither, as antic refuses it.
 anti_message(source_of_another_suffix
     FILES notes.txt "Notes.\n"
