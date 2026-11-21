@@ -1,0 +1,24 @@
+//! A clause of `unused-allow` waits for a clause of a doc warning it covers
+//! alone. One that covers none is a warning, though such clauses stand before
+//! it and after it.
+
+allow(undocumented, "the doc warnings decide");
+
+fn loud() -> int
+	allow(unused-allow, "no clause inside")
+{
+	return 0;
+}
+
+/// The helper.
+pub fn helper() -> int
+	allow(unused-allow, "the clause inside waits for the doc warnings")
+{
+	allow(undocumented, "the doc warnings decide")
+	return 1;
+}
+
+fn main() -> int
+{
+	return helper() + loud() - 1;
+}

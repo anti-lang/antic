@@ -5371,6 +5371,12 @@ antic_warnings_test(warning_unused_clause_waits_for_its_inner_clause
     "--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_waits.s,allow_unused_waits.anti"
     ""
     "[unused-allow]")
+# It waits for a clause inside it alone, so one that covers none is a
+# warning beside clauses of a doc warning before it and after it.
+antic_warnings_test(warning_unused_clause_waits_for_a_clause_inside_alone
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_waits_apart.s,allow_unused_waits_apart.anti"
+    "allow_unused_waits_apart.anti:8:2: warning: `allow(unused-allow)` silences nothing [unused-allow]"
+    "allow_unused_waits_apart.anti:5:;allow_unused_waits_apart.anti:15:;allow_unused_waits_apart.anti:17:")
 
 # The warning `blocking-under-lock` in a dev build, which goes on. It
 # names the innermost lock, and an `allow` before a statement and in the
