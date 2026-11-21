@@ -1,6 +1,7 @@
 //! Snapshots and owned function values. `snapshot fn` takes the values it uses
 //! when it is made. At a `keep own` parameter and in an `own` field it lives on
-//! the heap and is freed with its owner. At a `concurrent` parameter and at a
+//! the heap and is freed with its owner. A local owns its snapshot on the heap
+//! and frees it at the end of its block. At a `concurrent` parameter and at a
 //! parameter that does not keep its argument it stays in the caller's frame.
 //! `dup` copies an owned function value with its snapshot. Every step runs
 //! under a leak check, the count of the snapshots alive that the runtime keeps.

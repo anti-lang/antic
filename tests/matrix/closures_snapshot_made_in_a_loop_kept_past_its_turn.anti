@@ -1,5 +1,6 @@
 //! A snapshot takes the values it uses when it is made, so the one a local
-//! keeps from the first turn of a loop gives the value of that turn.
+//! keeps from the first turn of a loop gives the value of that turn. The local
+//! of the loop owns its snapshot, so `dup` gives the outer local a copy.
 
 import anti.io;
 import anti.text;
@@ -7,12 +8,20 @@ import anti.text;
 fn main() -> int
 {
 	let start = 7;
-	let kept = snapshot fn() { io.println(f"kept {start}"); };
+	let kept = snapshot fn() {
+		let t = f"kept {start}";
+		io.println(t);
+		free(t.ptr);
+	};
 	for i in 0..3 {
 		let v = i * 10;
-		let s = snapshot fn() { io.println(f"kept {v}"); };
+		let s = snapshot fn() {
+			let t = f"kept {v}";
+			io.println(t);
+			free(t.ptr);
+		};
 		if i == 0 {
-			kept = s;
+			kept = dup(s);
 		}
 	}
 	kept();

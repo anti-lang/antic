@@ -558,10 +558,12 @@ static void copy_captured(struct lowerer *l, const struct type *t,
 }
 
 /* DESIGN: a snapshot copies each captured value into its record when it
-   is made. At an `own` field or a `keep own` parameter the record goes
-   on the heap with the bytes of each `str` after it. The runtime counts
-   it until it is freed. Anywhere else it sits in a slot of the
-   frame, and nothing is allocated. */
+   is made. At an `own` field, a `keep own` parameter and a local that
+   its `let` gives it, the record goes on the heap with the bytes of each
+   `str` after it, by 4 of "Answers of 2026-11-21" in docs/decisions.md
+   for the local. The runtime counts it until it is freed. At a
+   parameter that does not keep it, the caller waits, so it sits in a
+   slot of the frame, and nothing is allocated. */
 static struct ir_operand lower_snapshot(struct lowerer *l,
                                         const struct expr *e,
                                         struct ir_operand code)

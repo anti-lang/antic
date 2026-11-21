@@ -1,0 +1,11 @@
+//! A local that owns a snapshot gives none to another local by `=`, since an
+//! owned function value is not copied by `=`. `dup` copies it.
+
+fn main() -> int
+{
+	let start = 7;
+	let kept = snapshot fn() -> int { return start; };
+	let s = snapshot fn() -> int { return start + 1; };
+	kept = s;
+	return kept();
+}

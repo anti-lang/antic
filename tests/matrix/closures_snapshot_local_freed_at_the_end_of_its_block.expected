@@ -1,0 +1,11 @@
+exit 0
+held 1
+block 5
+block 0
+turn 5
+turn 7
+loop 0
+early 6
+return 0
+again 10
+again 1

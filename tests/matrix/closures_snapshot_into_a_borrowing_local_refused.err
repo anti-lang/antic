@@ -1,0 +1,1 @@
+closures_snapshot_into_a_borrowing_local_refused.anti:13:6: error: `f` borrows the function it holds and owns no `snapshot fn`, which a `let` of its own takes

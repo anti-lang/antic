@@ -1,0 +1,1 @@
+closures_snapshot_local_given_by_assignment_refused.anti:9:9: error: an `own fn` value is not copied by `=`, use `dup`

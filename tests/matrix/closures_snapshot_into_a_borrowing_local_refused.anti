@@ -1,0 +1,15 @@
+//! A local that borrows the function it holds owns no snapshot, so `=` gives it
+//! none.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn main() -> int
+{
+	let k = 3;
+	let f = fn(n: int) -> int { return twice(n); };
+	f = snapshot fn(n: int) -> int { return n + k; };
+	return f(1);
+}

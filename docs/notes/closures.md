@@ -103,8 +103,11 @@ choices of `snapshot fn` and `own fn`.
   It marks a snapshot `snapshot_heap`, pairs a plain function with `none`,
   lets `dup` through and moves a `keep own` parameter of the function.
   `=` of any other owned value is refused with `dup` as the fix.
-- A `let` of an owned value takes the form of two words without the flag,
-  so a local borrows and never owns.
+- A `let` of a `snapshot fn` that captures gives the local the type `own
+  fn`, so `require_owned` puts the snapshot on the heap and the teardown of
+  the local frees it at the end of its block. A `let` of any other owned
+  value takes the form of two words without the flag, so that local
+  borrows. `=` of a snapshot into a local that borrows is refused.
 - `lower_snapshot` writes the record `<name>.snapshot`: the size, then one
   field per capture. On the heap the size adds the length of each `str`
   and one byte for its NUL, `anti_rt_snapshot_new` makes the block, and

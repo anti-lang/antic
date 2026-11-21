@@ -1,0 +1,50 @@
+//! A local that holds a snapshot owns it on the heap and frees it at the end of
+//! its block, on every exit: the end of the block, `break`, `continue` and
+//! `return`. `=` of a new snapshot frees the one it held before.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> int;
+
+fn alive(step: str)
+{
+	printf("%.*s %d\n".ptr, step.len as c_int, step.ptr,
+		anti_rt_snapshots_alive() as c_int);
+}
+
+fn early(n: int) -> int
+{
+	let s = snapshot fn() -> int { return n * 3; };
+	if n > 1 {
+		return s();
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let base = 5;
+	{
+		let s = snapshot fn() -> int { return base; };
+		alive("held");
+		printf("block %d\n".ptr, s() as c_int);
+	}
+	alive("block");
+	for i in 0..4 {
+		let s = snapshot fn() -> int { return base + i; };
+		if i == 1 {
+			continue;
+		}
+		if i == 3 {
+			break;
+		}
+		printf("turn %d\n".ptr, s() as c_int);
+	}
+	alive("loop");
+	printf("early %d\n".ptr, early(2) as c_int);
+	alive("return");
+	let r = snapshot fn() -> int { return base; };
+	r = snapshot fn() -> int { return base * 2; };
+	printf("again %d\n".ptr, r() as c_int);
+	alive("again");
+	return 0;
+}

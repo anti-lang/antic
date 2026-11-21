@@ -22,7 +22,7 @@ frame 11
 frame 12
 once 17
 local 30
-frame: 0 alive
+frame: 1 alive
 borrowed 47
 borrowed 41
 borrowed 42

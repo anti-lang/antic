@@ -903,9 +903,10 @@ void sema_if_let_none(struct checker *c, struct stmt *s, struct type *t)
     let->as.let.name = arm->value->as.name;
     let->as.let.name_pos = arm->pos;
     let->as.let.value = value;
-    /* A local never owns a function, as for `let`: m borrows an `own fn`
-       in the form of two words, and its owner frees the snapshot. T255
-       of docs/audit/tests-findings.md. The check of `let` refuses a value
+    /* A binding borrows the function it holds, as a `let` of anything
+       but a snapshot does: m borrows an `own fn` in the form of two
+       words, and its owner frees the snapshot. T255 of
+       docs/audit/tests-findings.md. The check of `let` refuses a value
        that nothing would own then, as the copy of `dup`. */
     if (t->kind == TYPE_FN && t->owned) {
         struct type *borrowed = types_fn_form(c->types, t, true, true);
