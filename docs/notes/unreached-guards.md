@@ -1571,7 +1571,10 @@ T384 and T386 in `src/antic/sema_escape.c`.
 
 The sides left unsorted, which a test can reach or no probe of the batch
 reached. In `check_collection` of `src/antic/sema_escape.c` a receiver
-`*p` of a collection, which the pass anchors nowhere. In `fold_inst` of
+`*p` of a collection, which the pass anchors nowhere. In `leave_stmt` of
+the same file a `fallthrough` outside a `switch` the scan entered. It
+ends the arm that holds the `dispatch`, so no `join` follows it in that
+block, and the job is refused with or without it. In `fold_inst` of
 `src/antic/optimize.c` a second operand of type `c_long` or `c_wchar`
 beside a first of another type. In `scalar_bytes` of the same file a
 field of a type of no fixed width, and in `offsets_apart` the pairs of
