@@ -133,6 +133,32 @@ static bool names_unused(const struct clause *c)
     return name == NAME_UNUSED_ALLOW || name == NAME_UNUSED_UNCHECKED;
 }
 
+/* Whether c, a clause that names `unused-allow` or `unused-unchecked`,
+   covers a clause of its kind whose check did not run in this build. The
+   build that runs that check decides whether the inner clause silences
+   something, and so whether c does. T383 of
+   docs/audit/tests-findings.md. */
+static bool covers_waiting(const struct module *module,
+                           const struct clause *c, warnings_ran ran)
+{
+    bool unchecked = warnings_find(c->name.text, c->name.length) ==
+                     NAME_UNUSED_UNCHECKED;
+    size_t i;
+
+    for (i = 0; i < module->clause_count; i++) {
+        const struct clause *inner = &module->clauses[i];
+        enum diag_name name =
+            warnings_find(inner->name.text, inner->name.length);
+        if (inner->unchecked == unchecked &&
+            (ran & WARNINGS_BIT(name)) == 0 &&
+            pos_compare(inner->pos.line, inner->pos.column, c->from) >= 0 &&
+            pos_compare(inner->pos.line, inner->pos.column, c->to) <= 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* The warning of each clause that silenced nothing. The ones that name
    `unused-allow` or `unused-unchecked` wait for the second round, since
    the first round writes what they silence. */
@@ -146,7 +172,8 @@ static void report_unused(const struct module *module,
         const struct clause *c = &module->clauses[i];
         enum diag_name name = warnings_find(c->name.text, c->name.length);
         if (used[i] || names_unused(c) != second ||
-            (ran & WARNINGS_BIT(name)) == 0) {
+            (ran & WARNINGS_BIT(name)) == 0 ||
+            (second && covers_waiting(module, c, ran))) {
             continue;
         }
         if (c->unchecked) {

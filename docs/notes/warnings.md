@@ -133,7 +133,10 @@ waits for the build that runs it.
 
 A clause may name `unused-allow` or `unused-unchecked`. The pass then applies
 the clauses in two rounds, so the first round writes the warnings the second
-round can silence.
+round can silence. A clause of either name may cover a clause of its kind
+whose check did not run. It then waits with that clause, by T383 of
+`docs/audit/tests-findings.md`, since the build that runs the check decides
+whether the clause inside silences something.
 
 ## Release builds
 

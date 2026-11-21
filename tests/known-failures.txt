@@ -22,4 +22,3 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_threads_dispatch_keeps_an_argument_with_an_own_field_dev T382 A job reads the `own` field of a local argument that the caller tore down before the job ran.
 matrix_threads_dispatch_keeps_an_argument_with_an_own_field_release T382 A job reads the `own` field of a local argument that the caller tore down before the job ran.
 matrix_threads_dispatch_keeps_an_argument_with_an_own_field_memory_checks T382 A job reads the `own` field of a local argument that the caller tore down before the job ran.
-warning_unused_clause_waits_for_its_inner_clause T383 A release build refuses a clause of `unused-allow` around a clause of a doc warning, which a build without --doc-warnings leaves alone.
