@@ -818,7 +818,6 @@ bool sema_type_owns(const struct type *t);
 /* How a message names what an owning type owns: its `own` fields for a
    class, its parts for a struct or a tuple. */
 const char *sema_owns_phrase(const struct type *t);
-bool sema_reads_existing(const struct expr *e);
 struct name sema_place_name(const struct expr *e);
 bool sema_move_local(struct checker *c, struct expr *e,
                      const struct name *into, const struct name *by);

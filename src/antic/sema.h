@@ -356,6 +356,10 @@ bool sema_has_body(const struct item *fn);
    struct and a tuple do with a part that does. Lowering tears down what
    this names. */
 bool sema_needs_teardown(const struct type *t);
+/* Whether e reads a value that already lives somewhere: a name, a field,
+   an element, `*p` or an `as` to the type the value has. A literal, a
+   call and `dup(x)` make a fresh one instead. */
+bool sema_reads_existing(const struct expr *e);
 /* The largest `align(N)` of t and of the parts it holds in place, or 0. */
 uint64_t sema_declared_align(const struct type *t);
 

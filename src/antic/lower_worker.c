@@ -37,6 +37,52 @@ static const struct type *worker_param(const struct expr *call, size_t i)
     return call->as.call.callee->symbol->type->params[i + 1];
 }
 
+/* The type of argument i of the call of a `dispatch` when the job holds a
+   `dup` of it, or NULL. That is a value that already lives somewhere, at
+   a parameter that takes a value and is not `own`, whose type owns
+   something. */
+static const struct type *job_copy(const struct expr *call, size_t i)
+{
+    const struct symbol *sym = call->as.call.callee->symbol;
+    const struct expr *arg = call->as.call.args[i];
+    const struct type *t = worker_param(call, i);
+
+    if (arg->moves || arg->to_iface != NULL || arg->to_context ||
+        t->kind == TYPE_POINTER || t->kind == TYPE_FN ||
+        (i + 1 < sym->owned_count && sym->owned[i + 1]) ||
+        !sema_reads_existing(arg) || !sema_needs_teardown(t)) {
+        return NULL;
+    }
+    return t;
+}
+
+/* Put argument i of call, of type t, into the context at at as a `dup`
+   of the value. A class value in place gives its address, which the copy
+   reads and `copied` names. A value that becomes its `?T` is copied from
+   the bytes of the context. */
+static void store_job_copy(struct lowerer *l, const struct expr *call,
+                           size_t i, const struct type *t,
+                           struct ir_operand at)
+{
+    const struct expr *arg = call->as.call.args[i];
+    struct ir_operand from;
+    uint32_t slot;
+
+    if (arg->type == t && lower_is_aggregate(t)) {
+        from = lower_expr(l, arg);
+        ir_memcopy(l->f, l->b, at, from, lower_vtype_of(l, t));
+        lower_copy_owned(l, t, from, at);
+        if (t->kind == TYPE_CLASS) {
+            lower_hook_copied(l, at, from);
+        }
+        return;
+    }
+    lower_store_value(l, t, arg, at);
+    slot = ir_entry_slot(l->f, lower_vtype_of(l, t));
+    ir_memcopy(l->f, l->b, lower_temp(l, slot), at, lower_vtype_of(l, t));
+    lower_copy_owned(l, t, lower_temp(l, slot), at);
+}
+
 /* The aggregate that carries the arguments every chunk receives, or
    IR_NO_AGG when the worker takes the chunk alone. */
 static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
@@ -70,10 +116,11 @@ static uint32_t context_aggregate(struct lowerer *l, const struct expr *call,
 /* Pack the arguments of call into a context in a slot of the frame,
    named `<name>.context`. Returns the address of the slot, or a null
    pointer for a call without arguments, and *agg receives the aggregate
-   of the context or IR_NO_AGG. */
+   of the context or IR_NO_AGG. job is true for a `dispatch`. */
 static struct ir_operand pack_context(struct lowerer *l,
                                       const struct expr *call, size_t extra,
-                                      const char *name, uint32_t *agg)
+                                      const char *name, uint32_t *agg,
+                                      bool job)
 {
     struct text context_name = {0};
     uint32_t slot;
@@ -94,6 +141,11 @@ static struct ir_operand pack_context(struct lowerer *l,
                                  ir_sym_operand(l->m,
                                                 ir_sym_offset_of(l->m, *agg,
                                                                  (uint32_t)i)));
+        const struct type *copy = job ? job_copy(call, i) : NULL;
+        if (copy != NULL) {
+            store_job_copy(l, call, i, copy, at);
+            continue;
+        }
         lower_store_value(l, worker_param(call, i), arg, at);
         /* A local that moves into an `own` parameter of the worker is
            the job's now. The error a handler binds holds `none` after
@@ -116,11 +168,15 @@ static struct ir_operand pack_context(struct lowerer *l,
 
    DESIGN: a fresh argument of a parameter that is not `own` has no owner
    but the job of a `dispatch`, as the argument of a call has no owner but
-   its caller. Its thunk tears it down in the context once the worker has
+   its caller. Neither has the `dup` that the job holds of a value that
+   already lives somewhere and owns something, by 1 of "Answers of
+   2026-11-21, third set". Its bytes alone would reach what the caller
+   tears down at the end of its block, and the job may run after that,
+   T382. The thunk tears both down in the context once the worker has
    returned, when drop is true, and the worker copies what it keeps. A
    fresh argument of an `own` parameter is the worker's, which tears it
-   down. Every chunk of a `parallel` reads one context, so no chunk tears
-   it down. */
+   down. Every chunk of a `parallel` reads one context while its caller
+   waits, so no chunk tears it down and none takes a copy. */
 static void call_worker(struct lowerer *l, const struct expr *call,
                         uint32_t context, struct ir_operand first,
                         size_t out, bool drop)
@@ -170,6 +226,13 @@ static void call_worker(struct lowerer *l, const struct expr *call,
         lower_drop_arguments(l, callee->symbol, callee->symbol->type,
                              (const struct expr *const *)call->as.call.args,
                              values, extra, 1);
+        for (i = extra; i > 0 && l->b != NULL; i--) {
+            const struct type *copy = job_copy(call, i - 1);
+            if (copy != NULL) {
+                lower_destroy_owned(l, copy, values[i - 1],
+                                    ir_int_op(IR_PTR, 0), false);
+            }
+        }
     }
     free(values);
     ir_ret(f, l->b, IR_VOID, lower_none());
@@ -265,7 +328,7 @@ struct ir_operand lower_dispatch(struct lowerer *l,
     text_format_name(name, sizeof name, "dispatch.%zu",
                      next_thunk(l, "dispatch."));
     args[0] = lower_expr(l, e->as.dispatch.object);
-    context = pack_context(l, call, extra, name, &agg);
+    context = pack_context(l, call, extra, name, &agg, true);
     args[1] = result->kind == TYPE_VOID ? ir_int_op(IR_I64, 0)
                                         : lower_size_operand(l, result);
     f = dispatch_thunk(l, e, name, agg);
@@ -474,7 +537,7 @@ struct ir_operand lower_parallel(struct lowerer *l,
     text_format_name(name, sizeof name, "parallel.%zu",
                      next_thunk(l, "parallel."));
     array = lower_address(l, e->as.parallel.array);
-    context = pack_context(l, call, extra, name, &agg);
+    context = pack_context(l, call, extra, name, &agg, false);
     results = ir_slot(l->f, l->b, ir_scalar(IR_PTR));
     count = ir_slot(l->f, l->b, ir_scalar(IR_I64));
     args[0] = lower_temp(l, ir_load(l->f, l->b, IR_PTR, array));

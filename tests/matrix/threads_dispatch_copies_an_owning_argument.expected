@@ -1,0 +1,7 @@
+exit 0
+a field: 1 42
+an element: 1 42
+a value behind a pointer: 1 42
+a value that becomes its ?T: 1 42
+the job copied a Noted
+a class that replaces copied: 1 42

@@ -44,6 +44,11 @@ tools can observe.
 - `anti_rt_dispatch` of `src/rt/threads.c` gives one object to the pool and gives back
   a job on the heap. It copies the arguments of the call into the job, since the slot
   of the caller's frame that held them may be written again before the job starts. A
+  value that already lives somewhere and owns something, at a parameter that is not
+  `own`, goes into the context as a `dup`, which `pack_context` of
+  `src/antic/lower_worker.c` makes, and the thunk tears the copy down once the worker
+  has returned. The caller keeps its value. The bytes alone reached what the caller
+  tears down at the end of its block, T382. A
   second dispatch of an object in flight gives a null job, so two workers never hold
   one object. `anti_rt_join` waits for the job, writes its result and frees it, and
   `join` of a null job writes zero bytes of the size of the result.

@@ -1,0 +1,142 @@
+//! A `dispatch` holds a `dup` of a value that owns something and stays with the
+//! caller, at a parameter that is not `own`, by 1 of "Answers of 2026-11-21,
+//! third set". Each function passes one kind of such a value and ends what
+//! holds it before the job runs: a field, an element, a value behind a pointer,
+//! a value that becomes its `?T` and a class that replaces `copied`. A new cell
+//! may take the memory of the one the caller tore down. The program runs with
+//! --anti.threads=1, so each job starts when it is joined. Each line prints
+//! what a job of a fresh value and the job of the value read.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell
+{
+	pub v: int = 0,
+}
+
+class Box
+{
+	pub own p: *Cell,
+}
+
+class Holder
+{
+	pub b: Box,
+}
+
+class Noted
+{
+	pub own p: *Cell,
+
+	concrete fn copied(self, from: *Object)
+	{
+		printf("the job copied a Noted\n".ptr);
+	}
+}
+
+class Runner
+{
+	pub n: int = 0,
+}
+
+worker fn read(r: *Runner, b: Box) -> int
+{
+	return b.p.v + r.n;
+}
+
+worker fn read_maybe(r: *Runner, b: ?Box) -> int
+{
+	if b != none {
+		return b.p.v + r.n;
+	}
+	return -1;
+}
+
+worker fn read_noted(r: *Runner, b: Noted) -> int
+{
+	return b.p.v + r.n;
+}
+
+/// A new cell of value v, made after the block of an argument ended, which
+/// takes the memory the cell of the argument held.
+fn reuse(v: int) -> *Cell
+{
+	return alloc Cell { v: v };
+}
+
+fn show(what: str, first: int, n: int, own other: *Cell)
+{
+	printf("%s: %d %d\n".ptr, what.ptr, first as c_int, n as c_int);
+	delete(other);
+}
+
+fn in_field(r: *Runner)
+{
+	let job = dispatch r -> read(Box { p: alloc Cell { v: 0 } });
+	let first = join(job);
+	{
+		let h = Holder { b: Box { p: alloc Cell { v: 41 } } };
+		job = dispatch r -> read(h.b);
+	}
+	let other = reuse(7);
+	show("a field", first, join(job), other);
+}
+
+fn in_element(r: *Runner)
+{
+	let job = dispatch r -> read(Box { p: alloc Cell { v: 0 } });
+	let first = join(job);
+	{
+		let row = [Box { p: alloc Cell { v: 41 } }, Box { p: alloc Cell { v: 9 } }];
+		job = dispatch r -> read(row[0]);
+	}
+	let other = reuse(7);
+	show("an element", first, join(job), other);
+}
+
+fn in_pointer(r: *Runner)
+{
+	let p = alloc Box { p: alloc Cell { v: 41 } };
+	let job = dispatch r -> read(*p);
+	delete(p);
+	let other = reuse(7);
+	show("a value behind a pointer", 1, join(job), other);
+}
+
+fn in_optional(r: *Runner)
+{
+	let job = dispatch r -> read_maybe(Box { p: alloc Cell { v: 0 } });
+	let first = join(job);
+	{
+		let b = Box { p: alloc Cell { v: 41 } };
+		job = dispatch r -> read_maybe(b);
+	}
+	let other = reuse(7);
+	show("a value that becomes its ?T", first, join(job), other);
+}
+
+fn in_copied(r: *Runner)
+{
+	let job = dispatch r -> read_noted(Noted { p: alloc Cell { v: 0 } });
+	let first = join(job);
+	{
+		let b = Noted { p: alloc Cell { v: 41 } };
+		job = dispatch r -> read_noted(b);
+	}
+	let other = reuse(7);
+	show("a class that replaces copied", first, join(job), other);
+}
+
+fn main() -> int
+{
+	let r = alloc Runner { n: 1 };
+	in_field(r);
+	in_element(r);
+	in_pointer(r);
+	in_optional(r);
+	in_copied(r);
+	free(r);
+	return 0;
+}

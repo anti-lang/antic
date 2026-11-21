@@ -784,7 +784,11 @@ static struct type *worker_callee(struct checker *c, struct expr **slot,
    DESIGN: the arguments of a `dispatch` are stored per job, by decision
    23 of "Decisions of 2026-10-11", so the job holds them as a call holds
    its arguments. A local passed to an `own` parameter moves into the job,
-   when job is true, and the caller tears it down no more. */
+   when job is true, and the caller tears it down no more. A value that
+   already lives somewhere and owns something, passed to a parameter that
+   is not `own`, stays with the caller, and the job holds a `dup` of it,
+   by 1 of "Answers of 2026-11-21, third set". Lowering makes the copy,
+   so nothing moves there. */
 static bool worker_args(struct checker *c, struct expr *call,
                         const struct type *fn, bool job)
 {

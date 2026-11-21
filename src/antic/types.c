@@ -2345,7 +2345,11 @@ static bool pointer_free(const struct type *t, struct ptr_set *answered)
            pointer and the `own` fields of a class. The table is read-only
            data that every object of the class shares, and an `own` field
            belongs to one object, so no two chunks reach the same memory
-           through either. A class whose other fields are pointer-free is
+           through either. A `dispatch` gives its job a `dup` of a value
+           that stays with the caller and owns something, by 1 of
+           "Answers of 2026-11-21, third set", so the job and the caller
+           reach no `own` field of one object either. A class whose other
+           fields are pointer-free is
            therefore pointer-free, and `[]Circle` chunks like any array. */
         for (i = 0; i < t->field_count; i++) {
             /* The base field of a class whose base was refused has no
