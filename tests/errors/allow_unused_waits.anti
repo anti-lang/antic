@@ -1,0 +1,17 @@
+//! A clause of `unused-allow` that covers a clause of a check this build does
+//! not run waits with it, since the build that runs the check decides whether
+//! the inner clause silences something. A build without --doc-warnings says
+//! nothing of either clause.
+
+/// The helper.
+pub fn helper() -> int
+	allow(unused-allow, "the clause inside waits for the doc warnings")
+{
+	allow(undocumented, "the doc warnings decide")
+	return 1;
+}
+
+fn main() -> int
+{
+	return helper() - 1;
+}

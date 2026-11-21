@@ -1,0 +1,44 @@
+//! A `dispatch` keeps the arguments of its job, by decision 23 of "Decisions of
+//! 2026-10-11", so a local class value passed to the worker stays the job's
+//! while the block of the local ends before the job runs. The value holds an
+//! `own` field, which the pointer-free rule of a worker lets through. The
+//! program runs with --anti.threads=1, so the pool has no thread and the job
+//! starts when it is joined, after the block tore the local down.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell
+{
+	pub v: int = 0,
+}
+
+class Box
+{
+	pub own p: *Cell,
+}
+
+class Runner
+{
+	pub n: int = 0,
+}
+
+worker fn read(r: *Runner, b: Box) -> int
+{
+	return b.p.v + r.n;
+}
+
+fn main() -> int
+{
+	let r = alloc Runner { n: 1 };
+	let job = dispatch r -> read(Box { p: alloc Cell { v: 0 } });
+	printf("fresh %d\n".ptr, join(job) as c_int);
+	{
+		let b = Box { p: alloc Cell { v: 41 } };
+		job = dispatch r -> read(b);
+	}
+	let other = alloc Cell { v: 7 };
+	printf("local %d\n".ptr, join(job) as c_int);
+	free(other);
+	free(r);
+	return 0;
+}

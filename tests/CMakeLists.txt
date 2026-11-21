@@ -5364,6 +5364,13 @@ antic_warnings_test(warning_unused_clauses_second_round
     "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_rounds.s,allow_unused_rounds.anti"
     "allow_unused_rounds.anti:21:2: warning: `allow(unused-allow)` silences nothing [unused-allow]"
     "allow_unused_rounds.anti:7:;allow_unused_rounds.anti:9:;allow_unused_rounds.anti:14:;allow_unused_rounds.anti:16:")
+# A clause of `unused-allow` around a clause of a doc warning waits for the
+# build that runs the doc warnings, as the clause inside it does, so a
+# release build refuses neither. T383 of docs/audit/tests-findings.md.
+antic_warnings_test(warning_unused_clause_waits_for_its_inner_clause
+    "--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_waits.s,allow_unused_waits.anti"
+    ""
+    "[unused-allow]")
 
 # The warning `blocking-under-lock` in a dev build, which goes on. It
 # names the innermost lock, and an `allow` before a statement and in the
