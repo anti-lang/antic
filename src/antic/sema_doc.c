@@ -353,6 +353,68 @@ static bool doc_word_ends(const char *line, size_t length, size_t at)
     return at == length || line[at] == ' ' || line[at] == '\t';
 }
 
+/* Whether the line of the doc text that starts at at, before length,
+   is the delimiter row of a Markdown table, by 2 of "Answers of
+   2026-11-21, third set" in docs/decisions.md. The row holds at least one
+   `|`, and the `|` split it into cells. An empty first or last cell
+   stands for a leading or a trailing `|`. Each other cell is one or more
+   `-`, with an optional `:` before and after them and spaces or tabs
+   around them, and the row holds at least one such cell. */
+static bool doc_delimiter_row(const char *text, size_t length, size_t at)
+{
+    size_t end = at;
+    size_t i = at;
+    size_t dashed = 0;
+    bool bar = false;
+
+    while (end < length && text[end] != '\n') {
+        end++;
+    }
+    for (;;) {
+        size_t first = i;
+        size_t last;
+        size_t k;
+        while (i < end && text[i] != '|') {
+            i++;
+        }
+        last = i;
+        while (first < last && (text[first] == ' ' || text[first] == '\t')) {
+            first++;
+        }
+        while (last > first &&
+               (text[last - 1] == ' ' || text[last - 1] == '\t')) {
+            last--;
+        }
+        if (first == last) {
+            /* An empty cell inside the row is no delimiter. */
+            if (bar && i < end) {
+                return false;
+            }
+        } else {
+            if (text[first] == ':') {
+                first++;
+            }
+            if (last > first && text[last - 1] == ':') {
+                last--;
+            }
+            if (first == last) {
+                return false;
+            }
+            for (k = first; k < last; k++) {
+                if (text[k] != '-') {
+                    return false;
+                }
+            }
+            dashed++;
+        }
+        if (i == end) {
+            return bar && dashed > 0;
+        }
+        bar = true;
+        i++;
+    }
+}
+
 /* One doc comment against the markup subset. Each kind is reported once,
    and the lines of a fenced block are skipped. */
 static void doc_check_text(const struct doc_scope *s,
@@ -418,7 +480,8 @@ static void doc_check_text(const struct doc_scope *s,
                 doc_markup_warning(s, doc, owner, "a heading");
                 heading = true;
             }
-            if (!table && line[lead] == '|') {
+            if (!table && line[lead] == '|' && end < doc->length &&
+                doc_delimiter_row(doc->text, doc->length, end + 1)) {
                 doc_markup_warning(s, doc, owner, "a table");
                 table = true;
             }

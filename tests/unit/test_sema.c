@@ -176,7 +176,16 @@ void test_sema(void)
     warns("/// # Heading\npub fn f() {}\n", 1, 1,
           "the doc comment of `f` holds a heading, which the doc markup has "
           "not");
-    warns("/// A table:\n///\n/// | a | b |\npub fn f() {}\n", 1, 1,
+    warns("/// A table:\n///\n/// | a | b |\n/// |---|:-:|\npub fn f() {}\n", 1,
+          1, "the doc comment of `f` holds a table, which the doc markup has "
+          "not");
+    /* A line that starts with `|` is a table with a delimiter row under
+       it alone, by 2 of "Answers of 2026-11-21, third set". The rows
+       below are text: a row of text, an empty cell between two `|`, a
+       colon alone, a last line, and dashes without a `|`. */
+    documented("/// | a | b |\n/// | c | d |\n/// || - |\n/// | : |\n"
+               "/// | e |\n/// ---\n///\n/// | f |\npub fn f() {}\n");
+    warns("/// | a | b |\n/// \t - | :-: \npub fn f() {}\n", 1, 1,
           "the doc comment of `f` holds a table, which the doc markup has "
           "not");
     warns("/// Such as *this*.\npub fn f() {}\n", 1, 1,
@@ -246,8 +255,9 @@ void test_sema(void)
     warns("/// The values *a *b* here.\npub fn f() {}\n", 1, 1,
           "the doc comment of `f` holds emphasis, which the doc markup has "
           "not");
-    warns("/// Two rows:\n///\n/// | a |\n///\n/// | b |\npub fn f() {}\n", 1,
-          1, "the doc comment of `f` holds a table, which the doc markup has "
+    warns("/// Two tables:\n///\n/// | a |\n/// | - |\n///\n/// | b |\n/// | - |\n"
+          "pub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds a table, which the doc markup has "
           "not");
     doc_without_tables();
 

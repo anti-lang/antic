@@ -11,6 +11,7 @@ pub const heads: int = 1;
 /// A table is outside the subset:
 ///
 /// | one | two |
+/// | --- | :-: |
 pub const tables: int = 2;
 
 /// Emphasis such as *this* is outside the subset.
@@ -26,6 +27,15 @@ pub const images: int = 5;
 
 /// `nowhere` names nothing of this module.
 pub const unresolved: int = 7;
+
+/// A line that starts with a bar is text without a row of dashes under it:
+///
+/// | one | two |
+/// | three | four |
+/// || --- |
+/// | : |
+/// | last |
+pub const bars: int = 9;
 
 /// `heads`, `plus`, `n`, `lang.Error` and `int` all resolve, and `--release`,
 /// `anti check`, `x + y` and `1` are no names at all.

@@ -5503,8 +5503,8 @@ set_tests_properties(silent_catch_no_shadow PROPERTIES
 set(MARKUP "the doc comment")
 antic_warnings_test(warning_doc_markup
     "--doc-warnings,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_markup.s,doc_markup.anti"
-    "doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:27:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
-    "${MARKUP} of `plus` holds;in ${MARKUP} of `plus` resolves;has no `///` comment")
+    "doc_markup.anti:1:1: warning: ${MARKUP} of the module holds HTML, which the doc markup has not;doc_markup.anti:6:1: warning: ${MARKUP} of `heads` holds a heading, which the doc markup has not;${MARKUP} of `tables` holds a table, which the doc markup has not;${MARKUP} of `stars` holds emphasis, which the doc markup has not;${MARKUP} of `numbers` holds a numbered list, which the doc markup has not;${MARKUP} of `images` holds an image, which the doc markup has not;doc_markup.anti:28:1: warning: `nowhere` in ${MARKUP} of `unresolved` resolves to nothing"
+    "${MARKUP} of `plus` holds;${MARKUP} of `bars` holds;in ${MARKUP} of `plus` resolves;has no `///` comment")
 antic_warnings_test(warning_undocumented
     "--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
     "warning: the pub item `undocumented` has no `///` comment"

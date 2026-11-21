@@ -6,7 +6,7 @@ variant Shape
 	/// A circle.
 	//# # A heading in the note of a case
 	Circle {
-		/// | a table in the doc of a field of a case |
+		/// 1. a numbered list in the doc of a field of a case
 		r: f32,
 		//# ![an image](in the note of a field of a case)
 		d: f32,

@@ -91,7 +91,11 @@ The markup rules read one line at a time and skip the lines of a fenced
 block. Each kind is reported once per comment. A heading is a word of `#`
 alone at the start of a line, and an item of a numbered list a word of
 digits and `.` or `)`, by I of "Answers of 2026-11-19" in
-`docs/decisions.md`. A line that starts with `#5` or `3.14` is text. Emphasis needs text after
+`docs/decisions.md`. A line that starts with `#5` or `3.14` is text. A table is a line that starts with `|` with a delimiter row of
+`-` cells as its next line, by 2 of "Answers of 2026-11-21, third set", and
+any other line that starts with `|` is text. `anti fmt` joins the lines of a
+paragraph, so a table never stands in the canonical form, and
+`doc_markup.anti` stays outside `fmt_canonical`. Emphasis needs text after
 its opening delimiter and text before its closing one, which keeps a
 pointer type and `a * b` in prose out of it. A run of the delimiter opens
 as one, so `**this**` is emphasis as `*this*` is. A comment that ends inside a

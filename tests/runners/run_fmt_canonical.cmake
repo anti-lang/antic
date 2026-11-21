@@ -6,14 +6,17 @@
 #
 # The fixtures whose layout or lexical error is the point of the test are
 # left out, because the canonical form of a source the lexer refuses is
-# unknown and the layout of the others is what they check. A source in the
-# canonical form that `anti fmt` does not write yet is left out while the
-# finding of its own test is open.
+# unknown and the layout of the others is what they check. The table of
+# doc_markup.anti needs its delimiter row on the line after its first,
+# and `anti fmt` joins the lines of a paragraph of a doc comment. A
+# source in the canonical form that `anti fmt` does not write yet is left
+# out while the finding of its own test is open.
 
 cmake_minimum_required(VERSION 3.21)
 
 set(SKIP
     "${TESTS}/check/format/src/com/example/loose.anti"
+    "${TESTS}/errors/doc_markup.anti"
     "${TESTS}/errors/format_literal.anti"
     "${TESTS}/errors/hex_bytes.anti"
     "${TESTS}/errors/hex_escape_short.anti"
