@@ -1461,6 +1461,30 @@ eightbyte, which stays two words, and `object_lock_of` of
 `src/antic/lower_sync.c` for `sync a, b` of two synchronized objects
 that are locals and not pointers.
 
+## The sides of batch 3aj
+
+Batch 3aj of the third phase read the doc warnings of `anti check` in
+`src/antic/sema_doc.c` against "Doc markup" in `docs/tooling-addendum.md`
+and the section of the lock orders of a library file in
+`src/antic/antl_locks.c`. It fixed T378, T379, T380 and T381 in
+`src/antic/sema_doc.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `doc_name_known` of `src/antic/sema_doc.c` | A name that the documented item alone answers for. | The pass reads the doc comments of the items of the module and of their members, and the loop over the items of the module reads each of them before. |
+| `doc_check_span` of `src/antic/sema_doc.c` | A span whose last two bytes are a `(` and another byte. | `doc_is_name` refuses such a span before, since a `(` is no byte of a name. |
+| `antl_read_locks` of `src/antic/antl_locks.c` | A kind of a wait below zero. | `antl_get_int` refuses a number above the largest `int`, so the kind it gives is never below zero. |
+
+The sides left unsorted, which a test can reach. In `doc_is_name` of
+`src/antic/sema_doc.c` a span whose last two bytes are a `(` and a
+letter. In `doc_emphasis` there a run of the delimiter before a space,
+`a * b`. In `doc_check_text` and `doc_word_ends` there a line of `#`
+alone, a word of `#` or of digits before a tab, and a second item of a
+numbered list in one comment. In `antl_read_locks` of
+`src/antic/antl_locks.c` the end of the file inside the first of two
+entries of each loop and before the kind of a wait. Each needs names long
+enough that the count of the entries passes the test of the bytes left.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
