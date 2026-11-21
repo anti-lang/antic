@@ -87,6 +87,13 @@ static bool doc_name_in_item(const struct item *it, const char *s, size_t n)
             return true;
         }
     }
+    /* A type parameter is a name the item declares, by T381 of
+       docs/audit/tests-findings.md. */
+    for (i = 0; i < it->type_param_count; i++) {
+        if (doc_same(&it->type_params[i].name, s, n)) {
+            return true;
+        }
+    }
     for (i = 0; i < it->case_count; i++) {
         size_t j;
         if (doc_same(&it->cases[i].name, s, n)) {

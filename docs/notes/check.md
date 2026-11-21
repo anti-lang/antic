@@ -81,8 +81,8 @@ marks each one, so the check tells them from the warnings of the checker.
 
 A backtick name is one identifier or a path of identifiers, with an
 optional `()` at the end. `doc_name_known` resolves it against the module
-and its items, the members of those items and the parameters of the
-documented item. The imports, the loaded libraries and the names the
+and its items, the members of those items and the parameters and the
+type parameters of the documented item. The imports, the loaded libraries and the names the
 compiler declares follow. `lexer_is_keyword` answers for every keyword and
 every builtin type name, so `` `int` `` and `` `return` `` are language
 words and not names.
