@@ -931,6 +931,18 @@ not re-open a settled decision without asking Eddie.
   sanitizer suite in the six parts of `asan`, the last up to test 8026:
   `asan` 380 s, 272 s, 367 s, 230 s, 172 s and 631 s, `ubsan` 375 s,
   267 s, 364 s, 235 s, 171 s and 667 s.
+  The step of the answers of 2026-11-21 measured `host` in the same
+  three parts, while `fseventsd` of the Mac ran beside it: 598 s, 419 s
+  and 557 s before the fix of T366, up to test 8028, 590 s, 410 s and
+  560 s before the commit of T376, up to test 8031, 589 s, 411 s and
+  558 s before its fix, 586 s, 411 s and 542 s before the fix of T375,
+  585 s, 411 s and 529 s before the commit of item 5, up to test 8032,
+  582 s, 409 s and 519 s before the fix of T370 and T371, up to test
+  8037, 584 s, 410 s and 515 s before the commit of item 3, up to test
+  8039, and 588 s, 417 s and 517 s before the commit of T377, up to test
+  8042. It ran each sanitizer suite in the six parts of `asan`, the last
+  up to test 8040: `asan` 366 s, 263 s, 364 s, 230 s, 174 s and 620 s,
+  `ubsan` 374 s, 255 s, 327 s, 204 s, 154 s and 649 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1541,12 +1553,13 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8016 ctest tests pass on the development Mac, and two of them, the
+- 8042 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
-  carry `host=windows`, the line of T365, the two lines of T366 and the
-  three lines each of T370 and T371, which wait for Eddie's choice.
-  The ASan and the UBSan builds run 8014 each
+  carry `host=windows`, the line of T365, which waits for Eddie's word
+  on the DESIGN of `append_type_name`, and the three lines of T377,
+  which wait for his choice.
+  The ASan and the UBSan builds run 8040 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
