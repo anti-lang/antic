@@ -1,0 +1,19 @@
+//! A tuple local holds a snapshot as a local of function type does, so the
+//! snapshot copies the bytes of a `str` it captures, and the text it prints
+//! stays when the memory of the text it was made from is freed.
+
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let n = 4;
+	let name = f"report {n}";
+	let t = (1, snapshot fn() { io.println(name); });
+	free(name.ptr);
+	let other = f"xxxxxxxx";
+	name = "draft";
+	t.1();
+	free(other.ptr);
+	return 0;
+}
