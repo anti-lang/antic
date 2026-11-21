@@ -5475,6 +5475,13 @@ antic_warnings_test(warning_undocumented
     "--doc-warnings,--warn-undocumented,--runtime,${ANTIC_RUNTIME_DIR},-S,-o,${CMAKE_CURRENT_BINARY_DIR}/doc_undocumented.s,doc_markup.anti"
     "warning: the pub item `undocumented` has no `///` comment"
     "the pub item `plus` has no;the pub item `heads` has no")
+# The `get` of a singleton and a function of a `tests` block are items the
+# compiler writes, which --warn-undocumented leaves out.
+add_expect_test(silent_doc_undocumented_written STATUS 0
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/errors"
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:antic>" --tests --doc-warnings
+            --warn-undocumented --front-end doc_undocumented_written.anti)
 add_test(NAME silent_doc_markup
     COMMAND antic --runtime "${ANTIC_RUNTIME_DIR}" -S
             -o "${CMAKE_CURRENT_BINARY_DIR}/doc_markup_silent.s"

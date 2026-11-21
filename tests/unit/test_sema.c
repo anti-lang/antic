@@ -130,6 +130,31 @@ static void documented(const char *source)
     checked_release(&c);
 }
 
+/* The doc warnings without a module name and without the type table.
+   `equals` is a function of `Object`, which the table answers for, and
+   `main.f` resolves through the name `main` of an entry function alone. */
+static void doc_without_tables(void)
+{
+    struct checked c;
+    struct sema_inputs in;
+
+    checked_run(&c, "/// `equals` and `main.f`.\npub fn f() {}\n");
+    doc_inputs(&c, &in);
+    CHECK(c.ok);
+    sema_doc_warnings(c.module, &in, false);
+    CHECK(c.diags.count == 0);
+    c.diags.count = 0;
+    in.module_name = NULL;
+    in.types = NULL;
+    sema_doc_warnings(c.module, &in, false);
+    CHECK(c.diags.count == 1);
+    if (c.diags.count == 1) {
+        CHECK_STR(c.diags.items[0].message,
+                  "`equals` in the doc comment of `f` resolves to nothing");
+    }
+    checked_release(&c);
+}
+
 void test_sema(void)
 {
     /* A developer note on a public item needs a user comment beside it. */
@@ -196,6 +221,35 @@ void test_sema(void)
                  "the pub item `f` has no `///` comment");
     warns_option("/// Doc.\npub class Thing { pub fn f(self) {} }\n", true,
                  2, 26, "the pub item `f` has no `///` comment");
+    /* A mark at the end of a line opens nothing: a star, a `<`, a `</`
+       and a tag the line cuts, and an `!`. Neither does a tag with a
+       space, an `!` before a letter, a star whose partner a letter
+       follows, a line of digits or code that ends in an open
+       parenthesis. */
+    documented("/// A product a *\n///\n/// An order a <\n///\n"
+               "/// A closer </\n///\n/// A cut tag <abc\n///\n"
+               "/// The tag <abc def> and the call !x.\n///\n"
+               "/// A shout!\n///\n/// The product x *a*b.\n///\n"
+               "/// 2026\n///\n/// The call `f(` cut.\npub fn f() {}\n");
+    /* Emphasis at the start of a line, with underscores, with its
+       partner at the end of the line and with a spaced star before the
+       partner. A second line of a table is the warning of the first. */
+    warns("/// *Every* value.\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds emphasis, which the doc markup has "
+          "not");
+    warns("/// The value is _checked_ once.\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds emphasis, which the doc markup has "
+          "not");
+    warns("/// Checked *once*\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds emphasis, which the doc markup has "
+          "not");
+    warns("/// The values *a *b* here.\npub fn f() {}\n", 1, 1,
+          "the doc comment of `f` holds emphasis, which the doc markup has "
+          "not");
+    warns("/// Two rows:\n///\n/// | a |\n///\n/// | b |\npub fn f() {}\n", 1,
+          1, "the doc comment of `f` holds a table, which the doc markup has "
+          "not");
+    doc_without_tables();
 
     typed("fn scale(x: int) -> int {\n"
           "    let k = 2 + 4;\n"

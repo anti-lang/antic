@@ -1,0 +1,21 @@
+//! Items that the compiler writes are no items a reader documents: the `get` of
+//! a singleton and a function of a `tests` block.
+
+/// The one counter of the program.
+pub singleton class Counter
+{
+	/// The count so far.
+	pub fn count(self) -> int
+	{
+		return 1;
+	}
+}
+
+tests
+{
+	pub fn counts_one()
+	{
+		let n = Counter.get().count();
+		assert(n == 1);
+	}
+}

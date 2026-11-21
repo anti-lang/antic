@@ -1691,6 +1691,57 @@ static void damaged_wait(void)
     refuses_file(longer, sizeof longer, NULL);
 }
 
+/* A section of the lock orders without its functions, which a file
+   written by hand may hold. */
+static void drop_lock_functions(struct damaged *d)
+{
+    struct lock_facts *facts = arena_alloc(d->arena, sizeof *facts);
+
+    *facts = *d->written->locks;
+    facts->function_count = 0;
+    d->written->locks = facts;
+}
+
+/* The section of the lock orders with one entry of each kind: `forward`
+   takes two locks, which add an edge, and `take` waits on a channel.
+   Every shorter file fails without reading past its end, in each loop of
+   the reader. A file whose section holds the edge and the wait alone
+   reads as well. */
+static void damaged_locks(void)
+{
+    static const char source[] = "pub struct Pair { a: Mutex, b: Mutex, n: int }\n"
+                                 "pub fn forward(p: *Pair) {\n"
+                                 "    sync p.a {\n"
+                                 "        sync p.b {\n"
+                                 "            p.n += 1;\n"
+                                 "        }\n"
+                                 "    }\n"
+                                 "}\n"
+                                 "pub fn take(c: chan int) -> int {\n"
+                                 "    let v = recv(c) else { return 0; };\n"
+                                 "    return *v;\n"
+                                 "}\n";
+    struct compilation s;
+    struct text bytes = {0};
+    size_t n;
+
+    compilation_open(&s);
+    if (build_library(&s, "pairs", source, &bytes)) {
+        CHECK(reads_file(&bytes));
+        for (n = 8; n < bytes.length; n++) {
+            refuses_file((const uint8_t *)bytes.data, n, NULL);
+        }
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+    compilation_open(&s);
+    if (build_damaged(&s, "pairs", source, drop_lock_functions, &bytes)) {
+        CHECK(reads_file(&bytes));
+    }
+    text_free(&bytes);
+    compilation_close(&s);
+}
+
 static void damaged_files(void)
 {
     /* Where the fields a poke below reaches sit, counted back from the
@@ -6285,6 +6336,7 @@ void test_modules(void)
     dependencies();
     damaged_files();
     damaged_wait();
+    damaged_locks();
     lock_edge_to_itself();
     damaged_records();
     damaged_simd();

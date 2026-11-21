@@ -147,6 +147,19 @@ anti_message(doc_name_after_a_span_cut_over_two_lines
         "anti check: formatting: 1 file"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/cut.anti:3:1: warning: `missing_one` in the doc comment of `one` resolves to nothing [doc-unresolved]")
+# An import of a module path of one segment answers for the name of that
+# segment alone, so a name beside it still resolves to nothing.
+anti_message(doc_name_beside_an_import_of_one_segment
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/util.anti "//! A module.\n\n/// One.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+          src/sum.anti "//! A module.\n\nimport util;\n\n/// Two, which is `util.one` and `missing` beside it.\npub fn two() -> int\n{\n\treturn util.one() + 1;\n}\n"
+    OUT "anti check: front end: 2 files, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 1"
+        "anti check: formatting: 2 files"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/sum.anti:5:1: warning: `missing` in the doc comment of `two` resolves to nothing [doc-unresolved]")
 anti_message(module_fence_never_closed
     STATUS 0
     FILES anti.toml "${check_manifest}"
