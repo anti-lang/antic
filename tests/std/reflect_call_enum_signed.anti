@@ -1,0 +1,42 @@
+//! `reflect.call` of a public function whose parameter is an enum over a signed
+//! base, with a declared value below zero and two numbers that the enum does
+//! not declare. The trampoline compares the number as the base holds it, so -1
+//! calls the function and 0 and -2 are refused with `WRONG_KIND`.
+import anti.lang;
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+enum Level: i16 { Low = -1, High = 1 }
+
+class Box
+{
+	pub fn number(self, x: Level) -> int
+	{
+		printf("number runs with %d\n".ptr, x as c_int);
+		return x as int;
+	}
+}
+
+/// Call `number` of `o` with v, and print its result or the code of the error.
+fn call(o: *Object, v: int)
+{
+	let args = [reflect.of_int(v)];
+	let r = reflect.call(o, 16, args[0..1]) catch e {
+		printf("%lld: refused %d\n".ptr, v, e.code as c_int);
+		return;
+	};
+	printf("%lld: gives %lld\n".ptr, v, r.data.i);
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let o: *Object = b;
+	call(o, -1);
+	call(o, 0);
+	call(o, -2);
+	call(o, 1);
+	delete(b);
+	return 0;
+}

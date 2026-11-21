@@ -127,6 +127,12 @@ tools can observe.
   call follows is `anti.rt.signature.<text>`. It checks the count and the kind of every
   `Value`, reads each argument at the type of its parameter, narrowing from the width the
   `Value` holds, calls the entry and widens the result back into a `Value`.
+- A text names an enum by its qualified name, by 1 of "Answers of 2026-11-21". Lowering
+  writes the descriptor `enum.<name>.descriptor` of each enum that the text of a function
+  names. The pass reads the type of its base and its values from those descriptors. A name with dots reads as an enum where the rest of the text then reads.
+  The trampoline compares each enum argument, narrowed to its base, with the values, and
+  gives 0 for a number that the enum does not declare. A text that names an enum without
+  values has a trampoline that gives 0 at once.
 - `src/rt/call.c` checks the index, the entry, the signature and the count before it calls the
   trampoline. A trampoline that refuses the call therefore found a wrong kind.
 - A `str` argument passes the address of its bytes inside the `Value`, as lowering passes

@@ -1,0 +1,15 @@
+//! A module that declares an enum and a class whose public function takes it,
+//! for `reflect.call` from another module.
+
+/// The speeds of a `Fan`, with gaps between their numbers.
+pub enum Speed: u8 { Off, Low = 4, High = 9 }
+
+/// A class whose public function takes a `Speed`.
+pub class Fan
+{
+	/// The number of the speed `s`, printed when the function runs.
+	pub fn level(self, s: Speed) -> int
+	{
+		return s as int;
+	}
+}

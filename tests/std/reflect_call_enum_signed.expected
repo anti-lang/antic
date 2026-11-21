@@ -1,0 +1,7 @@
+exit 0
+number runs with -1
+-1: gives -1
+0: refused 3
+-2: refused 3
+number runs with 1
+1: gives 1

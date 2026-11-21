@@ -1,0 +1,42 @@
+//! `reflect.call` of a public function whose parameter is an enum without
+//! values. The enum declares no number, so the call of every number is refused
+//! with `WRONG_KIND` and the function does not run, as `as` to the enum stops a
+//! dev build for every value.
+import anti.lang;
+import anti.reflect;
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+enum Nothing
+{
+}
+
+class Box
+{
+	pub fn number(self, x: Nothing) -> int
+	{
+		printf("number runs\n".ptr);
+		return 1;
+	}
+}
+
+/// Call `number` of `o` with v, and print its result or the code of the error.
+fn call(o: *Object, v: int)
+{
+	let args = [reflect.of_int(v)];
+	let r = reflect.call(o, 16, args[0..1]) catch e {
+		printf("%lld: refused %d\n".ptr, v, e.code as c_int);
+		return;
+	};
+	printf("%lld: gives %lld\n".ptr, v, r.data.i);
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let o: *Object = b;
+	call(o, 0);
+	call(o, 1);
+	delete(b);
+	return 0;
+}

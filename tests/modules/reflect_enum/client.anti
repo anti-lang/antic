@@ -1,0 +1,33 @@
+//! `reflect.call` of a function of a class of another module whose parameter is
+//! an enum of that module. The trampoline of the program checks the number
+//! against the values of the enum, so a number that the enum does not declare
+//! is refused with `WRONG_KIND`, in release mode and in dev mode.
+
+import anti.lang;
+import anti.reflect;
+import com.example.fans;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Call `level` of `o` with v, and print its result or the code of the error.
+fn call(o: *Object, v: uint)
+{
+	let args = [reflect.of_uint(v)];
+	let r = reflect.call(o, 16, args[0..1]) catch e {
+		printf("%llu: refused %d\n".ptr, v, e.code as c_int);
+		return;
+	};
+	printf("%llu: gives %lld\n".ptr, v, r.data.i);
+}
+
+fn main() -> int
+{
+	let f = alloc fans.Fan { };
+	let o: *Object = f;
+	call(o, 4);
+	call(o, 5);
+	call(o, 9);
+	call(o, 1);
+	delete(f);
+	return 0;
+}

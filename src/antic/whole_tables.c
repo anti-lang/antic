@@ -195,66 +195,180 @@ void whole_write_backtrace_default(struct ir_module *m, bool release)
 /* One name of a signature. The type passes the value, the kind of
    reflect.Value carries it, and the Value holds it at the wide type. The
    kinds are enum anti_value_kind of src/rt/reflect.h, which the unit test
-   reflect_contract compares with anti.reflect.ValueKind. */
+   reflect_contract compares with anti.reflect.ValueKind. id is the type
+   id of enum anti_type of src/rt/object.h, which the record of a value
+   of an enum holds for its base. */
 struct value_type {
     const char *name;
     enum ir_type type;
     enum ir_ext ext;
     enum anti_value_kind kind;
     enum ir_type wide;
+    enum anti_type id;
 };
 
 static const struct value_type value_types[] = {
-    {"void", IR_VOID, IR_EXT_NONE, ANTI_VALUE_NONE, IR_VOID},
-    {"bool", IR_I8, IR_EXT_ZERO, ANTI_VALUE_BOOL, IR_I8},
-    {"char", IR_I32, IR_EXT_NONE, ANTI_VALUE_CHAR, IR_I32},
-    {"i8", IR_I8, IR_EXT_SIGN, ANTI_VALUE_INT, IR_I64},
-    {"i16", IR_I16, IR_EXT_SIGN, ANTI_VALUE_INT, IR_I64},
-    {"i32", IR_I32, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64},
-    {"i64", IR_I64, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64},
-    {"u8", IR_I8, IR_EXT_ZERO, ANTI_VALUE_UINT, IR_I64},
-    {"u16", IR_I16, IR_EXT_ZERO, ANTI_VALUE_UINT, IR_I64},
-    {"u32", IR_I32, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
-    {"u64", IR_I64, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
-    {"f32", IR_F32, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64},
-    {"f64", IR_F64, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64},
-    {"str", IR_AGG, IR_EXT_NONE, ANTI_VALUE_STR, IR_AGG},
-    {"ptr", IR_PTR, IR_EXT_NONE, ANTI_VALUE_PTR, IR_PTR},
+    {"void", IR_VOID, IR_EXT_NONE, ANTI_VALUE_NONE, IR_VOID, ANTI_TYPE_NONE},
+    {"bool", IR_I8, IR_EXT_ZERO, ANTI_VALUE_BOOL, IR_I8, ANTI_TYPE_BOOL},
+    {"char", IR_I32, IR_EXT_NONE, ANTI_VALUE_CHAR, IR_I32, ANTI_TYPE_CHAR},
+    {"i8", IR_I8, IR_EXT_SIGN, ANTI_VALUE_INT, IR_I64, ANTI_TYPE_I8},
+    {"i16", IR_I16, IR_EXT_SIGN, ANTI_VALUE_INT, IR_I64, ANTI_TYPE_I16},
+    {"i32", IR_I32, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64, ANTI_TYPE_I32},
+    {"i64", IR_I64, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64, ANTI_TYPE_I64},
+    {"u8", IR_I8, IR_EXT_ZERO, ANTI_VALUE_UINT, IR_I64, ANTI_TYPE_U8},
+    {"u16", IR_I16, IR_EXT_ZERO, ANTI_VALUE_UINT, IR_I64, ANTI_TYPE_U16},
+    {"u32", IR_I32, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64, ANTI_TYPE_U32},
+    {"u64", IR_I64, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64, ANTI_TYPE_U64},
+    {"f32", IR_F32, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64, ANTI_TYPE_F32},
+    {"f64", IR_F64, IR_EXT_NONE, ANTI_VALUE_FLOAT, IR_F64, ANTI_TYPE_F64},
+    {"str", IR_AGG, IR_EXT_NONE, ANTI_VALUE_STR, IR_AGG, ANTI_TYPE_STR},
+    {"ptr", IR_PTR, IR_EXT_NONE, ANTI_VALUE_PTR, IR_PTR, ANTI_TYPE_PTR},
     /* The types of C whose width the target gives. The back end turns
        a conversion of one width into a copy. */
-    {"c_long", IR_CLONG, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64},
-    {"c_ulong", IR_CLONG, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
-    {"c_wchar", IR_CWCHAR, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64},
+    {"c_long", IR_CLONG, IR_EXT_NONE, ANTI_VALUE_INT, IR_I64, ANTI_TYPE_CLONG},
+    {"c_ulong", IR_CLONG, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64,
+     ANTI_TYPE_CULONG},
+    {"c_wchar", IR_CWCHAR, IR_EXT_NONE, ANTI_VALUE_UINT, IR_I64,
+     ANTI_TYPE_CWCHAR},
 };
 
 /* The most names a signature holds: the result and the parameters. */
 #define SIGNATURE_MAX 64
 
-/* The names of the signature text, result first. Returns the count, or
-   0 for a text with a name that no Value carries. */
-static size_t read_signature(const char *text,
-                             const struct value_type **out)
-{
-    size_t count = 0;
+/* The names a descriptor of an enum takes, `enum.<qualified name>.descriptor`,
+   as lower_desc.c writes them. */
+#define ENUM_PREFIX "enum."
+#define ENUM_SUFFIX ".descriptor"
 
-    while (count < SIGNATURE_MAX) {
-        size_t length = strcspn(text, ".");
-        size_t k;
-        for (k = 0; k < sizeof value_types / sizeof *value_types; k++) {
-            if (strlen(value_types[k].name) == length &&
-                strncmp(value_types[k].name, text, length) == 0) {
+/* An enum that a signature text names: its qualified name, the type its
+   base passes as, and the field list of its descriptor, one record per
+   value it declares. base is NULL for an enum without values, whose
+   descriptor holds no list. */
+struct enum_part {
+    const char *name;
+    size_t length;
+    const struct value_type *base;
+    const struct ir_const *values;
+};
+
+/* The type that the base of type id `id` passes as, or NULL. */
+static const struct value_type *base_of(uint64_t id)
+{
+    size_t k;
+
+    for (k = 0; k < sizeof value_types / sizeof *value_types; k++) {
+        if ((value_types[k].kind == ANTI_VALUE_INT ||
+             value_types[k].kind == ANTI_VALUE_UINT) &&
+            (uint64_t)value_types[k].id == (id & 0xff)) {
+            return &value_types[k];
+        }
+    }
+    return NULL;
+}
+
+/* The enums of the program, read from the descriptors that its modules
+   wrote, one per name, into out, which holds a slot per global. Returns
+   the count. */
+static size_t program_enums(const struct ir_module *m, struct enum_part *out)
+{
+    size_t prefix = strlen(ENUM_PREFIX);
+    size_t suffix = strlen(ENUM_SUFFIX);
+    size_t count = 0;
+    size_t i;
+    size_t k;
+
+    for (i = 0; i < m->global_count; i++) {
+        const struct ir_global *g = m->globals[i];
+        size_t length = strlen(g->name);
+        const struct ir_const *fields;
+        struct enum_part *e;
+        if (g->value == NULL || g->value->kind != IR_CONST_AGG ||
+            g->value->item_count <= RT_DESCRIPTOR_FIELDS ||
+            length <= prefix + suffix ||
+            strncmp(g->name, ENUM_PREFIX, prefix) != 0 ||
+            strcmp(g->name + length - suffix, ENUM_SUFFIX) != 0) {
+            continue;
+        }
+        for (k = 0; k < count; k++) {
+            if (out[k].length == length - prefix - suffix &&
+                strncmp(out[k].name, g->name + prefix, out[k].length) == 0) {
                 break;
             }
         }
-        if (k == sizeof value_types / sizeof *value_types ||
+        if (k < count) {
+            continue;
+        }
+        e = &out[count++];
+        e->name = g->name + prefix;
+        e->length = length - prefix - suffix;
+        e->base = NULL;
+        e->values = NULL;
+        fields = &g->value->items[RT_DESCRIPTOR_FIELDS];
+        if (fields->kind == IR_CONST_ADDR &&
+            m->globals[fields->global]->value != NULL &&
+            m->globals[fields->global]->value->item_count > 0) {
+            e->values = m->globals[fields->global]->value;
+            e->base = base_of(e->values->items[0].items[RT_FIELD_TYPE].integer);
+        }
+    }
+    return count;
+}
+
+/* The program's enums, for the parse of a signature text. */
+struct enums {
+    const struct enum_part *items;
+    size_t count;
+};
+
+/* The names of the signature text from name `count` on, result first,
+   into types and, for an enum, of. A name is a type a Value carries or
+   the qualified name of an enum of the program, which holds dots of its
+   own, so the parse tries each reading of a name and takes the first
+   that reads the rest. Returns the count, or 0 for a text with a name
+   that no Value carries. */
+static size_t read_names(const char *text, const struct enums *enums,
+                         const struct value_type **types,
+                         const struct enum_part **of, size_t count)
+{
+    size_t k;
+
+    if (count == SIGNATURE_MAX) {
+        return 0;
+    }
+    for (k = 0; k < sizeof value_types / sizeof *value_types; k++) {
+        size_t length = strlen(value_types[k].name);
+        size_t n;
+        if (strncmp(value_types[k].name, text, length) != 0 ||
+            (text[length] != '.' && text[length] != '\0') ||
             (count > 0 && value_types[k].type == IR_VOID)) {
-            return 0;
+            continue;
         }
-        out[count++] = &value_types[k];
+        types[count] = &value_types[k];
+        of[count] = NULL;
         if (text[length] == '\0') {
-            return count;
+            return count + 1;
         }
-        text += length + 1;
+        n = read_names(text + length + 1, enums, types, of, count + 1);
+        if (n > 0) {
+            return n;
+        }
+    }
+    for (k = 0; k < enums->count; k++) {
+        const struct enum_part *e = &enums->items[k];
+        size_t n;
+        if (strncmp(e->name, text, e->length) != 0 ||
+            (text[e->length] != '.' && text[e->length] != '\0')) {
+            continue;
+        }
+        types[count] = e->base;
+        of[count] = e;
+        if (text[e->length] == '\0') {
+            return count + 1;
+        }
+        n = read_names(text + e->length + 1, enums, types, of, count + 1);
+        if (n > 0) {
+            return n;
+        }
     }
     return 0;
 }
@@ -354,21 +468,68 @@ static uint32_t failing_call(struct ir_module *m, struct ir_function *f,
     return f->index;
 }
 
+/* Whether the argument at the pointer at, a Value of the enum e, holds
+   a number that e declares, in block b of the trampoline f. The number
+   is compared as the base holds it, after the narrowing that the call
+   passes, as reflect.set compares a field of the enum. */
+static struct ir_operand declared(struct ir_module *m, struct ir_function *f,
+                                  struct ir_block *b, const struct enum_part *e,
+                                  struct ir_operand at, uint32_t data)
+{
+    const struct value_type *t = e->base;
+    uint32_t payload = ir_ptradd(f, b, at, ir_sym_operand(m, data));
+    struct ir_operand n = unpack(f, b, t, ir_temp_op(f, payload));
+    struct ir_operand ok = ir_int_op(IR_I8, 0);
+    size_t i;
+
+    if (t->type != IR_I64) {
+        n = ir_temp_op(f, ir_unary(f, b,
+                                   t->kind == ANTI_VALUE_INT ? IR_SEXT
+                                                             : IR_ZEXT,
+                                   IR_I64, n));
+    }
+    for (i = 0; i < e->values->item_count; i++) {
+        uint64_t v = e->values->items[i].items[RT_FIELD_OWNED].integer;
+        struct ir_operand is = ir_temp_op(
+            f, ir_binary(f, b, IR_EQ, IR_I8, n, ir_int_op(IR_I64, v)));
+        ok = i == 0 ? is : ir_temp_op(f, ir_binary(f, b, IR_OR, IR_I8, ok, is));
+    }
+    return ok;
+}
+
+/* Whether the names of a text hold an enum without values, which has no
+   base to pass and declares no number. */
+static bool holds_empty_enum(const struct enum_part *const *of, size_t count)
+{
+    size_t k;
+
+    for (k = 0; k < count; k++) {
+        if (of[k] != NULL && of[k]->base == NULL) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /* DESIGN: a trampoline takes the entry of a table, the object, the
    Values of the arguments, their count and the Value of the result. It
    checks the count and the kind of every Value first, and gives 0 when
-   one does not fit. It then reads each argument at the type of its
-   parameter, calls the entry, writes the result as a Value and gives 1.
-   The layout of a Value is the aggregate of anti.reflect, so the IR
-   holds no size. */
+   one does not fit. An argument of an enum is checked against the values
+   of the enum's descriptor as well, and a number that the enum does not
+   declare gives 0, by 1 of "Answers of 2026-11-21" in docs/decisions.md.
+   It then reads each argument at the type of its parameter, calls the
+   entry, writes the result as a Value and gives 1. The layout of a
+   Value is the aggregate of anti.reflect, so the IR holds no size. */
 static uint32_t write_trampoline(struct ir_module *m, const char *text,
+                                 const struct enums *enums,
                                  uint32_t value_agg, uint32_t str_agg)
 {
     const struct value_type *types[SIGNATURE_MAX];
+    const struct enum_part *of[SIGNATURE_MAX];
     struct ir_operand args[SIGNATURE_MAX + 1];
     struct ir_operand at[SIGNATURE_MAX];
     bool failing = text[0] == '!';
-    size_t count = read_signature(failing ? text + 1 : text, types);
+    size_t count = read_names(failing ? text + 1 : text, enums, types, of, 0);
     size_t params = count > 0 ? count - 1 : 0;
     uint32_t stride = ir_sym_size_of(m, ir_aggregate(value_agg));
     uint32_t data = ir_sym_offset_of(m, value_agg, 1);
@@ -389,6 +550,22 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
 
     if (count == 0) {
         return IR_NO_INDEX;
+    }
+    /* An enum without values declares no number, so the trampoline
+       refuses every call, as `as` to it stops every value. */
+    if (holds_empty_enum(of, count)) {
+        text_appendf(&name, "trampoline.%s", text);
+        f = ir_function_add(m, RUNTIME_MODULE, text_cstr(&name), IR_I8,
+                            IR_NO_AGG);
+        text_free(&name);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        ir_param_add(f, IR_I64, IR_NO_AGG);
+        ir_param_add(f, IR_PTR, IR_NO_AGG);
+        b = ir_block_add(f);
+        ir_ret(f, b, IR_I8, ir_int_op(IR_I8, 0));
+        return f->index;
     }
     text_appendf(&name, "signature.%s", text);
     signature = ir_declare_add(
@@ -438,6 +615,15 @@ static uint32_t write_trampoline(struct ir_module *m, const char *text,
         test = ir_binary(f, b, IR_NE, IR_I8, ir_temp_op(f, kind),
                          ir_int_op(IR_I8, (uint64_t)types[k + 1]->kind));
         bad = ir_temp_op(f, test);
+        if (of[k + 1] != NULL) {
+            struct ir_block *value = ir_block_add(f);
+            struct ir_operand ok;
+            ir_branch(f, b, bad, fail, value);
+            b = value;
+            ok = declared(m, f, b, of[k + 1], at[k], data);
+            bad = ir_temp_op(f, ir_binary(f, b, IR_EQ, IR_I8, ok,
+                                          ir_int_op(IR_I8, 0)));
+        }
     }
     call = ir_block_add(f);
     ir_branch(f, b, bad, fail, call);
@@ -549,6 +735,8 @@ void whole_write_trampolines(struct ir_module *m, bool full)
     struct ir_const *items;
     struct ir_const *value;
     struct ir_global *g;
+    struct enum_part *parts;
+    struct enums enums;
     size_t count = 0;
     size_t n = 0;
     size_t i;
@@ -565,6 +753,9 @@ void whole_write_trampolines(struct ir_module *m, bool full)
     }
     seen = alloc_zeroed(max, sizeof *seen);
     items = alloc_zeroed(max, sizeof *items);
+    parts = alloc_zeroed(m->global_count, sizeof *parts);
+    enums.items = parts;
+    enums.count = program_enums(m, parts);
     for (i = 0; full && value_agg != IR_NO_AGG && str_agg != IR_NO_AGG &&
                 i < m->class_count;
          i++) {
@@ -572,7 +763,8 @@ void whole_write_trampolines(struct ir_module *m, bool full)
     }
     for (i = 0; i < count; i++) {
         char name[TEXT_NAME_SIZE];
-        uint32_t function = write_trampoline(m, seen[i], value_agg, str_agg);
+        uint32_t function =
+            write_trampoline(m, seen[i], &enums, value_agg, str_agg);
         struct ir_const *item;
         uint32_t text;
         if (function == IR_NO_INDEX) {
@@ -611,6 +803,7 @@ void whole_write_trampolines(struct ir_module *m, bool full)
     g->exported = true;
     free(seen);
     free(items);
+    free(parts);
 }
 
 /* The slots of one abstract class that the calls of the program reach,

@@ -1069,11 +1069,6 @@ static struct ir_global *class_ancestors(struct lowerer *l,
     return g;
 }
 
-/* The two spellings of a signature. The text of reflect.call names an
-   enum by its integer, which the trampoline passes. The structural hash
-   names it by its qualified name. The two differ in that alone. */
-enum spelling { SPELL_CALL, SPELL_HASH };
-
 /* Append the name a signature gives a type that a reflect.Value carries
    to out, or return false for a type it cannot carry. The C types whose
    width the target gives and the enums are among them, since T346 of
@@ -1082,10 +1077,11 @@ enum spelling { SPELL_CALL, SPELL_HASH };
    and `c_wchar` by those names and an enum by its qualified name, by 7
    of "Answers of 2026-11-20" in docs/decisions.md. Each interface with
    such an entry has a new chain, and a swap of one enum for another of
-   the same width changes it. The text of reflect.call names the enum by
-   its integer, so the two texts differ for an enum alone. */
-static bool append_type_name(struct text *out, const struct type *t,
-                             enum spelling spelling)
+   the same width changes it. The text of reflect.call names an enum by
+   its qualified name as well, by 1 of "Answers of 2026-11-21", so the
+   two texts are one. The trampoline of such a text refuses a number
+   that the enum does not declare. */
+static bool append_type_name(struct text *out, const struct type *t)
 {
     static const char *const names[] = {
         [TYPE_VOID] = "void", [TYPE_BOOL] = "bool", [TYPE_CHAR] = "char",
@@ -1104,12 +1100,9 @@ static bool append_type_name(struct text *out, const struct type *t,
         if (t->base == NULL) {
             return false;
         }
-        if (spelling == SPELL_HASH) {
-            text_appendf(out, "%.*s.%.*s", (int)t->module.length,
-                         t->module.text, (int)t->name.length, t->name.text);
-            return true;
-        }
-        return append_type_name(out, t->base, spelling);
+        text_appendf(out, "%.*s.%.*s", (int)t->module.length, t->module.text,
+                     (int)t->name.length, t->name.text);
+        return true;
     }
     /* A function with its context is two words, which no Value
        carries, so reflect.call refuses a function that takes one. */
@@ -1133,19 +1126,18 @@ static bool append_type_name(struct text *out, const struct type *t,
    the whole program writes one trampoline per such text, so equal
    signatures share one. A signature holding a type that a Value cannot
    carry has no text, and reflect.call refuses the function. */
-static bool signature_code(const struct type *fn, enum spelling spelling,
-                           struct text *code)
+static bool signature_code(const struct type *fn, struct text *code)
 {
     size_t i;
 
     if (fn == NULL || fn->kind != TYPE_FN ||
-        !append_type_name(code, fn->result, spelling)) {
+        !append_type_name(code, fn->result)) {
         return false;
     }
     for (i = 1; i < fn->param_count; i++) {
         text_append(code, ".");
         if (fn->params[i]->kind == TYPE_VOID ||
-            !append_type_name(code, fn->params[i], spelling)) {
+            !append_type_name(code, fn->params[i])) {
             return false;
         }
     }
@@ -1179,18 +1171,40 @@ static bool failing_code(const struct type *fn, struct text *code)
     if (!fn->has_out) {
         text_append(code, "void");
     } else if (fn->params[count]->kind != TYPE_POINTER ||
-               !append_type_name(code, fn->params[count]->element,
-                                 SPELL_CALL)) {
+               !append_type_name(code, fn->params[count]->element)) {
         return false;
     }
     for (i = 1; i < count; i++) {
         text_append(code, ".");
         if (fn->params[i]->kind == TYPE_VOID ||
-            !append_type_name(code, fn->params[i], SPELL_CALL)) {
+            !append_type_name(code, fn->params[i])) {
             return false;
         }
     }
     return true;
+}
+
+/* Write the descriptor of each enum that the text of the function fn
+   names into the module, where the pass over the whole program reads the
+   type of its base and its values for the trampoline. The out pointer of
+   a function that may fail names its result. */
+static void give_enum_descriptors(struct lowerer *l, const struct type *fn)
+{
+    size_t i;
+
+    if (fn->result->kind == TYPE_ENUM) {
+        enum_descriptor(l, fn->result);
+    }
+    for (i = 1; i < fn->param_count; i++) {
+        const struct type *p = fn->params[i];
+        if (fn->may_fail && fn->has_out && i == fn->param_count - 1 &&
+            p->kind == TYPE_POINTER) {
+            p = p->element;
+        }
+        if (p->kind == TYPE_ENUM) {
+            enum_descriptor(l, p);
+        }
+    }
 }
 
 /* DESIGN: the table entry of a function that may fail returns the error
@@ -1214,11 +1228,12 @@ static const struct ir_global *signature_text(struct lowerer *l,
     }
     coded = fn->kind == TYPE_FN && fn->may_fail
                 ? failing_code(fn, &code)
-                : signature_code(fn, SPELL_CALL, &code);
+                : signature_code(fn, &code);
     if (!coded) {
         text_free(&code);
         return NULL;
     }
+    give_enum_descriptors(l, fn);
     text.bytes = text_cstr(&code);
     text.length = code.length;
     g = lower_literal_global(l, &text);
@@ -1376,7 +1391,7 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
                        table.entries[i].name.length);
         h = ir_hash_bytes(h, ":", 1);
         if (fn != NULL && fn->symbol != NULL &&
-            signature_code(fn->symbol->type, SPELL_HASH, &code)) {
+            signature_code(fn->symbol->type, &code)) {
             h = ir_hash_bytes(h, text_cstr(&code), code.length);
         } else {
             text_format_name(params, sizeof params, "%zu",

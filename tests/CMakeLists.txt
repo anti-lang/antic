@@ -3791,6 +3791,14 @@ antic_modules_test(shared_class
     PROGRAM client
     STD lang mem text reflect
     WORK "${CMAKE_CURRENT_BINARY_DIR}/shared")
+# reflect.call of a function of a class of a library whose parameter is
+# an enum of the library, with numbers that the enum does not declare
+antic_modules_test(reflect_enum
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/reflect_enum"
+    LIBRARIES fans
+    PROGRAM client
+    STD lang mem text reflect
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/reflect-enum")
 # Two modules declare a class of one name, and `reflect.new` finds it by
 # its module path alone
 antic_modules_test(same_name
