@@ -3656,6 +3656,12 @@ antic_program_test(matrix_threads_jobs_no_hooks
     "${MATRIX}/threads_jobs.anti"
     OPTIONS "--no-hooks"
     WORK "${MATRIX_WORK}/no-hooks")
+# A dev build checks and marks each job of `join_all` in turn, and under
+# --no-hooks it joins each without the `joined` hook as well.
+antic_program_test(matrix_threads_jobs_dev_no_hooks
+    "${MATRIX}/threads_jobs.anti"
+    OPTIONS "--dev" "--no-hooks"
+    WORK "${MATRIX_WORK}/dev-no-hooks")
 
 # Programs of more than one module, the library files and the refusals
 # at the boundary of a module.
@@ -5351,6 +5357,13 @@ antic_warnings_test(warning_unused_clauses
 antic_warnings_test(warning_unused_doc_clause
     "--runtime,${ANTIC_RUNTIME_DIR},--dev,--doc-warnings,--warn-undocumented,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_doc.s,allow_unused.anti"
     "allow_unused.anti:10:1: warning: `allow(undocumented)` silences nothing [unused-allow]")
+# A clause may name `unused-allow` or `unused-unchecked`, and the second
+# round lets it silence the warning of a clause inside it. One that
+# silences nothing is a warning of its own.
+antic_warnings_test(warning_unused_clauses_second_round
+    "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/allow_unused_rounds.s,allow_unused_rounds.anti"
+    "allow_unused_rounds.anti:21:2: warning: `allow(unused-allow)` silences nothing [unused-allow]"
+    "allow_unused_rounds.anti:7:;allow_unused_rounds.anti:9:;allow_unused_rounds.anti:14:;allow_unused_rounds.anti:16:")
 
 # The warning `blocking-under-lock` in a dev build, which goes on. It
 # names the innermost lock, and an `allow` before a statement and in the
@@ -5365,8 +5378,8 @@ antic_warnings_test(warning_blocking_under_lock
 # and in the header of a function silences it.
 antic_warnings_test(warning_unused_result
     "--runtime,${ANTIC_RUNTIME_DIR},--dev,-S,-o,${CMAKE_CURRENT_BINARY_DIR}/unused_result.s,unused_result.anti"
-    "unused_result.anti:11:2: warning: `hash` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:12:2: warning: `mul_high` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:13:2: warning: `anti_rt_hash_bytes` has no effects and its result is dropped, so the call does nothing [unused-result]"
-    "unused_result.anti:19:;unused_result.anti:25:")
+    "unused_result.anti:12:2: warning: `hash` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:13:2: warning: `mul_high` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:14:2: warning: `anti_rt_hash_bytes` has no effects and its result is dropped, so the call does nothing [unused-result];unused_result.anti:43:2: warning: `anti_rt_f16_to_f32` has no effects and its result is dropped, so the call does nothing [unused-result]"
+    "unused_result.anti:20:;unused_result.anti:26:;unused_result.anti:44:")
 
 # Doc warnings come only with --doc-warnings, which anti check passes.
 add_expect_test(warning_note STATUS 0
@@ -6593,6 +6606,12 @@ endforeach()
 antic_dump_test(types scale
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.types"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/scale.anti")
+
+# lanes_and_flags.ir holds a simd operation of one operand and a subtraction that
+# gives its flags, which no other listing shows.
+antic_dump_test(ir lanes_and_flags
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/lanes_and_flags.ir"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/lanes_and_flags.anti")
 
 # main.ir is the IR listing that antic prints for main.anti.
 antic_dump_test(ir main

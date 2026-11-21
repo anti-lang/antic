@@ -1,0 +1,29 @@
+//! A clause may name `unused-allow` or `unused-unchecked`. The clauses apply in
+//! two rounds: the first writes the warning of each clause that silences
+//! nothing, and the second lets a clause of either name silence it. A clause of
+//! either name that silences nothing is a warning of its own.
+
+fn quiet() -> int
+	allow(unused-allow, "the clause inside waits for a handler")
+{
+	allow(shadowed-catch, "nothing is shadowed")
+	return 1;
+}
+
+fn checked() -> int
+	allow(unused-unchecked, "the clause inside waits for a pattern")
+{
+	unchecked(exponential-pattern, "no pattern is here")
+	return 2;
+}
+
+fn loud() -> int
+	allow(unused-allow, "no clause inside")
+{
+	return 3;
+}
+
+fn main() -> int
+{
+	return quiet() + checked() + loud() - 6;
+}

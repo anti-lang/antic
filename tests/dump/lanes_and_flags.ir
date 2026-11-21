@@ -1,0 +1,61 @@
+type lanes_and_flags.Vec4 = simd struct { x: f32, y: f32, z: f32, w: f32 }
+type [4]anti.rt.Field = array 4 of anti.rt.Field
+type anti.lang.Flags = struct { overflow: i8, carry: i8, zero: i8, negative: i8 }
+global lanes_and_flags.Vec4.descriptor anti.rt.Descriptor { @lanes_and_flags.1, i64 4, ptr 0, size_of lanes_and_flags.Vec4, i64 0, ptr 0, i64 4, @lanes_and_flags.Vec4.fields, ptr 0, i64 0, i64 0, ptr 0, @lanes_and_flags.package.version, i64 5, ptr 0, i64 0, ptr 0, ptr 0 }
+global lanes_and_flags.1 size 5 align 1 bytes 56 65 63 34 00
+global lanes_and_flags.2 size 2 align 1 bytes 78 00
+global lanes_and_flags.3 size 2 align 1 bytes 79 00
+global lanes_and_flags.4 size 2 align 1 bytes 7a 00
+global lanes_and_flags.5 size 2 align 1 bytes 77 00
+global lanes_and_flags.Vec4.fields [4]anti.rt.Field { anti.rt.Field { @lanes_and_flags.2, i64 1, offset_of lanes_and_flags.Vec4.x, i64 14, i64 0, ptr 0 }, anti.rt.Field { @lanes_and_flags.3, i64 1, offset_of lanes_and_flags.Vec4.y, i64 14, i64 0, ptr 0 }, anti.rt.Field { @lanes_and_flags.4, i64 1, offset_of lanes_and_flags.Vec4.z, i64 14, i64 0, ptr 0 }, anti.rt.Field { @lanes_and_flags.5, i64 1, offset_of lanes_and_flags.Vec4.w, i64 14, i64 0, ptr 0 } }
+global lanes_and_flags.package.version size 6 align 1 bytes 30 2e 30 2e 30 00
+fn lanes_and_flags.negate(%0: agg lanes_and_flags.Vec4) -> agg lanes_and_flags.Vec4 {
+b0:
+    %1 = slot lanes_and_flags.Vec4
+    vunary fneg f32 %1, %0, lanes_and_flags.Vec4
+    ret ptr %1
+}
+fn lanes_and_flags.borrows(%0: i64, %1: i64) -> i8 zeroext range 0, 2 {
+b0:
+    %2 = slot anti.lang.Flags
+    %3 = subfl i64 %0, %1
+    %4 = flag carry %3
+    %5 = copy i64 %3
+    %6 = ptradd %2, offset_of anti.lang.Flags.carry
+    store i8 %4, %6
+    %7 = ptradd inbounds %2, offset_of anti.lang.Flags.carry
+    %8 = load i8 %7 range 0, 2
+    %9 = copy i8 %8
+    branch %8, b1, b2
+b1:
+    %10 = ne i8 %5, 0
+    %9 = copy i8 %10
+    jump b2
+b2:
+    ret i8 %9
+}
+fn lanes_and_flags.main() -> i64 {
+b0:
+    %0 = slot lanes_and_flags.Vec4
+    %1 = slot lanes_and_flags.Vec4
+    lifestart %0
+    store f32 1, %1
+    %2 = ptradd %1, offset_of lanes_and_flags.Vec4.y
+    store f32 2, %2
+    %3 = ptradd %1, offset_of lanes_and_flags.Vec4.z
+    store f32 3, %3
+    %4 = ptradd %1, offset_of lanes_and_flags.Vec4.w
+    store f32 4, %4
+    %5 = call agg @lanes_and_flags.negate(%1)
+    memcopy %0, %5, lanes_and_flags.Vec4
+    %6 = load f32 %0 !type f32
+    %7 = flt i8 %6, 0
+    branch %7, b3, b2
+b1:
+    ret i64 0
+b2:
+    ret i64 1
+b3:
+    %8 = call i8 @lanes_and_flags.borrows(1, 2)
+    branch %8, b1, b2
+}

@@ -1,0 +1,24 @@
+//! The forms of the IR text that no other dump shows: a simd operation of one
+//! operand and a subtraction that gives its flags.
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+fn negate(v: Vec4) -> Vec4
+{
+	return -v;
+}
+
+fn borrows(a: u64, b: u64) -> bool
+{
+	let (r, f) = a - b;
+	return f.carry && r != 0;
+}
+
+fn main() -> int
+{
+	let v = negate(Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 });
+	if v.x < 0.0 && borrows(1, 2) {
+		return 0;
+	}
+	return 1;
+}

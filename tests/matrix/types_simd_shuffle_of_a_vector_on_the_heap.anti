@@ -1,0 +1,24 @@
+//! `shuffle` of a simd struct that a field of an object on the heap holds, and
+//! a shuffle written into such a field. A build with --memory-checks checks the
+//! bytes of the vector it reads and of the one it writes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Vec4 { x: f32, y: f32, z: f32, w: f32 }
+
+class Holder
+{
+	pub v: Vec4 = Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 },
+	pub w: Vec4 = Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 },
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { v: Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 4.0 } };
+	h.w = h.v.shuffle(3, 2, 1, 0);
+	let r = h.w.shuffle(0, 0, 1, 1);
+	printf("%g %g %g %g\n".ptr, h.w.x as f64, h.w.y as f64, h.w.z as f64, h.w.w as f64);
+	printf("%g %g %g %g\n".ptr, r.x as f64, r.y as f64, r.z as f64, r.w as f64);
+	free(h);
+	return 0;
+}

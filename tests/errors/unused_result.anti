@@ -1,8 +1,9 @@
 //! The warning `unused-result` prints in a dev build, which goes on. It names
 //! the function whose call has no effects: the default hash, `mul_high` and a
-//! function of the runtime without effects. `allow(unused-result, "reason")`
-//! silences it before a statement and last in the header of a function.
-//! allow_levels.anti silences it in a release build.
+//! function of the runtime whose row has the class none or reads its arguments.
+//! A function of the runtime with other effects gets none.
+//! `allow(unused-result, "reason")` silences it before a statement and last in
+//! the header of a function. allow_levels.anti silences it in a release build.
 
 extern fn anti_rt_hash_bytes(bytes: ?*byte, count: i64) -> u64;
 
@@ -28,7 +29,17 @@ fn allowed_in_the_header(n: int)
 fn main() -> int
 {
 	warned(3, "three");
+	runtime_rows();
 	allowed_here(3);
 	allowed_in_the_header(3);
 	return 0;
+}
+
+extern fn anti_rt_f16_to_f32(bits: u32) -> f32;
+extern fn anti_rt_backtrace_on() -> bool;
+
+fn runtime_rows()
+{
+	anti_rt_f16_to_f32(15360);
+	anti_rt_backtrace_on();
 }
