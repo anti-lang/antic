@@ -147,6 +147,74 @@ anti_message(doc_name_after_a_span_cut_over_two_lines
         "anti check: formatting: 1 file"
     ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
     ERR "src/com/example/cut.anti:3:1: warning: `missing_one` in the doc comment of `one` resolves to nothing [doc-unresolved]")
+# A numbered list is a word of digits and `.` or `)` at the start of a
+# line, and a heading a word of `#` alone, by I of "Answers of 2026-11-19"
+# in docs/decisions.md. A word that goes on after them opens neither.
+anti_message(doc_numbered_list_with_a_parenthesis
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/steps.anti "//! A module.\n\n/// The steps of the function.\n///\n/// 1) It reads the text.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 1"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/steps.anti:3:1: warning: the doc comment of `one` holds a numbered list, which the doc markup has not [doc-markup]")
+anti_message(doc_hash_before_a_digit
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/count.anti "//! A module.\n\n/// The count of the lines.\n///\n/// #5 is the count.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
+anti_message(doc_digits_before_a_point
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/pi.anti "//! A module.\n\n/// The value of pi.\n///\n/// 3.14 is pi.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
+# A `//#` note on a `pub` function of a class body without a `///`
+# comment, which is a `pub` item as one at module level is.
+anti_message(doc_note_on_a_member_alone
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/thing.anti "//! A module.\n\n/// A thing.\npub class Thing\n{\n\t//# The count, which the caller keeps.\n\tpub fn count(self) -> int\n\t{\n\t\treturn 1;\n\t}\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 1"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/thing.anti:7:9: warning: the pub item `count` has a `//#` note and no `///` comment [doc-note-only]")
+
+# Strong emphasis, a run of two delimiters, is emphasis as Markdown renders
+# it, which the doc markup has not.
+anti_message(doc_strong_emphasis
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/strong.anti "//! A module.\n\n/// The count, which is **never** below one.\npub fn one() -> int\n{\n\treturn 1;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 1"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}"
+    ERR "src/com/example/strong.anti:3:1: warning: the doc comment of `one` holds emphasis, which the doc markup has not [doc-markup]")
+
+# A type parameter is a name the item declares, as a parameter is.
+anti_message(doc_type_parameter_of_the_item
+    STATUS 0
+    FILES anti.toml "${check_manifest}"
+          src/com/example/larger.anti "//! A module.\n\n/// The larger of `a` and `b`, both of the type `T`.\npub fn larger<T: Ordered>(a: T, b: T) -> bool\n{\n\treturn b < a;\n}\n"
+    OUT "anti check: front end: 1 file, 1 target, 0 warnings"
+        "anti check: doc blocks: 0 blocks"
+        "anti check: doc warnings: 0"
+        "anti check: formatting: 1 file"
+    ARGS check --work "${WORK}/check" --runtime "${RUNTIME}")
+
 # An import of a module path of one segment answers for the name of that
 # segment alone, so a name beside it still resolves to nothing.
 anti_message(doc_name_beside_an_import_of_one_segment
