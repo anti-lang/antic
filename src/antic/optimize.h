@@ -21,8 +21,8 @@ void optimize_module(struct ir_module *program, const char *module);
 
 /* Run the passes of optimize_program on one function, without removing
    unused functions. The back end uses it after it folds symbolic
-   values. */
-void optimize_function(struct ir_function *f);
+   values. m holds the symbolic values f names. */
+void optimize_function(const struct ir_module *m, struct ir_function *f);
 
 /* DESIGN: an assertion and a dev-mode check both reach this pass as a
    branch to a block that lowering marked. A library file carries them,

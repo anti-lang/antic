@@ -1279,7 +1279,156 @@ static void drop_slot_addresses(struct ir_function *f, uint32_t base)
     }
 }
 
-static bool split_slots(struct ir_function *f)
+/* The bytes of a scalar of type t, or 0 where the target gives them or t
+   is no scalar. Every target of antic has pointers of eight bytes. */
+static uint64_t scalar_bytes(enum ir_type t)
+{
+    switch (t) {
+    case IR_I8:
+        return 1;
+    case IR_I16:
+        return 2;
+    case IR_I32:
+    case IR_F32:
+        return 4;
+    case IR_I64:
+    case IR_F64:
+    case IR_PTR:
+        return 8;
+    default:
+        return 0;
+    }
+}
+
+/* Whether offset reaches element *index of an array whose elements have
+   the vtype *element: 0, `size_of T` or `n * size_of T`. The constant 0
+   leaves *element as it is, since it is element 0 of any array. */
+static bool element_of(const struct ir_module *m, struct ir_operand offset,
+                       struct ir_vtype *element, bool *typed,
+                       uint64_t *index)
+{
+    const struct ir_sym *s;
+    const struct ir_sym *a;
+    const struct ir_sym *b;
+
+    *typed = false;
+    if (offset.kind == IR_INT) {
+        *index = 0;
+        return offset.as.integer == 0;
+    }
+    if (offset.kind != IR_SYM || m == NULL) {
+        return false;
+    }
+    s = &m->syms[offset.as.index];
+    if (s->kind == IR_SYM_SIZE_OF) {
+        *element = s->of;
+        *typed = true;
+        *index = 1;
+        return true;
+    }
+    if (s->kind != IR_SYM_OP || s->op != IR_MUL || s->b == IR_NO_AGG) {
+        return false;
+    }
+    a = &m->syms[s->a];
+    b = &m->syms[s->b];
+    if (a->kind == IR_SYM_SIZE_OF) {
+        const struct ir_sym *t = a;
+        a = b;
+        b = t;
+    }
+    if (a->kind != IR_SYM_INT || b->kind != IR_SYM_SIZE_OF) {
+        return false;
+    }
+    *element = b->of;
+    *typed = true;
+    *index = a->value;
+    return true;
+}
+
+/* DESIGN: two fields of a slot are two temporaries, so the pass splits a
+   slot only where no two of its offsets may reach the same bytes. Two
+   constants are apart where the bytes of their types do not overlap.
+   Before the back end folds them, the offsets are symbolic, and two
+   symbols that differ may still name one address: `offset_of Pair.second`
+   and `size_of i32` both reach the second element of a `[2]c_int` that a
+   view reads as a `Pair`. The pass then holds two offsets apart in
+   three cases alone: two fields of one struct, the start of the slot
+   and a field after the first of the struct the slot holds, and two
+   elements of one array of scalars that each access reads whole. Any
+   other pair keeps the slot
+   whole, and the back end splits it once its offsets are constants, by
+   T376 of docs/audit/tests-findings.md. */
+static bool offsets_apart(const struct ir_module *m, struct ir_vtype slot,
+                          const struct slot_field *x,
+                          const struct slot_field *y)
+{
+    struct ir_vtype ex = {IR_VOID, IR_NO_AGG};
+    struct ir_vtype ey = {IR_VOID, IR_NO_AGG};
+    uint64_t ix;
+    uint64_t iy;
+    bool tx;
+    bool ty;
+
+    if (x->offset.kind == IR_INT && y->offset.kind == IR_INT) {
+        uint64_t sx = scalar_bytes(x->type);
+        uint64_t sy = scalar_bytes(y->type);
+        uint64_t ox = x->offset.as.integer;
+        uint64_t oy = y->offset.as.integer;
+        return sx > 0 && sy > 0 &&
+               ((ox < oy && oy - ox >= sx) || (oy < ox && ox - oy >= sy));
+    }
+    if (m != NULL && x->offset.kind == IR_SYM && y->offset.kind == IR_SYM) {
+        const struct ir_sym *a = &m->syms[x->offset.as.index];
+        const struct ir_sym *b = &m->syms[y->offset.as.index];
+        if (a->kind == IR_SYM_OFFSET_OF && b->kind == IR_SYM_OFFSET_OF &&
+            a->of.type == IR_AGG && b->of.type == IR_AGG &&
+            a->of.agg == b->of.agg && a->of.agg < m->agg_count &&
+            m->aggs[a->of.agg]->kind == IR_AGG_STRUCT) {
+            return a->field != b->field;
+        }
+    }
+    if (m != NULL && slot.type == IR_AGG && slot.agg < m->agg_count &&
+        m->aggs[slot.agg]->kind == IR_AGG_STRUCT) {
+        const struct slot_field *start = x->offset.kind == IR_INT ? x : y;
+        const struct slot_field *field = start == x ? y : x;
+        if (start->offset.kind == IR_INT && start->offset.as.integer == 0 &&
+            field->offset.kind == IR_SYM) {
+            const struct ir_sym *b = &m->syms[field->offset.as.index];
+            return b->kind == IR_SYM_OFFSET_OF && b->of.type == IR_AGG &&
+                   b->of.agg == slot.agg && b->field != 0;
+        }
+    }
+    if (!element_of(m, x->offset, &ex, &tx, &ix) ||
+        !element_of(m, y->offset, &ey, &ty, &iy) || ix == iy) {
+        return false;
+    }
+    if (!tx) {
+        ex = ey;
+    } else if (ty && (ex.type != ey.type || ex.agg != ey.agg)) {
+        return false;
+    }
+    return ex.type != IR_AGG && ex.type != IR_VOID && x->type == ex.type &&
+           y->type == ex.type;
+}
+
+/* Whether every two fields of a slot are apart. */
+static bool fields_apart(const struct ir_module *m, struct ir_vtype slot,
+                         const struct slot_field *fields, size_t count)
+{
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < count; i++) {
+        for (j = i + 1; j < count; j++) {
+            if (!offsets_apart(m, slot, &fields[i], &fields[j])) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool split_slots(const struct ir_module *m, struct ir_function *f)
 {
     struct slot_field fields[SPLIT_FIELDS];
     bool changed = false;
@@ -1296,7 +1445,8 @@ static bool split_slots(struct ir_function *f)
             }
             base = slot->result;
             if (written_again(f, slot, base) ||
-                !slot_fields(f, slot, fields, &count) || count == 0) {
+                !slot_fields(f, slot, fields, &count) || count == 0 ||
+                !fields_apart(m, slot->of, fields, count)) {
                 continue;
             }
             /* Rewrite every load and store, then drop the addresses. */
@@ -1310,7 +1460,7 @@ static bool split_slots(struct ir_function *f)
     return changed;
 }
 
-void optimize_function(struct ir_function *f)
+void optimize_function(const struct ir_module *m, struct ir_function *f)
 {
     bool changed = true;
 
@@ -1327,7 +1477,7 @@ void optimize_function(struct ir_function *f)
         changed = apply_peephole_rules(f) || changed;
         /* Forwarding runs before propagation, so the copy it leaves is
            removed in the same round. */
-        changed = split_slots(f) || changed;
+        changed = split_slots(m, f) || changed;
         changed = forward_stores(f) || changed;
         changed = propagate_copies(f) || changed;
         changed = remove_dead_code(f) || changed;
@@ -1449,7 +1599,7 @@ void optimize_program(struct ir_module *program, const char *entry)
 
     for (i = 0; i < program->function_count; i++) {
         if (!program->functions[i]->is_extern) {
-            optimize_function(program->functions[i]);
+            optimize_function(program, program->functions[i]);
         }
     }
     remove_unused_functions(program, entry, false);
@@ -1495,7 +1645,7 @@ void optimize_module(struct ir_module *program, const char *module)
             strcmp(f->module, RUNTIME_MODULE) != 0) {
             drop_body(f);
         } else {
-            optimize_function(f);
+            optimize_function(program, f);
         }
     }
     /* DESIGN: the object of a module holds the one copy of its data, and

@@ -884,7 +884,7 @@ static int llvm_back_end(const struct options *o, struct ir_module *program,
         bool resolved = false;
         ok = layout_resolve(&layouts, f, &resolved);
         if (ok && resolved && !f->is_extern) {
-            optimize_function(f);
+            optimize_function(program, f);
         }
         if (ok && program->memory_checks && !f->is_extern) {
             memcheck_function(program, f, &layouts);
