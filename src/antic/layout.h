@@ -47,10 +47,13 @@ struct layout {
     bool vector;
 };
 
-/* DESIGN: the members of an aggregate are recorded up to 32 bytes. Every
-   convention passes a larger aggregate in memory, and a float aggregate
-   of AAPCS64 has at most four members of 8 bytes. */
-enum { LAYOUT_MEMBER_LIMIT = 32 };
+/* DESIGN: the members of an aggregate are recorded up to 64 bytes, by 7
+   of "Answers of 2026-11-21" in docs/decisions.md. AAPCS64 passes a
+   homogeneous aggregate of up to four vectors of 16 bytes, 64 bytes, in
+   vector registers, T375 of docs/audit/tests-findings.md, so members are
+   kept up to that size. Every other aggregate above the size a
+   convention takes in registers still passes in memory. */
+enum { LAYOUT_MEMBER_LIMIT = 64 };
 
 struct layouts {
     enum target target;
