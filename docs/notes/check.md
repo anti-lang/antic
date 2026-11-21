@@ -88,7 +88,10 @@ every builtin type name, so `` `int` `` and `` `return` `` are language
 words and not names.
 
 The markup rules read one line at a time and skip the lines of a fenced
-block. Each kind is reported once per comment. Emphasis needs text after
+block. Each kind is reported once per comment. A heading is a word of `#`
+alone at the start of a line, and an item of a numbered list a word of
+digits and `.` or `)`, by I of "Answers of 2026-11-19" in
+`docs/decisions.md`. A line that starts with `#5` or `3.14` is text. Emphasis needs text after
 its opening delimiter and text before its closing one, which keeps a
 pointer type and `a * b` in prose out of it. A comment that ends inside a
 fenced block gets `holds a fence that nothing closes` under the name

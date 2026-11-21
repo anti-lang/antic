@@ -23,9 +23,6 @@ std_reflect_call_enum T365 reflect.call passes a number that the enum of the par
 matrix_closures_snapshot_in_a_tuple_local_keeps_its_text_dev T377 A tuple local holds its snapshot in the frame with the str it captures, so it reads the freed text.
 matrix_closures_snapshot_in_a_tuple_local_keeps_its_text_release T377 A tuple local holds its snapshot in the frame with the str it captures, so it reads the freed text.
 matrix_closures_snapshot_in_a_tuple_local_keeps_its_text_memory_checks T377 A tuple local holds its snapshot in the frame with the str it captures, so it reads the freed text.
-anti_check_message_doc_numbered_list_with_a_parenthesis T378 The doc warnings read digits and a point alone as an item of a numbered list, so 1) gives no warning.
-anti_check_message_doc_hash_before_a_digit T378 The doc warnings read any # at the start of a line as a heading.
-anti_check_message_doc_digits_before_a_point T378 The doc warnings read digits before a point inside a number as an item of a numbered list.
 anti_check_message_doc_note_on_a_member_alone T379 The doc warnings read the note of an item at module level alone.
 anti_check_message_doc_strong_emphasis T380 The doc warnings read no run of two delimiters as emphasis.
 anti_check_message_doc_type_parameter_of_the_item T381 The doc warnings resolve no type parameter of an item.

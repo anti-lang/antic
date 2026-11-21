@@ -331,6 +331,16 @@ static bool doc_html(const char *line, size_t length, size_t at)
     return i < length && line[i] == '>';
 }
 
+/* Whether the word that opens a line ends at byte at: a heading is a
+   word of `#` alone and an item of a numbered list a word of digits and
+   `.` or `)`, by I of "Answers of 2026-11-19" in docs/decisions.md and
+   T378 of docs/audit/tests-findings.md. Markdown reads `#5` and `3.14`
+   at the start of a line as text. */
+static bool doc_word_ends(const char *line, size_t length, size_t at)
+{
+    return at == length || line[at] == ' ' || line[at] == '\t';
+}
+
 /* One doc comment against the markup subset. Each kind is reported once,
    and the lines of a fenced block are skipped. */
 static void doc_check_text(const struct doc_scope *s,
@@ -383,11 +393,16 @@ static void doc_check_text(const struct doc_scope *s,
         }
         if (lead < end - start) {
             size_t digits = lead;
+            size_t hashes = lead;
             while (digits < end - start && line[digits] >= '0' &&
                    line[digits] <= '9') {
                 digits++;
             }
-            if (!heading && line[lead] == '#') {
+            while (hashes < end - start && line[hashes] == '#') {
+                hashes++;
+            }
+            if (!heading && hashes > lead &&
+                doc_word_ends(line, end - start, hashes)) {
                 doc_markup_warning(s, doc, owner, "a heading");
                 heading = true;
             }
@@ -396,7 +411,8 @@ static void doc_check_text(const struct doc_scope *s,
                 table = true;
             }
             if (!numbered && digits > lead && digits < end - start &&
-                line[digits] == '.') {
+                (line[digits] == '.' || line[digits] == ')') &&
+                doc_word_ends(line, end - start, digits + 1)) {
                 doc_markup_warning(s, doc, owner, "a numbered list");
                 numbered = true;
             }
