@@ -746,6 +746,7 @@ struct leave_scan {
     bool leaves;                    /* a way out of the block, or a use */
     bool in_loop;                   /* inside a loop the scan entered */
     bool in_handler;                /* inside a handler the scan entered */
+    bool in_switch;                 /* inside a switch the scan entered */
 };
 
 static bool leave_stmt(void *data, const struct stmt *s);
@@ -787,8 +788,24 @@ static bool leave_stmt(void *data, const struct stmt *s)
     switch (s->kind) {
     case STMT_RETURN:
     case STMT_FAIL:
-    case STMT_FALLTHROUGH:
         scan->leaves = true;
+        break;
+    case STMT_FALLTHROUGH:
+        /* It goes on to the next arm of its switch, by T386 of
+           docs/audit/tests-findings.md. */
+        scan->leaves = scan->leaves || !scan->in_switch;
+        break;
+    case STMT_SWITCH:
+        if (!scan->in_switch) {
+            struct leave_scan inner = *scan;
+            struct ast_visitor v = {leave_expr, leave_stmt, NULL};
+
+            inner.in_switch = true;
+            v.data = &inner;
+            ast_walk_stmt(&v, s);
+            scan->leaves = scan->leaves || inner.leaves;
+            return false;
+        }
         break;
     case STMT_YIELD:
         scan->leaves = scan->leaves || !scan->in_handler;
@@ -835,12 +852,12 @@ static bool leave_stmt(void *data, const struct stmt *s)
 /* Whether the statement s may leave the block it stands in, or names the
    job sym, which may then be given away before its join. A NULL sym
    names no job. A loop or a handler s holds keeps its own `break`,
-   `continue` and `yield`, and a closure its own `return`. A `return`
-   that joins the job leaves after the join, so its value alone is
-   read. */
+   `continue` and `yield`, a `switch` its own `fallthrough`, and a
+   closure its own `return`. A `return` that joins the job leaves after
+   the join, so its value alone is read. */
 static bool may_leave(const struct stmt *s, const struct symbol *sym)
 {
-    struct leave_scan scan = {sym, false, false, false};
+    struct leave_scan scan = {sym, false, false, false, false};
     struct ast_visitor v = {leave_expr, leave_stmt, NULL};
 
     v.data = &scan;
