@@ -1,0 +1,4 @@
+exit 0
+returned: 5
+outer block: 6
+field: 7

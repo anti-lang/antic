@@ -1,0 +1,41 @@
+//! A job of `dispatch` that its block joins after a `switch` may take the
+//! address of the local. An arm of the `switch` ends with `fallthrough`, which
+//! goes on to the next arm and stays inside the block of the local.
+
+import anti.io;
+import anti.text;
+
+class Counter
+{
+	pub n: int = 0,
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn steps(k: int) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(5);
+	let n = 0;
+	switch k {
+		1 => {
+			n += 1;
+			fallthrough;
+		},
+		2 => n += 10,
+		else => n += 100,
+	}
+	return join(job) + n;
+}
+
+fn main() -> int
+{
+	let s = f"joined after a fallthrough: {steps(1)}";
+	io.println(s);
+	free(s.ptr);
+	return 0;
+}

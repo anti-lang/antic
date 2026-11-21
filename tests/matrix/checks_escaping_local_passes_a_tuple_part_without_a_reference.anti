@@ -1,0 +1,53 @@
+//! E1 gives a name that `let (p, n) = t` takes apart from a tuple local the
+//! reference of the tuple only where the type of the name can hold one. `n` is
+//! an `int`, so it holds no reference to `x`, and each context lets it through:
+//! a `return`, a local of an outer block and a field behind a parameter. Each
+//! context is a function of its own and prints one line.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Holder
+{
+	n: int,
+}
+
+fn returned() -> int
+{
+	let x = 1;
+	let t = (&x, 5);
+	let (p, n) = t;
+	*p += 1;
+	return n;
+}
+
+fn outer() -> int
+{
+	let m = 0;
+	if m == 0 {
+		let x = 2;
+		let t = (&x, 6);
+		let (p, n) = t;
+		*p += 1;
+		m = n;
+	}
+	return m;
+}
+
+fn field(h: *Holder) -> int
+{
+	let x = 3;
+	let t = (&x, 7);
+	let (p, n) = t;
+	*p += 1;
+	h.n = n;
+	return h.n;
+}
+
+fn main() -> int
+{
+	printf("returned: %d\n".ptr, returned());
+	printf("outer block: %d\n".ptr, outer());
+	let h = Holder { n: 0 };
+	printf("field: %d\n".ptr, field(&h));
+	return 0;
+}

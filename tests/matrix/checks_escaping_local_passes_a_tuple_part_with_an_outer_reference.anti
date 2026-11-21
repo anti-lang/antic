@@ -1,0 +1,47 @@
+//! E1 gives a part of a tuple local the reference that part holds. `t` holds a
+//! reference to `x` of the inner block and one to `y` of the outer block. The
+//! second part holds the one to `y`, so it may be stored into `q`, which ends
+//! with `y`. The part is taken apart by `let (a, b) = t` and read as `t.1`.
+//! Each form is a function of its own and prints one line.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn taken_apart() -> int
+{
+	let y = 4;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let t = (&x, &y);
+		let (a, b) = t;
+		*a += 1;
+		q = b;
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}
+
+fn read_as_a_field() -> int
+{
+	let y = 5;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let t = (&x, &y);
+		*t.0 += 1;
+		q = t.1;
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}
+
+fn main() -> int
+{
+	printf("taken apart: %d\n".ptr, taken_apart());
+	printf("read as a field: %d\n".ptr, read_as_a_field());
+	return 0;
+}
