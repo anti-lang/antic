@@ -920,6 +920,17 @@ not re-open a settled decision without asking Eddie.
   ran each sanitizer suite in the six parts of `asan`, the last up to
   test 8014: `asan` 248 s, 181 s, 263 s, 166 s, 122 s and 623 s, `ubsan`
   255 s, 183 s, 263 s, 173 s, 128 s and 635 s.
+  Batch 3ai of the third phase of coverage measured `host` in the same
+  three parts, while other programs of the Mac ran: 512 s, 417 s and
+  585 s before the commit of T373 to T375, up to test 8022, where
+  `fmt_canonical` failed on two new programs and `raw_output` on three C
+  files without `binary_stdio.h`, which passed alone once they stood
+  right, 600 s, 415 s and 571 s before the fix of T374, 597 s, 413 s and
+  556 s before the fix of T373, and 591 s, 413 s and 561 s before the
+  commit of the tests of `lower_sync.c`, up to test 8028. It ran each
+  sanitizer suite in the six parts of `asan`, the last up to test 8026:
+  `asan` 380 s, 272 s, 367 s, 230 s, 172 s and 631 s, `ubsan` 375 s,
+  267 s, 364 s, 235 s, 171 s and 667 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.

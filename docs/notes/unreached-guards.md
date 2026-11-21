@@ -1441,6 +1441,26 @@ length, `check_for` of `src/antic/sema_stmt.c` for a `for` of more than
 two names over a collection, and `enum_value` of `src/antic/lower_check.c`
 for a signed base of no width.
 
+## The sides of batch 3ai
+
+Batch 3ai of the third phase read the classification of the C convention
+in `src/antic/abi.c` against clang, the members of a layout in
+`src/antic/layout.c` and the lowering of locks, channels and `select` in
+`src/antic/lower_sync.c`. It fixed T373 in `src/antic/abi.c` and
+`src/antic/layout.c`, and T374 in `src/antic/abi.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `sysv_words` of `src/antic/abi.c` | A vector member whose lower eightbyte is neither the one classed nor the one before it. | A vector of 16 bytes aligns to 16, so in an aggregate of at most 16 bytes it starts at offset 0. |
+| `load_handle` and `received_element` of `src/antic/lower_sync.c` | A channel that an operation or an arm of `select` reaches through a pointer. | `channel_of` of `src/antic/sema_thread.c` and `check_select` of `src/antic/sema_stmt.c` take a channel alone, and `types_is_chan` refuses a pointer to one. |
+| `lower_select` of `src/antic/lower_sync.c` | An arm that the comparisons reach after the block ended. | Each arm before the last branches to the next block, so the block of every arm exists when the loop reaches it. |
+
+The sides left unsorted, which a test can reach: `sysv_words` of
+`src/antic/abi.c` for a union of a vector and floats in its upper
+eightbyte, which stays two words, and `object_lock_of` of
+`src/antic/lower_sync.c` for `sync a, b` of two synchronized objects
+that are locals and not pointers.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
