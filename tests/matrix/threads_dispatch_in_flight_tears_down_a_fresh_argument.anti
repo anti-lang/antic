@@ -1,0 +1,61 @@
+//! A `dispatch` of an object that is in flight gives a job whose handle is
+//! `none`, and no worker runs for it. A fresh value it took at a parameter that
+//! is not `own` has no owner but that job all the same, so it is torn down
+//! once. The program runs with --anti.threads=1, so the first job is in flight
+//! until it is joined. The line prints what the two jobs give and the cells
+//! alive after both joins.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell
+{
+	pub v: int = 0,
+
+	pub static atomic live: int = 0;
+
+	fn construct(self)
+	{
+		Cell.live.add(1);
+	}
+
+	fn destruct(self)
+	{
+		Cell.live.sub(1);
+	}
+}
+
+class Box
+{
+	pub own p: *Cell,
+}
+
+class Runner
+{
+	pub n: int = 0,
+}
+
+worker fn read(r: *Runner, b: Box) -> int
+{
+	return b.p.v + r.n;
+}
+
+fn fresh(r: *Runner)
+{
+	let first = dispatch r -> read(Box { p: alloc Cell { v: 1 } });
+	let second = dispatch r -> read(Box { p: alloc Cell { v: 2 } });
+	let a = join(first);
+	let b = join(second);
+	printf("a fresh argument: %d %d, alive %d\n".ptr, a as c_int, b as c_int,
+		Cell.live.load() as c_int);
+}
+
+fn main() -> int
+{
+	let r = alloc Runner { n: 1 };
+	fresh(r);
+	free(r);
+	printf("at the end: alive %d\n".ptr, Cell.live.load() as c_int);
+	return 0;
+}
