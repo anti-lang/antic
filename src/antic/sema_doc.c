@@ -493,6 +493,25 @@ static void doc_check_item(struct doc_scope *s, const struct item *it)
     s->item = outer;
 }
 
+/* A `pub` item with a `//#` note and no `///` comment, the item of a
+   class body among them, as --warn-undocumented reads them, by T379 of
+   docs/audit/tests-findings.md. */
+static void doc_check_note_only(const struct doc_scope *s,
+                                const struct item *it)
+{
+    size_t i;
+
+    if (it->pub && it->note.length > 0 && it->doc.length == 0) {
+        diagnostics_doc(s->diags, NAME_DOC_NOTE_ONLY, it->name_pos.line,
+                        it->name_pos.column, "the pub item `%.*s` has a `//#` note and no "
+                        "`///` comment", (int)it->name.length,
+                        it->name.text);
+    }
+    for (i = 0; i < it->member_count; i++) {
+        doc_check_note_only(s, it->members[i]);
+    }
+}
+
 /* DESIGN: --warn-undocumented reports every `pub` item without a `///`
    comment, the item of a class body among them. An item the compiler
    wrote, such as the `get` of a singleton or a function of a `tests`
@@ -537,13 +556,7 @@ void sema_doc_warnings(const struct module *module,
         doc_check_item(&scope, module->items[i]);
     }
     for (i = 0; i < module->item_count; i++) {
-        const struct item *it = module->items[i];
-        if (it->pub && it->note.length > 0 && it->doc.length == 0) {
-            diagnostics_doc(in->diags, NAME_DOC_NOTE_ONLY, it->name_pos.line,
-                            it->name_pos.column, "the pub item `%.*s` has a `//#` note and no "
-                            "`///` comment", (int)it->name.length,
-                            it->name.text);
-        }
+        doc_check_note_only(&scope, module->items[i]);
     }
     if (undocumented) {
         for (i = 0; i < module->item_count; i++) {
