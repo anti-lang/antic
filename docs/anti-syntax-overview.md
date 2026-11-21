@@ -1478,7 +1478,7 @@ fn main() -> int
 42
 ```
 
-Worker parameters are pointer-free. The table pointer and `own` fields do not count. A worker cannot `delete` an object, which another worker may hold. A `worker fn` that may fail is called directly with a handler, and `parallel` and `dispatch` refuse it. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
+Worker parameters are pointer-free. The table pointer and `own` fields do not count. A `dispatch` that passes a value that owns something and lives on in the caller to a parameter that is not `own` gives the job a `dup` of it, which the job tears down once the worker has returned. A worker cannot `delete` an object, which another worker may hold. A `worker fn` that may fail is called directly with a handler, and `parallel` and `dispatch` refuse it. `[]Circle` chunks like any array, `[]*Shape` is refused and points at `dispatch`. `--anti.threads` and the key `threads` of the configuration file set the pool size.
 
 `sync m { }` holds a `Mutex` for its block and unlocks it on every exit. A `sync` on a `Mutex` that its thread holds already is refused where the checker sees it, and stops a dev build otherwise. `chan T` is a bounded queue of pointer-free values, and `select` waits on more than one channel, written like `switch` over them.
 
