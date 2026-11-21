@@ -1019,8 +1019,12 @@ static void walk_let(struct escape_walk *w, const struct stmt *s)
             continue;
         }
         at = declare(w, s->as.let.names[i].symbol, w->depth, w->ends);
-        w->locals[at].refers = index_of(w, root_of(w, part));
-        w->locals[at].reaches = index_of(w, reached_param(w, part));
+        /* A name whose type holds no reference holds none of the
+           value, by T384 of docs/audit/tests-findings.md. */
+        if (carries(s->as.let.names[i].symbol->type)) {
+            w->locals[at].refers = index_of(w, root_of(w, part));
+            w->locals[at].reaches = index_of(w, reached_param(w, part));
+        }
     }
 }
 

@@ -22,9 +22,6 @@ no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text a
 matrix_threads_dispatch_keeps_an_argument_with_an_own_field_dev T382 A job reads the `own` field of a local argument that the caller tore down before the job ran.
 matrix_threads_dispatch_keeps_an_argument_with_an_own_field_release T382 A job reads the `own` field of a local argument that the caller tore down before the job ran.
 matrix_threads_dispatch_keeps_an_argument_with_an_own_field_memory_checks T382 A job reads the `own` field of a local argument that the caller tore down before the job ran.
-matrix_checks_escaping_local_passes_a_tuple_part_without_a_reference_dev T384 E1 refuses an `int` that `let (p, n) = t` takes from a tuple local that holds a reference.
-matrix_checks_escaping_local_passes_a_tuple_part_without_a_reference_release T384 E1 refuses an `int` that `let (p, n) = t` takes from a tuple local that holds a reference.
-matrix_checks_escaping_local_passes_a_tuple_part_without_a_reference_memory_checks T384 E1 refuses an `int` that `let (p, n) = t` takes from a tuple local that holds a reference.
 matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_dev T385 E1 gives every part of a tuple local the deepest reference the tuple holds.
 matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_release T385 E1 gives every part of a tuple local the deepest reference the tuple holds.
 matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_checks T385 E1 gives every part of a tuple local the deepest reference the tuple holds.
