@@ -1,0 +1,15 @@
+//! Each local of the frame fits the limit of 2^31 bytes, and their sum does
+//! not, so the frame is a compile error: the LLVM text checks each sum against
+//! the limit before it makes it.
+
+fn first(a: *[1500000000]u8, b: *[1500000000]u8) -> int
+{
+	return (*a)[0] as int + (*b)[0] as int;
+}
+
+fn main() -> int
+{
+	let a: [1500000000]u8 = [0; 1500000000];
+	let b: [1500000000]u8 = [0; 1500000000];
+	return first(&a, &b);
+}

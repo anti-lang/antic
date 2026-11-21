@@ -340,6 +340,13 @@ anti_message(fault_check_directory_unread
     ARGS symbols check --conf conf.toml
     ERR "anti: cannot read ."
     OUT "missing the program: . holds no program of Anti")
+# The configuration, which files_read_file of files.c reads, fails at its
+# first read.
+anti_message(fault_check_configuration_unread
+    FILES conf.toml "[runtime]\nthreads = 2\n"
+    FAULT read:1:EIO
+    ARGS symbols check --conf conf.toml
+    ERR "anti: cannot read conf.toml")
 anti_message(fault_inventory_archive_not_written
     FILES conf.toml "[runtime]\nthreads = 2\n"
     FAULT write:1:ENOSPC

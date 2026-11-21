@@ -220,6 +220,14 @@ anti_message(project_cached_library_imports_unread STATUS 0
     OUT "ok com.example.twice.doubles"
         "anti test: 1 tests in 1 modules, 0 modules failed"
     ARGS test --runtime "${RUNTIME}")
+# The library directory of a second run, which files_remove_tree of
+# files.c empties first: the removal of a library file of the first run,
+# and the directory, which then still holds the others.
+anti_message(project_library_file_not_removed
+    SETUP write_project_and_run
+    FAULT remove:1:EACCES
+    ARGS test --runtime "${RUNTIME}"
+    ERR "anti: cannot replace build/tests/lib")
 # The object of the module, compile_object of test.c: the directory of its
 # cache, the library files it imports and the key beside it.
 anti_message(project_object_cache_not_made

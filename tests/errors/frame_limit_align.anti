@@ -1,0 +1,15 @@
+//! The array leaves the frame a few bytes below the limit of 2^31 bytes, and
+//! the alignment of the `u64` after it takes the start of its slot past the
+//! limit, so the frame is a compile error.
+
+fn first(a: *[2147483595]u8, b: *u64) -> int
+{
+	return (*a)[0] as int + *b as int;
+}
+
+fn main() -> int
+{
+	let a: [2147483595]u8 = [0; 2147483595];
+	let b: u64 = 1;
+	return first(&a, &b);
+}

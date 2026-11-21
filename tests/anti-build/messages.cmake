@@ -1036,6 +1036,25 @@ anti_message(fault_program_not_replaced
     FAULT rename:1:EACCES
     ARGS build ${tools}
     ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
+# The close of the copy, which flushes its last bytes, and the stat of the
+# program whose permissions the copy takes, files_copy_program of files.c.
+# The lock, which files_write of files.c writes, flushes its bytes at the
+# second close of the run.
+anti_message(fault_lock_not_closed
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT close:2:ENOSPC
+    ARGS build ${tools}
+    ERR "anti: cannot write ./anti.lock")
+anti_message(fault_program_not_closed
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT close:28:ENOSPC
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
+anti_message(fault_program_permissions_unread
+    FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
+    FAULT stat:22:EACCES
+    ARGS build ${tools}
+    ERR "anti: cannot write ./dist/${HOST}/dev/app${EXE}")
 anti_message(fault_sources_unread
     FILES anti.toml "${manifest_package}" ${app_source} "${app_text}"
     FAULT open:37:EACCES

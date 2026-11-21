@@ -1,0 +1,14 @@
+//! Two locals of 2^31 bytes in one frame give one message: the first ends the
+//! function, and the second adds nothing to the frame.
+
+fn first(a: *[2147483648]u8, b: *[2147483648]u8) -> int
+{
+	return (*a)[0] as int + (*b)[0] as int;
+}
+
+fn main() -> int
+{
+	let a: [2147483648]u8 = [0; 2147483648];
+	let b: [2147483648]u8 = [0; 2147483648];
+	return first(&a, &b);
+}

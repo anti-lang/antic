@@ -141,6 +141,8 @@ static void walk_links(void)
     touch(TREE "/src/a.anti");
     CHECK(symlink("..", TREE "/src/up") == 0);
     CHECK(symlink("a.anti", TREE "/src/b.anti") == 0);
+    /* A link that leads nowhere names no file. */
+    CHECK(symlink("absent.anti", TREE "/src/c.anti") == 0);
     CHECK(files_list_tree(TREE, ".anti", &found));
     CHECK(found.count == 2);
     if (found.count == 2) {
@@ -446,14 +448,48 @@ static void base_names(void)
     CHECK_STR(files_base_name("a/b/c.anti"), "c.anti");
     CHECK_STR(files_base_name("a\\b\\c.anti"), "c.anti");
     CHECK_STR(files_base_name("a\\b/c.anti"), "c.anti");
+    CHECK_STR(files_base_name("a/b\\c.anti"), "c.anti");
     CHECK_STR(files_base_name("c.anti"), "c.anti");
     CHECK_STR(files_base_name("a/"), "");
+}
+
+/* files_cut_suffix takes the suffix off a text that ends with it alone,
+   and an empty suffix takes nothing off. */
+static void cut_suffixes(void)
+{
+    struct text t = {0};
+
+    text_append(&t, "app.bin");
+    files_cut_suffix(&t, ".bin");
+    CHECK_STR(text_cstr(&t), "app");
+    files_cut_suffix(&t, ".bin");
+    CHECK_STR(text_cstr(&t), "app");
+    files_cut_suffix(&t, "");
+    CHECK_STR(text_cstr(&t), "app");
+    files_cut_suffix(&t, "longer than app");
+    CHECK_STR(text_cstr(&t), "app");
+    text_free(&t);
+}
+
+/* A request for elements of no bytes is never one for no memory, so the
+   helpers give memory and do not take the NULL that calloc and realloc
+   may answer for it as a failure. */
+static void no_bytes(void)
+{
+    void *items = files_array(4, 0);
+
+    CHECK(items != NULL);
+    items = files_resize(items, 8, 0);
+    CHECK(items != NULL);
+    free(items);
 }
 
 void test_files(void)
 {
     grow_array();
+    no_bytes();
     base_names();
+    cut_suffixes();
     read_whole();
     read_error();
     write_errors();
