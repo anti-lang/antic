@@ -1516,6 +1516,34 @@ function of a `fixtures` block after `setup` or `teardown`, and a source
 that does not parse in `anti check`, whose front end class ends the run
 before the class of the doc blocks reads the outline.
 
+## The sides of batch 3al
+
+Batch 3al of the third phase read the LLVM text of a function and its
+instructions in `src/antic/llvm_emit_function.c` against the two entries
+on frames of `2^31` bytes under "Compiler behaviour" in
+`docs/decisions.md` and the DESIGN comments of the file, and the file
+helpers of `anti` in `src/anti/files.c` against the DESIGN comments of
+the file and the rules of its callers.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `scalar_type`, `llvm_emit_operand` and `llvm_emit_effects` of `src/antic/llvm_emit_function.c` | A value outside `enum ir_type`, `enum ir_operand_kind` or `enum ir_effects`, and an operand of kind `IR_NONE`, `IR_BLOCK` or `IR_SYM` where a value stands. | Each switch names every kind of its enum, the IR holds no other, and lowering writes a block or a symbolic value where an instruction takes one alone. |
+| `llvm_emit_frame_add` of `src/antic/llvm_emit_function.c` | An alignment of 0 and one above the limit of the frame. | Layout gives every type an alignment of 1 or more, and `align(N)` takes at most 4096. |
+| `conversion` of `src/antic/llvm_emit_function.c` | A type with no LLVM value type, and `as f16` of a constant. | A conversion takes and gives a scalar, and `fold_conversion` of `src/antic/optimize.c` folds every conversion of a constant, in both modes. |
+| `load_store`, `ptradd`, `memcopy`, `bits`, `vsplat`, `vbinary`, `flag_operation`, `overflow_operation`, `wide_product`, `saturating`, `vunary`, `vshuffle`, `vselect`, `vreduce` and `instruction` of `src/antic/llvm_emit_function.c` | An operand that failed, and a type, a unit or a lane with no LLVM value type. | `llvm_emit_operand` fails for an operand kind that no instruction holds, and a scalar, a bitfield unit, a lane and every temporary have a value type. |
+| `flag_read` and `branch_overflow` of `src/antic/llvm_emit_function.c` | A flag apart from its flag operation or past `negative`, and a `branchov` apart from its overflow operation. | Lowering writes each read of a flag and each `branchov` right after its operation, and reads the four flags of `anti.lang.Flags` alone. |
+| `type_suffix` of `src/antic/llvm_emit_function.c` | An intrinsic of a fold of `f64` lanes. | `vreduce` takes the halving fold for float lanes, and only the unit test `vector_rest` hands it an intrinsic of `f32` lanes. |
+| `vunary` of `src/antic/llvm_emit_function.c` | A negation of integer lanes through `fneg`. | `lower_simd_unary` of `src/antic/lower_simd.c` writes `IR_FNEG` for float lanes alone and `IR_NEG` for integer lanes. |
+| `llvm_emit_definition` of `src/antic/llvm_emit_function.c` | A signature that fails, a frame that the temporaries take past the limit and a temporary with no LLVM value type. | `llvm_emit_signature` of `src/antic/llvm_emit_call.c` fails through the frame alone, and its slots, the first of the frame, hold coerced aggregates of 16 bytes at most. A temporary holds a scalar, and the slots of the locals follow the temporaries. |
+| `files_remove_tree` of `src/anti/files.c` | A directory removed after the removal of an entry of it failed. | A directory that still holds the entry cannot be removed. |
+| `files_copy_which` of `src/anti/files.c` | A close of the copy that fails after a write that failed. | A run of a test makes one call of the system fail, so the write and the close never both fail. |
+
+The sides left unsorted, which a test can reach or no probe of the batch
+reached. In `files_make_dirs` and `files_make_dirs_or_say` of
+`src/anti/files.c` a backslash as a separator and a colon before one,
+which no path that the suite hands `anti` holds. In `files_array` of
+the same file a count of 0, which no caller in the suite passes.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
