@@ -1,0 +1,37 @@
+//! A `join` in an argument of a call after `?.` may not run, so it joins the
+//! job of `dispatch` on no path that E1 can prove, and the address of the local
+//! that the job takes is refused.
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn add(self, k: int) -> *Counter
+	{
+		self.n += k;
+		return self;
+	}
+}
+
+worker fn bump(c: *Counter, by: int) -> int
+{
+	c.n += by;
+	return c.n;
+}
+
+fn later(maybe: ?*Counter) -> int
+{
+	let c = Counter { };
+	let job = dispatch &c -> bump(5);
+	let r = maybe?.add(join(job));
+	let m = r else {
+		return 0;
+	};
+	return m.n;
+}
+
+fn main() -> int
+{
+	let d = Counter { };
+	return later(&d) - 5;
+}

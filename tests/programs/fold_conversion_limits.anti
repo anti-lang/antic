@@ -1,0 +1,23 @@
+//! The conversions of a float to an integer that antic's optimizer leaves to
+//! the back end. Each operand is a constant once the copies of the locals are
+//! propagated, and a constant out of the range of the type, below it or above
+//! it, or NaN, has no value of the IR, so the fold skips it. Release mode then
+//! gives the defined results: a value out of range saturates and NaN gives 0.
+//! It returns the number of results that differ from those, and exits with 0.
+
+fn main() -> int
+{
+	let wrong = 0;
+	let low: f64 = -3.0e9;
+	let high: f64 = 3.0e9;
+	let nan: f64 = 0.0 / 0.0;
+	if low as i32 != -2147483647 - 1 { wrong += 1; }
+	if high as i32 != 2147483647 { wrong += 1; }
+	if nan as i32 != 0 { wrong += 1; }
+	if low as u32 != 0 { wrong += 1; }
+	if nan as u32 != 0 { wrong += 1; }
+	let tiny: f32 = -1.0e30;
+	if tiny as i64 != -9223372036854775807 - 1 { wrong += 1; }
+	if tiny as u8 != 0 { wrong += 1; }
+	return wrong;
+}
