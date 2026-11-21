@@ -1386,7 +1386,8 @@ static void coerced(void)
    docs/work-order-llvm-optimization.md as attributes. noundef stands on a
    scalar parameter and result and never on a coerced aggregate, whose
    padding is undefined. A `*T` is nonnull dereferenceable(N), an own
-   pointer noalias, and the result of a function that allocates noalias.
+   pointer is not noalias, by T366 of docs/audit/tests-findings.md, and
+   the result of a function that allocates is noalias.
    A result of 8 or 16 bits extends on every definition, and on a
    declaration of C where its convention extends it: System V x86_64 and
    Apple arm64. */
@@ -1421,7 +1422,7 @@ static void param_attributes(void)
     CHECK(run(&x, TARGET_MACOS_ARM64));
     CHECK(holds(&x, "define internal noundef signext i8 @main.f("
                     "ptr noundef nonnull dereferenceable(16) %p0, "
-                    "ptr noalias noundef nonnull %p1, [2 x i64] %p2.0, "
+                    "ptr noundef nonnull %p1, [2 x i64] %p2.0, "
                     "i64 noundef %p3) #0 {\n"));
     CHECK(holds(&x, "declare noalias noundef ptr @anti_rt_copy_buffer("
                     "ptr noundef, i64 noundef) #1\n"));

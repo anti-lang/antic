@@ -436,10 +436,10 @@ define hidden void @owners.brighten(ptr noundef nonnull dereferenceable(56) %p0,
 ...
 define hidden noundef i64 @owners.sum(i64 %p0.0, i64 %p0.1) #0 {
 ...
-define hidden void @owners.drop(ptr noalias noundef nonnull dereferenceable(56) %p0) #0 {
+define hidden void @owners.drop(ptr noundef nonnull dereferenceable(56) %p0) #0 {
 ```
 
-`brighten` takes a `lent *Sprite` and `drop` an `own *Sprite`, since a function deletes only what it received as `own`. Both parameters are the same `ptr`. The `own` of `drop` adds `noalias`, since the function took the object over and no other pointer of it reaches the object. The `lent []byte` of `sum` is the two words of every slice, the address in `%p0.0` and the length in `%p0.1`.
+`brighten` takes a `lent *Sprite` and `drop` an `own *Sprite`, since a function deletes only what it received as `own`. Both parameters are the same `ptr` with the same facts. The `own` of `drop` adds no `noalias`, since a plain pointer may reach the object that the function took over. The `lent []byte` of `sum` is the two words of every slice, the address in `%p0.0` and the length in `%p0.1`.
 
 `own` reaches the code through two functions that antic writes for every class: a teardown named `<Class>.destroy` and a copy named `<Class>.copy`. The table of the class holds both. `delete(s)` is one call, `anti_rt_delete(s, descriptor)`. The runtime reads the teardown from the table of the object and calls it, then frees the object.
 
@@ -1932,14 +1932,14 @@ define hidden void @calls.grow(ptr noundef nonnull dereferenceable(24) %p0) #0 {
 ...
 define hidden noundef i64 @calls.consume(ptr byval([24 x i8]) align 8 %p0) #0 {
 ...
-define hidden void @calls.end(ptr noalias noundef nonnull dereferenceable(24) %p0) #0 {
+define hidden void @calls.end(ptr noundef nonnull dereferenceable(24) %p0) #0 {
 ...
 define hidden void @calls.larger(ptr sret([24 x i8]) align 8 %sret, ptr byval([24 x i8]) align 8 %p0, ptr byval([24 x i8]) align 8 %p1) #0 {
 ```
 
 - `look` and `consume` receive a `Box` by value. A value of 24 bytes passes in the memory of the stack on linux-x86_64, which `byval` says. The plain parameter and the `own` one have the same type.
 - `bump` and `grow` receive a pointer. `nonnull` and `dereferenceable(24)` come from the type `*Box`, and `lent` adds nothing.
-- `end` receives an `own` pointer, which is `noalias`: the optimizer may assume that no other pointer of the function reaches the object.
+- `end` receives an `own` pointer, with the facts of a `*Box`. It is not `noalias`, since a plain pointer may reach the same object while the call runs.
 - `larger` returns a `Box` through the pointer `%sret`, which the caller passes.
 
 A class value of 16 bytes passes in two registers. On arm64 a value above 16 bytes passes as a pointer to a copy that the caller makes with a `memcpy` before the call.

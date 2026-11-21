@@ -212,7 +212,7 @@ define hidden noundef i64 @decl.width(ptr byval([40 x i8]) align 8 %p0) #0 {
 ...
 define hidden noundef i64 @decl.first(i64 %p0.0, i64 %p0.1) #0 {
 ...
-define hidden noundef i64 @decl.consume(ptr noalias noundef nonnull dereferenceable(16) %p0) #0 {
+define hidden noundef i64 @decl.consume(ptr noundef nonnull dereferenceable(16) %p0) #0 {
 ...
 define internal noundef i64 @twice(i64 noundef %p0) #0 {
 ...
@@ -224,7 +224,7 @@ define hidden noundef i64 @decl.main() noinline #0 {
 - `widen` takes a pointer. A `*Box` is never `none` and points at 40 bytes, which `nonnull dereferenceable(40)` tells the optimizer.
 - `width` takes a `Box` by value. `byval([40 x i8])` is a copy of 40 bytes that the caller puts on the stack.
 - `first` takes its slice as two words, the pointer and the length.
-- `consume` takes an `own` pointer, which is `noalias`: no other pointer of the callee reaches the object.
+- `consume` takes an `own` pointer, which carries the same facts as a `*Box`. It is not `noalias`, since a plain pointer of the caller may reach the same object.
 - `twice` is the `export fn`, under its plain name. A program of Linux that links musl statically and no object of C makes the symbol `internal`, kept by `llvm.used`, so that it takes the place of no function of the C library.
 - `main` is `noinline`, so that the runtime finds it as a function.
 

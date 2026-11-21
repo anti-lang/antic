@@ -104,9 +104,9 @@ rules, and the tests named there pin each fact.
   pointer, and `!invariant.load` on a slot. A call through the table of a
   known object then becomes a direct call or inlines.
 - The parameter facts: `noundef`, `nonnull` and `dereferenceable(N)` of a
-  `*T`, `noalias` of an `own` pointer and of an allocation, `signext` and
-  `zeroext` of a narrow integer, and `range()` on a result of a `bool` or an
-  enum.
+  `*T`, `noalias` of an allocation, `signext` and `zeroext` of a narrow
+  integer, and `range()` on a result of a `bool` or an enum. An `own`
+  pointer is not `noalias`, by 2 of "Answers of 2026-11-21".
 - The facts of arithmetic and addresses: `nsw` and `nuw` where the value
   rules make them hold, `getelementptr inbounds` on a field, `!range` on a
   load of a `bool`, an enum or a tag, and `llvm.lifetime` around the slot of

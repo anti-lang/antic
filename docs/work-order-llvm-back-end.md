@@ -569,9 +569,11 @@ Parameter and return attributes:
 - `nonnull` and `dereferenceable(N)` on a `ptr` parameter whose Anti type
   is a non-optional reference, with N the folded size of the referenced
   type. The checker guarantees both.
-- `noalias` on a parameter of an `own` pointer. The owner is the only
-  holder by the rules of the language. No other access to the object
-  overlaps the call.
+- No `noalias` on a parameter of an `own` pointer, by 2 of "Answers of
+  2026-11-21" in `docs/decisions.md`. A plain pointer may reach the
+  object that the parameter takes over while the call runs, so the owner
+  is not the only holder. T366 of `docs/audit/tests-findings.md` found a
+  write through such a pointer lost in a release build.
 - `noalias` on the result of the allocation functions of the runtime,
   which return fresh memory.
 - `signext` or `zeroext` on `i8` and `i16` parameters and results, from

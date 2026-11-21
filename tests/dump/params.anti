@@ -1,7 +1,7 @@
 //! One function for each fact of a parameter and a result that the LLVM text
 //! writes. A `*T` is `nonnull dereferenceable(N)`, and a `?*T` takes none of
-//! the facts of a pointer. An `own` pointer is `noalias`, and so is the result
-//! of `anti_rt_mem_alloc`. A result of 8 or 16 bits is `signext` or `zeroext`,
+//! the facts of a pointer. An `own` pointer is not `noalias`, but the result of
+//! `anti_rt_mem_alloc` is. A result of 8 or 16 bits is `signext` or `zeroext`,
 //! and every scalar is `noundef`. A struct with padding, passed in words, takes
 //! no `noundef`.
 

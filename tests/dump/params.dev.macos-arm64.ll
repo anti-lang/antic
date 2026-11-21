@@ -69,7 +69,7 @@ b4:
   ret i64 %v26
 }
 
-define hidden noundef i64 @params.take(ptr noalias noundef nonnull dereferenceable(16) %p0) #0 {
+define hidden noundef i64 @params.take(ptr noundef nonnull dereferenceable(16) %p0) #0 {
 b0:
   %t0 = alloca ptr, align 8
   %t1 = alloca ptr, align 8

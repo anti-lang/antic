@@ -116,11 +116,14 @@ static const char *extension(enum ir_type type, enum ir_ext ext)
 
 /* DESIGN: the facts of a parameter as attributes, as "Parameters and
    results" in docs/work-order-llvm-optimization.md gives them. A scalar
-   is noundef, an own pointer noalias, and a `*T` nonnull and
-   dereferenceable for the size of T where that size is not zero. A
-   coerced aggregate, a vector and a parameter in memory take none of
-   them: the words of an aggregate may hold its padding, whose bytes are
-   undefined, and clang leaves them out as well. */
+   is noundef, and a `*T` nonnull and dereferenceable for the size of T
+   where that size is not zero. An own pointer is not noalias, by 2 of
+   "Answers of 2026-11-21" in docs/decisions.md: a plain pointer may
+   reach the object while the call runs, so the owner is not the only
+   holder, T366 of docs/audit/tests-findings.md. A coerced aggregate, a
+   vector and a parameter in memory take none of them: the words of an
+   aggregate may hold its padding, whose bytes are undefined, and clang
+   leaves them out as well. */
 static void param_facts(struct emitter *e, const struct ir_param *param,
                         const struct abi_param *p, struct text *head)
 {
@@ -129,7 +132,6 @@ static void param_facts(struct emitter *e, const struct ir_param *param,
     if (p->kind != ABI_DIRECT) {
         return;
     }
-    text_append(head, param->own ? " noalias" : "");
     text_append(head, " noundef");
     text_append(head, param->nonnull ? " nonnull" : "");
     if (param->deref_size != IR_NO_INDEX &&
