@@ -3622,7 +3622,8 @@ Eddie took these decisions on 2026-11-20. Items 1 to 4 answer the four questions
 - 5, T347. `reflect.call` passes on the error of a function that may fail, through a trampoline that passes the out pointer and reads the error. This replaces the refusal with `NOT_CARRIED`, and the entry under "Object model" changes with it.
 - 6, T348. `reflect.set` of an `own` field and `reflect.call` of a function with an `own` parameter stay refused with `NOT_CARRIED`. The entry under "Object model" loses its `[provisional]` tag.
 - 7. The structural hash of an interface names `c_long`, `c_ulong`, `c_wchar` and an enum in the signature of an entry, an enum by its qualified name. Each interface with such an entry gets a new chain, and a swap of one enum for another of the same width changes it.
-- [provisional] Item 3 gives the copy the C name for the header alone. A module that uses a copy whose C name a library file gave keeps the symbols of its generic. Its own `export type` of the copy takes the name in place of the one the file gave. Reason: the module of the `type` defines the symbols of the C name, by the entry on the symbols of a named copy. A module that defined them as well would give the link two definitions of each.
+- Item 3 gives the copy the C name for the header and for its symbols. A module uses a copy whose C name a library file gave. It refers to the symbols that the module of the `type` defines, as to a copy that a library file holds. The program then holds one copy. This replaces the provisional line of the same item, by 3 of "Answers of 2026-11-21".
+- [provisional] A library file names a copy, and the module's own `export type` names it as well. The module takes its own name in place of the one the file gave, and defines the symbols of that name. That program holds two copies. Reason: a copy has one name in C, and the header of the module writes the name the module gives it.
 
 ## Answers of 2026-11-21
 

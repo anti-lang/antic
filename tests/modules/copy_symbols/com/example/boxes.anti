@@ -1,0 +1,29 @@
+//! A generic box of a library module, the copy of it that an `export type`
+//! names, and a function that makes one.
+
+import anti.lang;
+
+/// Up to eight values and their count.
+pub class Box<T>
+{
+	pub items: [8]T,
+	pub count: c_int = 0,
+
+	/// Put a value in.
+	pub fn add(self, value: T)
+	{
+		self.items[self.count as int] = dup(value);
+		self.count = self.count + 1;
+	}
+}
+
+/// The box of `c_int` that C uses.
+export type Ints = Box<c_int>;
+
+/// A box that holds 5, as an object.
+pub fn made() -> *Object
+{
+	let b = alloc Ints { items: [0; 8] };
+	b.add(5);
+	return b;
+}

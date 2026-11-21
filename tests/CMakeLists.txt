@@ -4125,6 +4125,15 @@ antic_modules_test(copy_defaults
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/copy_defaults")
 
+# 3 of "Answers of 2026-11-21" in docs/decisions.md. The client refers to
+# the symbols of the copy that the library names with `export type`, so an
+# object the library made is an object of the same copy there.
+antic_modules_test(copy_symbols
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/copy_symbols"
+    LIBRARIES boxes
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/copy_symbols")
+
 # A class of a library module built with arguments under the name of its
 # module, `built.Built(4)` and `alloc built.Built(5)`. T030 of
 # docs/audit/tests-findings.md.

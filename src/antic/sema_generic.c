@@ -655,6 +655,7 @@ void sema_resolve_generics(struct checker *c)
         if (t->c_name.length == 0 || t->c_name_read) {
             t->c_name = it->name;
             t->c_name_read = false;
+            t->c_name_home = NULL;
             t->item_exported = true;
         }
     }

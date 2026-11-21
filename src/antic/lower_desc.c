@@ -285,7 +285,7 @@ struct ir_global *lower_class_global(struct lowerer *l, const struct type *t,
        LOWER_WRITTEN. */
     if (t->item_exported && t->kind == TYPE_CLASS &&
         (strcmp(suffix, "table") == 0 || strcmp(suffix, "descriptor") == 0)) {
-        struct name c = types_symbol_c_name(t);
+        struct name c = types_c_name(t);
         text_appendf(&name, "anti_%.*s_%s", (int)c.length, c.text,
                      strcmp(suffix, "table") == 0 ? "vtable" : "descriptor");
     } else if (t->item_exported && t->kind == TYPE_CLASS &&

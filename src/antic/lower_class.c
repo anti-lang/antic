@@ -59,8 +59,8 @@ void lower_init_name(const struct type *t, bool exported, struct text *out)
 {
     if (exported) {
         text_appendf(out, "anti_%.*s_init",
-                     (int)types_symbol_c_name(t).length,
-                     types_symbol_c_name(t).text);
+                     (int)types_c_name(t).length,
+                     types_c_name(t).text);
         return;
     }
     lower_class_part(out, t, "init");
@@ -307,8 +307,8 @@ void lower_class_construct(struct lowerer *l, const struct item *it)
     sig = m->symbol->type;
     target = lower_callee_function(l, m->symbol);
     text_appendf(&name, "anti_%.*s_construct",
-                 (int)types_symbol_c_name(t).length,
-                 types_symbol_c_name(t).text);
+                 (int)types_c_name(t).length,
+                 types_c_name(t).text);
     f = ir_function_add(l->m, l->module_name, text_cstr(&name),
                         lower_ir_type_of(sig->result), IR_NO_AGG);
     text_free(&name);

@@ -1,0 +1,20 @@
+//! The client of the boxes library. An object the library made of the copy it
+//! names with `export type` is an object of the same copy here, since the
+//! program holds one copy.
+
+import anti.lang;
+import com.example.boxes;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let o = boxes.made();
+	printf("is %d\n".ptr, (o is *boxes.Box<c_int>) as c_int);
+	if let b = o as ?*boxes.Box<c_int> {
+		b.add(6);
+		printf("count %d\n".ptr, b.count);
+	}
+	delete(o);
+	return 0;
+}

@@ -1321,6 +1321,17 @@ static bool known_copy(struct lowerer *l, const struct item *it)
         return false;
     }
     t = it->symbol->type;
+    /* The descriptor of an export class has the C name, under the module
+       of the class, as lower_class_global names it. */
+    if (it->kind == ITEM_CLASS && t->item_exported) {
+        struct name c = types_c_name(t);
+        char *module = lower_cstr(&t->module);
+        text_appendf(&name, "anti_%.*s_descriptor", (int)c.length, c.text);
+        g = lower_find_global(l->m, module, text_cstr(&name));
+        free(module);
+        text_free(&name);
+        return g != NULL && g->index < l->first_global && !g->is_extern;
+    }
     if (it->kind == ITEM_CLASS) {
         lower_class_part(&name, t, "descriptor");
     } else {

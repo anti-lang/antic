@@ -467,12 +467,15 @@ static struct item *type_item(struct copies *k, struct type *copy)
     made->type_param_count = 0;
     /* A copy stands in no interface: each module that uses the generic
        makes its own. One that an `export type` names is an export class
-       to C, which the module of that `type` defines. */
+       to C, which the module of that `type` defines. A module that uses
+       a copy whose C name a library file gave refers to the symbols of
+       that module, as to a copy that a library file holds, by 3 of
+       "Answers of 2026-11-21" in docs/decisions.md. */
     made->pub = false;
     made->vis = VIS_PRIVATE;
-    made->exported = copy->c_name.length > 0 && !copy->c_name_read;
+    made->exported = copy->c_name.length > 0;
     if (made->exported) {
-        made->home_module = NULL;
+        made->home_module = copy->c_name_read ? copy->c_name_home : NULL;
     }
     made->nested = NULL;
     made->nested_count = 0;

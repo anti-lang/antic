@@ -1382,6 +1382,7 @@ void antl_read_items(struct reader *r)
             sym->type->c_name.length == 0) {
             sym->type->c_name = sym->name;
             sym->type->c_name_read = true;
+            sym->type->c_name_home = iface->module;
         }
         sym->kind = (enum symbol_kind)kind;
         sym->state = EVAL_DONE;
