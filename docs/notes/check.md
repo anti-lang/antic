@@ -93,7 +93,8 @@ alone at the start of a line, and an item of a numbered list a word of
 digits and `.` or `)`, by I of "Answers of 2026-11-19" in
 `docs/decisions.md`. A line that starts with `#5` or `3.14` is text. Emphasis needs text after
 its opening delimiter and text before its closing one, which keeps a
-pointer type and `a * b` in prose out of it. A comment that ends inside a
+pointer type and `a * b` in prose out of it. A run of the delimiter opens
+as one, so `**this**` is emphasis as `*this*` is. A comment that ends inside a
 fenced block gets `holds a fence that nothing closes` under the name
 `doc-markup`, by R179 of "Rules of 2026-10-13". Such a block holds no
 `anti` block for the class before.

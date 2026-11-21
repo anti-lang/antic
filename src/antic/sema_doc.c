@@ -282,20 +282,25 @@ static void doc_check_span(const struct doc_scope *s,
 /* Whether the delimiter at s opens emphasis and the line holds one that
    closes it. Markdown asks the opener to have text after it and the
    closer to have text before it. That rule keeps `a * b` and a pointer
-   type out. */
+   type out. A run of the delimiter opens as one, so `**this**` is
+   emphasis as `*this*` is, by T380 of docs/audit/tests-findings.md. */
 static bool doc_emphasis(const char *line, size_t length, size_t at)
 {
     char d = line[at];
+    size_t run = at;
     size_t i;
 
-    if (at + 1 >= length || line[at + 1] == ' ' || line[at + 1] == d) {
+    while (run < length && line[run] == d) {
+        run++;
+    }
+    if (run >= length || line[run] == ' ') {
         return false;
     }
     if (at > 0 && line[at - 1] != ' ' && line[at - 1] != '(' &&
         line[at - 1] != '"') {
         return false;
     }
-    for (i = at + 2; i < length; i++) {
+    for (i = run + 1; i < length; i++) {
         if (line[i] == '`') {
             return false;
         }
