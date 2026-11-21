@@ -1544,6 +1544,40 @@ reached. In `files_make_dirs` and `files_make_dirs_or_say` of
 which no path that the suite hands `anti` holds. In `files_array` of
 the same file a count of 0, which no caller in the suite passes.
 
+## The sides of batch 3am
+
+Batch 3am of the third phase read the safety check `escaping-local` in
+`src/antic/sema_escape.c` against E1 of "Compile-time checks of
+2026-10-20" in `docs/decisions.md`, its correction of 2026-10-25 and its
+`[provisional]` entries, and the passes of the optimizer in
+`src/antic/optimize.c` against the DESIGN comments of the file. It fixed
+T384 and T386 in `src/antic/sema_escape.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `find`, `outer_param`, `reached_param`, `anchor_of`, `captured_root`, `check_concurrent`, `walk_let`, `walk_arms` and `walk_for` of `src/antic/sema_escape.c` | A name without a symbol or a type, a local the walk did not declare where a closure captures it, and a switch, a loop or a destructuring without arms, a body or names. | The pass runs on a body the checker checked without an error, so every name has its symbol and its type, every capture names a local of the walk, and the parser gives every arm, loop and destructuring its parts. |
+| `place_root` and `anchor_of` of `src/antic/sema_escape.c` | A place reached through a unary operator other than `*`, and a place of another kind of expression. | The checker takes `&` of a name, a field, an element or `*p` alone, and the target of a `=` is one of those as well. |
+| `root_of` of `src/antic/sema_escape.c` | `.ptr` of an array, and an element of an array whose base has no type. | An array has no field `ptr`, so the checker refuses `a.ptr`, and every base has its type. |
+| `place_name` and `refuse` of `src/antic/sema_escape.c` | A place without a name, and a place outside `enum escape_place`. | Every refused store names a local, a field, an element or a global, and each caller passes one of the places of the enum. |
+| `refuse_store` and `check_store` of `src/antic/sema_escape.c` | A store whose anchor is no global, field, element, parameter or local, and a name as the target whose anchor is no local of the walk. | The callers refuse a store that outlives the local alone, which names one of those, and a target name is a local or a parameter the walk declared, since a global is anchored before. |
+| `check_collection` of `src/antic/sema_escape.c` | A function of a collection called without a receiver, a receiver that is no pointer, and more arguments than the function takes. | Every call of a function with `self` passes the receiver first as a pointer, and the checker matches the arguments with the parameters. |
+| `check_dispatch` of `src/antic/sema_escape.c` | A `dispatch` without its call. | The parser gives every `dispatch` the call of its worker. |
+| `leave_expr` and `leave_stmt` of `src/antic/sema_escape.c` | A statement after the one that leaves the block, read while the scan has already found the way out. | The walk stops at the first way out, since each visitor returns false once the scan has found one. |
+| `walk_function`, `walk_handler`, `walk_yield` and `sema_check_escapes` of `src/antic/sema_escape.c` | A function or a handler without a body, a `yield` outside a handler, and a check in a quiet context. | The callers pass a function with a body, the checker refuses a `yield` outside a handler before the pass runs, and no caller runs the pass while the checker is quiet. |
+| `propagate_copies` of `src/antic/optimize.c` | A copy of a temporary into itself, and a copy whose one definition in the block follows it. | Lowering writes no such copy, and by property 1 of the DESIGN of the file a definition stands before every use. |
+| `merge_blocks` of `src/antic/optimize.c` | A jump to the entry block. | Lowering starts a loop in a block of its own, so no jump goes back to the entry. |
+| `address_of` and `forward_stores` of `src/antic/optimize.c` | A `ptradd` whose base or offset is written again between it and the load or store that reads it, and a load into its own offset. | Lowering writes each address right before the load or the store that reads it. |
+| `element_of` of `src/antic/optimize.c` | An offset of a slot that is the symbol `n * size_of T`. | Lowering writes the offset of element `n` of a local as a `mul` instruction, which `simplify` turns into `size_of T` or a shift, never into a symbol. The products of `src/antic/lower_hook.c` and `src/antic/whole_tables.c` reach globals. |
+
+The sides left unsorted, which a test can reach or no probe of the batch
+reached. In `check_collection` of `src/antic/sema_escape.c` a receiver
+`*p` of a collection, which the pass anchors nowhere. In `fold_inst` of
+`src/antic/optimize.c` a second operand of type `c_long` or `c_wchar`
+beside a first of another type. In `scalar_bytes` of the same file a
+field of a type of no fixed width, and in `offsets_apart` the pairs of
+offsets that are no two fields of one struct, no start and field of the
+struct of the slot and no two elements of one array.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
