@@ -204,6 +204,10 @@ struct checker {
        leaves a value of an abstract class to the `let`, which names its
        local as `let s = *sp;` does, by Q6 of "Answers of 2026-11-10". */
     const struct expr *let_value;
+    /* A tuple or an array literal inside the value of a `let` checked
+       now, whose parts the local owns as it owns those of the value, or
+       NULL. */
+    const struct expr *owning_literal;
     int deferring;              /* above 0, a `defer` or `undo` is checked */
     const struct stmt *deferred;    /* the innermost of them, or NULL */
     int deferred_loops;         /* loop_depth where deferred began */
@@ -479,7 +483,10 @@ struct name sema_shared_name(struct arena *arena, const struct name *op,
                              const struct name *type);
 
 /* sema_expr.c */
-
+/* Whether e is a `snapshot fn` that captures, which goes on the heap
+   where something owns it. One that captures nothing is a plain
+   function value. */
+bool sema_takes_snapshot(const struct expr *e);
 bool sema_is_place(const struct expr *e);
 const struct struct_field *sema_bitfield_of(const struct expr *e);
 void sema_mark_address_taken(struct checker *c, struct expr *e);

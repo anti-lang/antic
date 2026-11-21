@@ -1,0 +1,19 @@
+//! A tuple literal that a `let` takes apart holds its snapshot for the local of
+//! the `let`, so the snapshot copies the bytes of a `str` it captures, and the
+//! name that takes it prints the text after the memory of the text it was made
+//! from is freed.
+
+import anti.io;
+import anti.text;
+
+fn main() -> int
+{
+	let n = 4;
+	let name = f"report {n}";
+	let (a, g) = (1, snapshot fn() { io.println(name); });
+	free(name.ptr);
+	let other = f"xxxxxxxx";
+	g();
+	free(other.ptr);
+	return a - 1;
+}

@@ -669,21 +669,85 @@ static bool owned_fn(const struct type *t)
     return t != NULL && t->kind == TYPE_FN && t->owned;
 }
 
+bool sema_takes_snapshot(const struct expr *e)
+{
+    return e->kind == EXPR_FN && e->as.fn->snapshot &&
+           e->as.fn->capture_count > 0;
+}
+
+/* Whether e is a tuple or an array literal. */
+static bool is_part_literal(const struct expr *e)
+{
+    return e->kind == EXPR_TUPLE || e->kind == EXPR_ARRAY_LIT;
+}
+
+/* Whether a local owns the parts of the tuple or array literal e: e is
+   the value of a `let`, or a literal inside it. */
+static bool owns_parts(const struct checker *c, const struct expr *e)
+{
+    return e == c->let_value || e == c->owning_literal;
+}
+
+/* Check the part item of a literal whose parts a local owns where owns
+   says so, against the type expected, which may be NULL. A literal in
+   the part has its parts owned as well. */
+static struct type *check_part(struct checker *c, struct expr *item,
+                               struct type *expected, bool owns)
+{
+    const struct expr *outer = c->owning_literal;
+    struct type *t;
+
+    c->owning_literal = owns && is_part_literal(item) ? item : NULL;
+    t = sema_check_kept(c, item, expected, true);
+    c->owning_literal = outer;
+    return t;
+}
+
+/* The type of a part of a literal whose parts a local owns, for a value
+   of the function type t: `own fn` in the form of two words, and t for
+   any other type. */
+static struct type *owned_part(struct checker *c, struct type *t)
+{
+    if (sema_is_error(t) || t->kind != TYPE_FN || t->owned || t->bound) {
+        return t;
+    }
+    return types_fn_owned(c->types, t);
+}
+
 /* DESIGN: the element of a tuple or an array literal without a context
    takes the type of its value, so an `own fn` value makes the literal an
-   owner of its snapshot. The element then takes the value as every `own
-   fn` place does, by `require_owned`: a `keep own` parameter moves, and
-   an existing value is refused, by T260 of docs/audit/tests-findings.md.
-   An element whose context gives its type takes it through
-   `sema_require`, which runs the same rule. Returns whether the value
-   e of type got is taken. */
+   owner of its snapshot. A literal that a local holds owns the snapshots
+   its parts hold as well, by 2 of "Answers of 2026-11-21, second set" in
+   docs/decisions.md, as a local of function type owns the one its `let`
+   gives it. Such a part takes the type `own fn`, so the snapshot goes on
+   the heap with the bytes of each `str` it captures, and the teardown of
+   the local frees it on every exit, by T377 of
+   docs/audit/tests-findings.md. The element then takes the value as
+   every `own fn` place does, by `require_owned`: a `keep own` parameter
+   moves, and an existing value is refused, by T260. An element whose
+   context gives its type takes it through `sema_require`, which runs the
+   same rule. part is the type of the element, which the value e of type
+   got gives it. Returns whether the value is taken. */
 static bool take_owned_part(struct checker *c, struct expr *e,
-                            struct type *got)
+                            struct type *got, struct type *part)
 {
-    if (sema_is_error(got) || !owned_fn(got)) {
+    if (sema_is_error(got) || !owned_fn(part)) {
         return true;
     }
     return require_owned(c, e, got);
+}
+
+/* Whether the array literal e holds a snapshot that captures. */
+static bool holds_snapshot(const struct expr *e)
+{
+    size_t i;
+
+    for (i = 0; i < e->as.array_lit.count; i++) {
+        if (sema_takes_snapshot(e->as.array_lit.elements[i])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /* Refuse the value e of a tuple or an array whose parts hold a function
@@ -2727,13 +2791,17 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
         struct type *element = expected != NULL && expected->kind == TYPE_ARRAY
                                    ? expected->element
                                    : NULL;
+        bool owns = owns_parts(c, e);
         bool ok = true;
         for (i = 0; i < e->as.array_lit.count; i++) {
             struct expr *item = e->as.array_lit.elements[i];
-            struct type *it = sema_check_kept(c, item, element, true);
+            struct type *it = check_part(c, item, element, owns);
             if (element == NULL) {
-                element = it;
-                ok = take_owned_part(c, item, it) && ok;
+                /* An array that a local holds owns the snapshot of each
+                   element when one of them takes a snapshot, since its
+                   elements have one type. */
+                element = owns && holds_snapshot(e) ? owned_part(c, it) : it;
+                ok = take_owned_part(c, item, it, element) && ok;
             } else {
                 ok = sema_require(c, item, it, element) && ok;
             }
@@ -2767,12 +2835,13 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                     expected->param_count == e->as.tuple.count
                 ? expected
                 : NULL;
+        bool owns = owns_parts(c, e);
         bool ok = true;
         for (i = 0; i < e->as.tuple.count; i++) {
             struct expr *item = e->as.tuple.elements[i];
             struct type *element =
                 want != NULL ? want->params[i] : NULL;
-            elements[i] = sema_check_kept(c, item, element, true);
+            elements[i] = check_part(c, item, element, owns);
             /* An element holds a value, as a `let` does, by Q6 of
                "Answers of 2026-11-10" in docs/decisions.md: a call of
                `void` gives none, and an abstract class has no complete
@@ -2792,7 +2861,11 @@ static struct type *check_expr_inner(struct checker *c, struct expr *e,
                 ok = sema_require(c, item, elements[i], element) && ok;
                 elements[i] = element;
             } else {
-                ok = take_owned_part(c, item, elements[i]) && ok;
+                struct type *part = owns && sema_takes_snapshot(item)
+                                        ? owned_part(c, elements[i])
+                                        : elements[i];
+                ok = take_owned_part(c, item, elements[i], part) && ok;
+                elements[i] = part;
             }
             if (sema_literal_moves(item)) {
                 sema_refuse_lock_copy(c, item, elements[i]);

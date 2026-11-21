@@ -1,0 +1,53 @@
+//! A tuple or an array local owns the snapshots its literal holds on the heap
+//! and frees them at the end of its block, on every exit: the end of the block,
+//! `break`, `continue` and `return`. A tuple inside the literal holds its
+//! snapshot for the local as well.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> int;
+
+fn alive(step: str)
+{
+	printf("%.*s %d\n".ptr, step.len as c_int, step.ptr,
+		anti_rt_snapshots_alive() as c_int);
+}
+
+fn early(n: int) -> int
+{
+	let t = (n, snapshot fn() -> int { return n * 3; });
+	let a = [snapshot fn() -> int { return n * 4; }];
+	if n > 1 {
+		return t.1() + a[0]();
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	let base = 5;
+	{
+		let t = (1, snapshot fn() -> int { return base; });
+		let a = [snapshot fn() -> int { return base + 1; },
+			snapshot fn() -> int { return base + 2; }];
+		let n = ((2, snapshot fn() -> int { return base + 3; }), 4);
+		alive("held");
+		printf("tuple %d array %d %d nested %d\n".ptr, t.1() as c_int,
+			a[0]() as c_int, a[1]() as c_int, n.0.1() as c_int);
+	}
+	alive("block");
+	for i in 0..4 {
+		let t = (i, snapshot fn() -> int { return base + i; });
+		let a = [snapshot fn() -> int { return base * i; }];
+		if i == 1 {
+			continue;
+		}
+		if i == 3 {
+			break;
+		}
+		printf("turn %d %d\n".ptr, t.1() as c_int, a[0]() as c_int);
+	}
+	alive("loop");
+	printf("early %d\n".ptr, early(2) as c_int);
+	alive("return");
+	return 0;
+}

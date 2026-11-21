@@ -108,6 +108,12 @@ choices of `snapshot fn` and `own fn`.
   the local frees it at the end of its block. A `let` of any other owned
   value takes the form of two words without the flag, so that local
   borrows. `=` of a snapshot into a local that borrows is refused.
+- A tuple or an array literal that a `let` takes, and a literal inside one,
+  gives each part that is a `snapshot fn` that captures the type `own fn`
+  through `take_owned_part`, so the local owns it as above. An array gives
+  every element that type when one of them is such a snapshot, since its
+  elements have one type. `check_part` hands the mark to a literal inside
+  the literal through `owning_literal` of the checker.
 - `lower_snapshot` writes the record `<name>.snapshot`: the size, then one
   field per capture. On the heap the size adds the length of each `str`
   and one byte for its NUL, `anti_rt_snapshot_new` makes the block, and

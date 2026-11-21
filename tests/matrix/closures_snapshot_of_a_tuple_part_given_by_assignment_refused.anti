@@ -1,0 +1,24 @@
+//! A name that a `let` takes from a tuple literal owns the snapshot of its
+//! part, as the tuple local would, so `=` gives it to no `own` field, since an
+//! owned function value is not copied by `=`. `dup` copies it.
+
+class Holder
+{
+	pub own handler: fn() -> int = zero,
+}
+
+fn zero() -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let start = 7;
+	let (s, n) = (snapshot fn() -> int { return start; }, 1);
+	let h = alloc Holder { };
+	h.handler = s;
+	let r = h.handler() - n;
+	delete(h);
+	return r;
+}

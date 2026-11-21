@@ -1,0 +1,1 @@
+closures_snapshot_of_a_tuple_part_given_by_assignment_refused.anti:20:14: error: an `own fn` value is not copied by `=`, use `dup`

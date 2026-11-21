@@ -818,15 +818,6 @@ static void refuse_read_only(struct checker *c, struct pos pos,
                   (int)sym->name.length, sym->name.text);
 }
 
-/* Whether e is a `snapshot fn` that captures, which goes on the heap
-   where something owns it. One that captures nothing is a plain
-   function value. */
-static bool takes_snapshot(const struct expr *e)
-{
-    return e->kind == EXPR_FN && e->as.fn->snapshot &&
-           e->as.fn->capture_count > 0;
-}
-
 /* DESIGN: a local that borrows the function it holds owns no snapshot,
    so `=` gives it none, by 4 of "Answers of 2026-11-21" in
    docs/decisions.md. The local owns what its `let` gave it alone, and a
@@ -841,7 +832,7 @@ static bool refuse_borrowed_snapshot(struct checker *c,
 
     if (sym == NULL || sym->kind != SYMBOL_LOCAL || sym->type == NULL ||
         sym->type->kind != TYPE_FN || sym->type->owned ||
-        !takes_snapshot(value)) {
+        !sema_takes_snapshot(value)) {
         return false;
     }
     sema_error_at(c, value->pos, "`%.*s` borrows the function it holds and "
@@ -2160,7 +2151,7 @@ static void check_let(struct checker *c, struct stmt *s)
        outlives its turn where `dup` copies it into a local outside the
        loop, by T370 of docs/audit/tests-findings.md, and its text
        outlives the memory it was made from, by T371. */
-    if (!sema_is_error(t) && takes_snapshot(s->as.let.value) &&
+    if (!sema_is_error(t) && sema_takes_snapshot(s->as.let.value) &&
         (declared == NULL ||
          (declared->kind == TYPE_FN && declared->context &&
           !declared->owned && !declared->nullable))) {

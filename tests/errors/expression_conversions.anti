@@ -69,7 +69,7 @@ fn lent_parts(h: *Holder, lent p: *Circle) -> int
 fn owned(h: *Holder)
 {
 	let n = 1;
-	let (a, b) = (snapshot fn(k: int) { ignore(n); }, 1);
+	let (a, b) = (fn(k: int) { ignore(n); }, 1);
 	h.handler = a;
 }
 
