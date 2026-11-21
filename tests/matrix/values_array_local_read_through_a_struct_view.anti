@@ -1,0 +1,18 @@
+//! A view of an array local as a struct reads each element under the field at
+//! its offset.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	first: c_int,
+	second: c_int,
+}
+
+fn main() -> int
+{
+	let words: [2]c_int = [3, 4];
+	let p = &words as *Pair;
+	printf("%d %d\n".ptr, p.first, p.second);
+	return 0;
+}
