@@ -953,6 +953,17 @@ not re-open a settled decision without asking Eddie.
   suite in the six parts of `asan`, the last up to test 8048: `asan`
   377 s, 269 s, 369 s, 237 s, 179 s and 674 s, `ubsan` 378 s, 265 s,
   308 s, 173 s, 128 s and 687 s.
+  The step of the second set of answers of 2026-11-21 measured `host` in
+  the same three parts: 395 s, 272 s and 376 s before the fix of T365, up
+  to test 8054, where `emit_identity` failed on the moved texts,
+  `fmt_canonical` on a new program and `header_sections` on a declaration
+  of the next fix, each of which passed alone once it stood right, 400 s,
+  276 s and 382 s before the fix of T377, up to test 8063, where
+  `error_expression_conversions` failed on a snapshot that a tuple now
+  owns, and 397 s, 275 s and 372 s once its case took a closure by
+  reference, up to test 8064. It ran each sanitizer suite in the six parts
+  of `asan`, the last up to test 8062: `asan` 253 s, 184 s, 262 s, 167 s,
+  128 s and 635 s, `ubsan` 258 s, 184 s, 261 s, 171 s, 128 s and 646 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1563,13 +1574,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8050 ctest tests pass on the development Mac, and two of them, the
+- 8064 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
-  carry `host=windows`, the line of T365, which waits for Eddie's word
-  on the DESIGN of `append_type_name`, and the three lines of T377,
-  which wait for his choice.
-  The ASan and the UBSan builds run 8048 each
+  carry `host=windows`.
+  The ASan and the UBSan builds run 8062 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
