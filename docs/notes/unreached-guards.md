@@ -1485,6 +1485,37 @@ numbered list in one comment. In `antl_read_locks` of
 entries of each loop and before the kind of a wait. Each needs names long
 enough that the count of the entries passes the test of the bytes left.
 
+## The sides of batch 3ak
+
+Batch 3ak of the third phase read the clauses `allow` and `unchecked` in
+`src/antic/warnings.c` against "Errors, warnings and checks" in
+`docs/decisions.md`, the lowering of `parallel`, `dispatch` and `join` in
+`src/antic/lower_worker.c`, the checks of `--memory-checks` in
+`src/antic/memcheck.c`, the text form of the IR in `src/antic/ir_print.c`
+and the rows of the runtime in `src/antic/rt_abi.c`. It fixed T383 in
+`src/antic/warnings.c`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `drop_silenced` of `src/antic/warnings.c` | A promoted diagnostic, and an error with a name that is no safety check. | `settle_diagnostics` of `src/antic/driver.c` promotes the warnings after the clauses apply, and `sema_check_at` of `src/antic/sema.c` gives an error the name of a safety check alone. |
+| `warnings_apply` of `src/antic/warnings.c` | No module. | Both callers in `src/antic/driver.c` pass the tree the parser wrote. |
+| `pack_context` of `src/antic/lower_worker.c` | A moved argument that is no name, and the error a handler binds moved into a worker. | `sema_note_move` and `sema_move_caught` of `src/antic/sema_value.c` mark a name alone, and `worker_type` of `src/antic/sema_thread.c` refuses the `*Error` of a handler, a pointer to an object that is not thread-safe. |
+| `check` of `src/antic/memcheck.c` | An access of no bytes, and an address that is no temporary. | An array has a length of 1 or more and a struct has a field, and lowering takes every address into a temporary, a global through `ir_addr`. |
+| `rt_without_effects` of `src/antic/rt_abi.c` | A row of the class none or reads without willreturn, one that never returns and one without a result. | Every such row of `RT_FUNCTIONS` in `src/antic/rt_abi.h` takes `IR_GUARANTEES`, returns and gives a value. |
+| `ir_sym_print` and `operand` of `src/antic/ir_print.c` | A kind outside `enum ir_sym_kind` or `enum ir_operand_kind`. | Each switch names every kind of its enum, and the IR holds no other. |
+| `param_type` of `src/antic/ir_print.c` | A size of `deref` past the table of symbolic values. | Lowering writes a size it made with `ir_sym_size_of`, an index of the table. |
+| `signature` of `src/antic/ir_print.c` | A variadic function without a parameter. | The parser asks for a parameter before `...`, and no function of the runtime is variadic. |
+| `instruction` of `src/antic/ir_print.c` | A select of no mask, a flag past `negative` and a member past the fields of its aggregate. | `ir_vselect` of `src/antic/ir.c` writes one mask, lowering reads the four flags of `anti.lang.Flags` alone, and a typed load or store names a member of the aggregate it reads. |
+
+The sides left unsorted, which a test can reach or no probe of the batch
+reached. In `src/antic/ir_print.c` a symbolic operation of one operand,
+which `shift_wrap_sym` of `src/antic/lower_expr.c` writes, an aggregate
+constant of no items and an operand of kind `IR_NONE` in a listing. In
+`antic_outline` of `src/antic/antic.c` a function after `main` and a
+function of a `fixtures` block after `setup` or `teardown`, and a source
+that does not parse in `anti check`, whose front end class ends the run
+before the class of the doc blocks reads the outline.
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
