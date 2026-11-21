@@ -435,7 +435,9 @@ static void scalar_check(struct lowerer *l, const struct expr *e,
 /* DESIGN: a value that becomes an enum must be one of the values the
    enum declares. The test compares the widened value against each of
    them and takes the union. That is one comparison per name and no
-   block of its own. */
+   block of its own. An enum without values declares none, so the test
+   fails for every value, by 5 of "Answers of 2026-11-21" in
+   docs/decisions.md, as Object.deserialize refuses every number there. */
 static void enum_check(struct lowerer *l, const struct expr *e,
                        const struct type *from, const struct type *to,
                        struct ir_operand wide, bool sign_changes,
@@ -462,6 +464,9 @@ static void enum_check(struct lowerer *l, const struct expr *e,
        is held at or above zero as well, by T372 of
        docs/audit/tests-findings.md. An enum whose values all leave the
        top bit clear needs no such test. */
+    if (ok.kind == IR_NONE) {
+        ok = ir_int_op(IR_I8, 0);
+    }
     if (sign_changes && top_bit) {
         struct ir_operand held =
             lower_temp(l, ir_binary(l->f, l->b, IR_SGE, IR_I8, wide,
@@ -508,7 +513,7 @@ void lower_narrow_check(struct lowerer *l, const struct expr *e,
         struct ir_operand wide = lower_widen_operand(l, v, source_form);
         if (to->kind == TYPE_CHAR) {
             scalar_check(l, e, from, wide, text_cstr(&operation), kind, v);
-        } else if (to->field_count > 0) {
+        } else {
             enum_check(l, e, from, to, wide, sign_changes,
                        text_cstr(&operation), kind, v);
         }

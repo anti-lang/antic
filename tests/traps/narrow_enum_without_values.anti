@@ -1,0 +1,21 @@
+//! An enum without values declares no value, so a dev build stops `as` of any
+//! integer to it.
+
+enum Nothing
+{
+}
+
+fn opaque(n: int) -> int
+{
+	return n;
+}
+
+fn sink(n: Nothing)
+{
+}
+
+fn main() -> int
+{
+	sink(opaque(0) as Nothing);
+	return 7;
+}

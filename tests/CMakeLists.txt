@@ -1911,6 +1911,9 @@ antic_check_test(narrow_enum_from_u64 "not declared by"
 antic_check_test(narrow_enum_from_negative "not declared by"
     "narrow_enum_from_negative\\.anti:[0-9]+: value not declared by Mask: value -1"
     ON)
+antic_check_test(narrow_enum_without_values "not declared by"
+    "narrow_enum_without_values\\.anti:[0-9]+: value not declared by Nothing: value 0"
+    ON)
 antic_check_test(divide "division by zero"
     "divide\\.anti:[0-9]+: division by zero in /: left 10"
     OFF)

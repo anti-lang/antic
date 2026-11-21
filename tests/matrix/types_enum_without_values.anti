@@ -1,6 +1,7 @@
 //! An enum without values compiles and has the size of `c_int`, by R052 of
 //! "Rules of 2026-10-13". No value of it exists, and a field of it holds the
-//! bytes an integer leaves there.
+//! bytes an integer leaves there. A view of two `c_int` fills the field, since
+//! `as` of any integer to the enum stops a dev build.
 
 extern fn printf(format: ?*byte, ...) -> c_int;
 
@@ -16,8 +17,8 @@ struct Holder
 
 fn main() -> int
 {
-	let zero = 0;
-	let h = Holder { lead: 1, n: zero as Nothing };
+	let words: [2]c_int = [1, 0];
+	let h = &words as *Holder;
 	printf("%d %d %d\n".ptr, (size_of(Nothing) == size_of(c_int)) as c_int,
 		(size_of(Holder) == 2 * size_of(c_int)) as c_int, h.n as c_int);
 	return 0;
