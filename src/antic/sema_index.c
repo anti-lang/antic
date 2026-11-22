@@ -143,7 +143,15 @@ static struct fact *add_fact(struct index_walk *w, const struct symbol *sym)
 static void mark_changed(struct index_walk *w, const struct expr *e)
 {
     struct fact *f;
+    size_t i;
 
+    /* The flags form `(r, f) = e;` assigns each name of its tuple, T388. */
+    if (e != NULL && e->kind == EXPR_TUPLE) {
+        for (i = 0; i < e->as.tuple.count; i++) {
+            mark_changed(w, e->as.tuple.elements[i]);
+        }
+        return;
+    }
     if (e != NULL && e->kind == EXPR_NAME && e->symbol != NULL) {
         f = add_fact(w, e->symbol);
         f->changed = true;
