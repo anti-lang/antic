@@ -1,0 +1,1 @@
+checks_uninitialized_read_after_a_loop_that_writes_no_element.anti:17:10: error: element 2 of `p` is read before every path from `alloc` on line 9 wrote it [uninitialized-read]

@@ -1,0 +1,17 @@
+//! A public function of an `export class` whose signature names an unknown type
+//! gets the one message of the unknown type, and no message of the export rule.
+
+export class Box
+{
+	n: c_int = 0,
+
+	pub fn get(self, x: Nope) -> c_int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

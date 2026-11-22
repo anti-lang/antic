@@ -1,0 +1,20 @@
+//! C1 and a loop after a write at a computed index: the write before the loop
+//! counts for no turn of it, so a loop whose turns write no element writes no
+//! range, and the read of element 2 after it is refused.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	let i = 1;
+	p[i] = 1;
+	for j in 0..4 {
+		printf("turn %d\n".ptr, j as c_int);
+	}
+	let x = p[2];
+	free(p);
+	return x;
+}
