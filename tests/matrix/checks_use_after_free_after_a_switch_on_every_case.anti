@@ -1,0 +1,34 @@
+//! E2 after a `switch` without `else` on an enum: every value runs an arm, and
+//! each arm deletes the node, so it is dead on every path after the statement.
+//! The message names the line of the first delete, as after an `if` with an
+//! `else` whose two branches delete it.
+
+enum Mode
+{
+	Low,
+	High,
+}
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn drop(m: Mode) -> int
+{
+	let p = alloc Node { n: 1 };
+	switch m {
+		Mode.Low => {
+			delete(p);
+		},
+		Mode.High => {
+			delete(p);
+		},
+	}
+	return p.n;
+}
+
+fn main() -> int
+{
+	return drop(Mode.High);
+}

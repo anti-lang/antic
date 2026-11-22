@@ -1,0 +1,18 @@
+//! C1 and a read at the index of a write: the closure captures `i` by reference
+//! and sets it to 3, so the read reads element 3, which no path wrote.
+
+fn main() -> int
+{
+	let p = alloc(int, 4) else {
+		return 1;
+	};
+	let i = 0;
+	let set = fn() {
+		i = 3;
+	};
+	p[i] = 1;
+	set();
+	let x = p[i];
+	free(p);
+	return x;
+}

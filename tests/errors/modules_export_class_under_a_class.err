@@ -1,0 +1,1 @@
+modules_export_class_under_a_class.anti:6:14: error: export class `Meter` has the C name of export class `Meter` in module `com.example.exports`

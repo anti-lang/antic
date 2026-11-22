@@ -1,0 +1,17 @@
+//! The result of an `export fn` that may fail has a type that C can hold, and a
+//! tuple that holds a `str` is none.
+
+import anti.lang;
+
+export fn pair(n: c_int) -> (c_int, str) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return (n, "pair");
+}
+
+fn main() -> int
+{
+	return 0;
+}

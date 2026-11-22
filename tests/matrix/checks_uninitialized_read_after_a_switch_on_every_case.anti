@@ -1,0 +1,61 @@
+//! C1 after a `switch` without `else` on an enum and on a variant: every value
+//! runs an arm, so the element that each arm writes is written on every path,
+//! and the read after the statement passes.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Mode
+{
+	Low,
+	High,
+}
+
+variant Shape
+{
+	Circle { r: int },
+	Empty,
+}
+
+fn on_enum(m: Mode) -> int
+{
+	let p = alloc(int, 2) else {
+		return 0;
+	};
+	switch m {
+		Mode.Low => {
+			p[0] = 1;
+		},
+		Mode.High => {
+			p[0] = 2;
+		},
+	}
+	let x = p[0];
+	free(p);
+	return x;
+}
+
+fn on_variant(s: Shape) -> int
+{
+	let p = alloc(int, 2) else {
+		return 0;
+	};
+	switch s {
+		Circle c => {
+			p[0] = c.r;
+		},
+		Empty => {
+			p[0] = 0;
+		},
+	}
+	let x = p[0];
+	free(p);
+	return x;
+}
+
+fn main() -> int
+{
+	printf("a switch on an enum: %d\n".ptr, on_enum(Mode.High) as c_int);
+	printf("a switch on a variant: %d\n".ptr,
+		on_variant(Shape.Circle { r: 3 }) as c_int);
+	return 0;
+}

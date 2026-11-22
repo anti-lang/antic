@@ -1,0 +1,14 @@
+//! A module exports a class under the C name of a class that a library it
+//! imports exports already. The two give C one tag and one set of helpers.
+
+import com.example.exports;
+
+export class Meter
+{
+	pub n: c_int = 0,
+}
+
+fn main() -> int
+{
+	return 0;
+}

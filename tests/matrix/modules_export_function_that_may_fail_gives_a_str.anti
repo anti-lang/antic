@@ -1,0 +1,18 @@
+//! The result of an `export fn` that may fail has a type that C can hold, as
+//! the result of one that cannot fail has, and a `str` is none. C reads it
+//! through the out pointer.
+
+import anti.lang;
+
+export fn name(n: c_int) -> str may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return "name";
+}
+
+fn main() -> int
+{
+	return 0;
+}

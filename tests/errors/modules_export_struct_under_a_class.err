@@ -1,0 +1,1 @@
+modules_export_struct_under_a_class.anti:6:15: error: export struct `Meter` has the C name of export class `Meter` in module `com.example.exports`

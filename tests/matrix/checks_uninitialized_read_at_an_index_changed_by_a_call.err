@@ -1,0 +1,1 @@
+checks_uninitialized_read_at_an_index_changed_by_a_call.anti:17:10: error: an element of `p` is read at a computed index before every path from `alloc` on line 11 wrote the whole range [uninitialized-read]

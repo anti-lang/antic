@@ -1,0 +1,1 @@
+modules_export_enum_under_a_struct.anti:6:13: error: export enum `Vec2` has the C name of export struct `Vec2` in module `com.example.exports`

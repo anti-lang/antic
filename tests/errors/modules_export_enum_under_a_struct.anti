@@ -1,0 +1,15 @@
+//! A module exports an enum under the C name of a struct that a library it
+//! imports exports already. C has one name space for the tags of both.
+
+import com.example.exports;
+
+export enum Vec2: c_int
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	return 0;
+}

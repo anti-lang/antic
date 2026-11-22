@@ -1,0 +1,23 @@
+//! The result of a public function of an `export class` that may fail has a
+//! type that C can hold, and the refusal names the result that the function
+//! declares and no parameter.
+
+import anti.lang;
+
+export class Named
+{
+	pub n: c_int = 0,
+
+	pub fn name(self) -> str may fail
+	{
+		if self.n < 0 {
+			fail "below zero";
+		}
+		return "name";
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}
