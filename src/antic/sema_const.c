@@ -1585,6 +1585,88 @@ static void const_deps_of(struct chain_deps *d, const struct expr *e)
     }
 }
 
+/* Whether e names a function of the module or a function of the body of
+   a type of the module. */
+static bool names_function(struct checker *c, const struct expr *e)
+{
+    const struct symbol *sym;
+    const struct expr *base;
+    size_t i;
+
+    if (e->kind == EXPR_NAME) {
+        sym = e->qualified ? e->symbol : sema_lookup(c, &e->as.name);
+        return sym != NULL &&
+               (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN);
+    }
+    if (e->kind != EXPR_FIELD) {
+        return false;
+    }
+    base = e->as.field.base;
+    if (base->kind != EXPR_NAME) {
+        return false;
+    }
+    sym = sema_lookup(c, &base->as.name);
+    if (sym == NULL || sym->kind != SYMBOL_STRUCT || sym->item == NULL) {
+        return false;
+    }
+    for (i = 0; i < sym->item->member_count; i++) {
+        const struct item *m = sym->item->members[i];
+        if (m->kind == ITEM_FN &&
+            types_same_name(&m->name, &e->as.field.name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The first name of a function in e, a constant expression, in the order
+   the evaluator meets its parts, or NULL. */
+static const struct expr *function_in(struct checker *c, const struct expr *e)
+{
+    const struct expr *found = NULL;
+    size_t i;
+
+    if (e == NULL) {
+        return NULL;
+    }
+    if (names_function(c, e)) {
+        return e;
+    }
+    switch (e->kind) {
+    case EXPR_FIELD:
+        return function_in(c, e->as.field.base);
+    case EXPR_UNARY:
+        return function_in(c, e->as.unary.operand);
+    case EXPR_BINARY:
+        found = function_in(c, e->as.binary.left);
+        return found != NULL ? found : function_in(c, e->as.binary.right);
+    case EXPR_CAST:
+        return function_in(c, e->as.cast.operand);
+    case EXPR_INDEX:
+        found = function_in(c, e->as.index.base);
+        return found != NULL ? found : function_in(c, e->as.index.index);
+    case EXPR_ARRAY_LIT:
+        for (i = 0; found == NULL && i < e->as.array_lit.count; i++) {
+            found = function_in(c, e->as.array_lit.elements[i]);
+        }
+        return found;
+    case EXPR_TUPLE:
+        for (i = 0; found == NULL && i < e->as.tuple.count; i++) {
+            found = function_in(c, e->as.tuple.elements[i]);
+        }
+        return found;
+    case EXPR_ARRAY_REPEAT:
+        return function_in(c, e->as.array_repeat.value);
+    case EXPR_STRUCT_LIT:
+        for (i = 0; found == NULL && i < e->as.struct_lit.field_count; i++) {
+            found = function_in(c, e->as.struct_lit.fields[i].value);
+        }
+        return found;
+    default:
+        return NULL;
+    }
+}
+
 /* DESIGN: the default of a field of a class is a constant expression,
    and the checker reads it before it declares the types of functions. A
    call there finds no type yet and gives no message, so the walk refuses
@@ -1664,6 +1746,21 @@ bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e)
     default:
         return false;
     }
+}
+
+/* The value of an enum, the width of a bitfield and the N of `align(N)`
+   are numbers, read before the functions have their types. The check of
+   a name of a function there finds no type and gives no message, as that
+   of a call does, so the walk refuses it as well, by T394 of
+   docs/audit/tests-findings.md. */
+bool sema_refuse_value_parts(struct checker *c, const struct expr *e)
+{
+    const struct expr *function = c->fns_typed ? NULL : function_in(c, e);
+
+    if (sema_refuse_runtime_parts(c, e)) {
+        return true;
+    }
+    return function != NULL && !fail_const(c, function, "a function");
 }
 
 /* Enter the context the value of sym is checked in. A constant of the
@@ -1783,7 +1880,7 @@ bool sema_const_symbol(struct checker *c, struct symbol *sym,
         }
         ok = false;
     }
-    ok = ok && (c->fns_typed || !sema_refuse_runtime_parts(c, value)) &&
+    ok = ok && (c->fns_typed || !sema_refuse_value_parts(c, value)) &&
          sema_require(c, value, sema_check_expr(c, value, t), t);
     if (ok) {
         struct const_value *made = arena_alloc(c->arena, sizeof *made);

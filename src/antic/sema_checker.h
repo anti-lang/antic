@@ -759,6 +759,10 @@ bool sema_refuse_copy_without_value(struct checker *c, struct pos pos,
 /* Refuse the first call or `??` in e, a constant expression, in the order
    the evaluator meets them. True when it refused. */
 bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e);
+/* sema_refuse_runtime_parts for a place whose value is a number, which
+   refuses a name of a function as well while the functions have no
+   types. True when it refused. */
+bool sema_refuse_value_parts(struct checker *c, const struct expr *e);
 bool sema_const_symbol(struct checker *c, struct symbol *sym,
                        struct pos use);
 

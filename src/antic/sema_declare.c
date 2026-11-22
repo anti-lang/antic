@@ -80,7 +80,7 @@ static uint8_t bitfield_width(struct checker *c, struct param *field,
                       "found `%s`", sema_tn(t));
         return 0;
     }
-    if (sema_refuse_runtime_parts(c, e) ||
+    if (sema_refuse_value_parts(c, e) ||
         !sema_require(c, e, sema_check_expr(c, e, sema_builtin(c, TYPE_I64)),
                       sema_builtin(c, TYPE_I64)) ||
         !sema_eval_const(c, e, &v)) {
@@ -186,7 +186,7 @@ static uint64_t alignment(struct checker *c, struct expr *e)
 {
     struct const_value v;
 
-    if (sema_refuse_runtime_parts(c, e) ||
+    if (sema_refuse_value_parts(c, e) ||
         !sema_require(c, e, sema_check_expr(c, e, sema_builtin(c, TYPE_I64)),
                       sema_builtin(c, TYPE_I64)) ||
         !sema_eval_const(c, e, &v)) {
@@ -1146,7 +1146,7 @@ static void check_enum_value(struct checker *c, struct item *it,
     }
     c->enum_item = it;
     c->enum_value = j;
-    *folded = !sema_refuse_runtime_parts(c, e) &&
+    *folded = !sema_refuse_value_parts(c, e) &&
               sema_require(c, e, sema_check_expr(c, e, base), base) &&
               sema_eval_const(c, e, v);
     c->enum_item = NULL;
