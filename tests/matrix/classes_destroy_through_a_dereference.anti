@@ -1,0 +1,24 @@
+//! `destroy(*pq)` runs the chain of the object that `*pq` points at, a heap
+//! object, without the final free, and `free(q)` then gives the memory back.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Thing
+{
+	pub n: int = 0,
+
+	fn destruct(self)
+	{
+		printf("destruct %lld\n".ptr, self.n);
+	}
+}
+
+fn main() -> int
+{
+	let q = alloc Thing { n: 6 };
+	let pq = &q;
+	destroy(*pq);
+	printf("destroyed\n".ptr);
+	free(q);
+	return 0;
+}

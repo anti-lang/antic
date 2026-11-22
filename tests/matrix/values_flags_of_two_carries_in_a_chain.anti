@@ -1,0 +1,22 @@
+//! `a + b + f.carry + g.carry` takes two carries in. The second carry follows a
+//! sum that takes one already, so it is that sum plus 0 and the carry, by the
+//! DESIGN of `lower_flag_operation`, and the flags are those of the last step.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let a: u8 = 200;
+	let b: u8 = 100;
+	let (s, f) = a + b;
+	let (t, g) = b + b + f.carry;
+	let (r, h) = a + b + f.carry + g.carry;
+	let (q, k) = a + f.carry + g.carry;
+	let (z, m) = r + 210 + f.carry + f.carry;
+	printf("first %u %d\n".ptr, s as c_uint, f.carry as c_int);
+	printf("second %u %d\n".ptr, t as c_uint, g.carry as c_int);
+	printf("two %u %d\n".ptr, r as c_uint, h.carry as c_int);
+	printf("after one %u %d\n".ptr, q as c_uint, k.carry as c_int);
+	printf("last %u %d\n".ptr, z as c_uint, m.carry as c_int);
+	return 0;
+}

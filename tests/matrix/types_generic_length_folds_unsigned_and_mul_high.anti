@@ -1,0 +1,30 @@
+//! Lengths of a copy of a generic struct that fold an operation of `u64`, a
+//! division of the least value of `int`, and `mul_high` of `u64` and of `int`
+//! once the copy puts 5 in place of `N`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Ops<N: int>
+{
+	a: [((N as u64) / 2 + (N as u64) % 2) as int]int,
+	b: [(((N as u64) << 1) >> 1) as int]int,
+	c: [((N as u64) <<% 1) as int]int,
+	d: [(N - 5 - 9223372036854775807 - 1) / 4611686018427387904 + 3]int,
+	e: [mul_high(N as u64, 9223372036854775808) as int + 1]int,
+	f: [mul_high(N, 2) + 1]int,
+}
+
+fn main() -> int
+{
+	let o = Ops<5> {
+		a: [0; 3],
+		b: [0; 5],
+		c: [0; 10],
+		d: [0; 1],
+		e: [0; 3],
+		f: [0; 1],
+	};
+	printf("ops %d %d %d %d %d %d\n".ptr, o.a.len as c_int, o.b.len as c_int,
+		o.c.len as c_int, o.d.len as c_int, o.e.len as c_int, o.f.len as c_int);
+	return 0;
+}

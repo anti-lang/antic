@@ -1,0 +1,28 @@
+//! A bitfield as wide as its type, `u64 : 64` and `i64 : 64`, in a literal, an
+//! assignment and the default of a class field. Every value fits such a field,
+//! so the check of a constant there passes over it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Wide
+{
+	low: u64 : 64,
+	high: i64 : 64,
+}
+
+class Holder
+{
+	pub w: u64 : 64 = 18446744073709551615,
+}
+
+fn main() -> int
+{
+	let w = Wide { low: 18446744073709551615, high: -5 };
+	printf("literal %llu %lld\n".ptr, w.low, w.high);
+	w.low = 7;
+	w.high = -9223372036854775807;
+	printf("assigned %llu %lld\n".ptr, w.low, w.high);
+	let h = Holder { };
+	printf("default %llu\n".ptr, h.w);
+	return 0;
+}

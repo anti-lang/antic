@@ -1,0 +1,12 @@
+//! The value of an enum that is `dup(3)`. `dup` copies a value at run time, and
+//! the walk of the value refuses it as it refuses a call.
+
+enum Mode
+{
+	A = dup(3),
+}
+
+fn main() -> int
+{
+	return Mode.A as int;
+}

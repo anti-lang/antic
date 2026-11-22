@@ -1,0 +1,1 @@
+types_enum_value_holds_a_dup.anti:6:6: error: a call is not a constant expression

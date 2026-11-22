@@ -1,0 +1,23 @@
+//! Constants that compare an optional with `none`, on either side, and a `str`
+//! with a literal, and a constant that negates a float constant.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+const NAME: str = "anti";
+const NONE: ?*int = none;
+const SOME: ?int = 5;
+const SAME: bool = NAME == "anti";
+const LESS: bool = NAME < "bnti";
+const EMPTY: bool = NONE == none;
+const HELD: bool = SOME != none;
+const LEFT: bool = none == SOME;
+const G: f64 = 2.5;
+const NEG: f64 = -G;
+
+fn main() -> int
+{
+	printf("text %d %d\n".ptr, SAME as c_int, LESS as c_int);
+	printf("none %d %d %d\n".ptr, EMPTY as c_int, HELD as c_int, LEFT as c_int);
+	printf("negated %.1f\n".ptr, NEG);
+	return 0;
+}

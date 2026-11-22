@@ -1,0 +1,25 @@
+//! A condition that reads a `bool` through a pointer, `*p`, alone and as an
+//! operand of `&&`, in an `if` and a `while`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn test(p: *bool) -> int
+{
+	let turns = 0;
+	while *p && turns < 2 do {
+		turns += 1;
+	}
+	if *p {
+		return turns + 10;
+	}
+	return turns;
+}
+
+fn main() -> int
+{
+	let a = true;
+	let b = false;
+	printf("true %d\n".ptr, test(&a) as c_int);
+	printf("false %d\n".ptr, test(&b) as c_int);
+	return 0;
+}
