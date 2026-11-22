@@ -1037,6 +1037,19 @@ not re-open a settled decision without asking Eddie.
   parts of `asan`, the last up to test 8231: `asan` 246 s, 180 s, 266 s,
   168 s, 131 s and 614 s, `ubsan` 254 s, 181 s, 265 s, 168 s, 101 s and
   636 s.
+  Batch 3as of the third phase of coverage measured `host` in the same
+  three parts: 388 s, 281 s and 394 s before the commit of T396 to T401,
+  up to test 8268, 346 s, 212 s and 367 s before the fix of T396, 388 s,
+  287 s and 406 s before that of T397, up to test 8271, where
+  `std_sync_map` and `std_concurrent_map` failed in both modes on a `??`
+  that copied a local, and 384 s for the first part once they copied it
+  with `dup`, 389 s, 284 s and 404 s before that of T399, 381 s, 284 s
+  and 407 s before that of T398, 362 s, 285 s and 397 s before that of
+  T400, 362 s, 301 s and 405 s before that of T401, and 386 s, 283 s and
+  415 s before the commit of the tests of the sides, up to test 8297. It
+  ran each sanitizer suite in the six parts of `asan`, the last up to
+  test 8295: `asan` 252 s, 181 s, 266 s, 165 s, 130 s and 691 s, `ubsan`
+  264 s, 187 s, 269 s, 165 s, 144 s and 732 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1647,12 +1660,12 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8233 ctest tests pass on the development Mac, and two of them, the
+- 8297 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
   carry `host=windows`, the three lines of T385, which wait for Eddie's
   choice, and the three lines of T387, which wait for his answer.
-  The ASan and the UBSan builds run 8231 each
+  The ASan and the UBSan builds run 8295 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which

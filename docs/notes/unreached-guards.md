@@ -1754,6 +1754,34 @@ their own headings above stand as they were.
 | `sema_refuse_value_parts` of `src/antic/sema_const.c` | A function in an early place once the functions have their types. | The row of batch 3aq says why. |
 | `sema_const_symbol` of `src/antic/sema_const.c` | A static field that is not atomic. | The checker refuses one with `` `n` is `static` and must be `atomic` ``. |
 
+## The sides of batch 3as
+
+Batch 3as of the third phase read the values and the moves of the checker
+in `src/antic/sema_value.c` and the shared parts of lowering in
+`src/antic/lower.c`. It found T396 to T401 and fixed each. The rows of the
+two files under their own headings above stand as they were.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `replaces_destroyed` of `src/antic/sema_value.c` | A function of a class without its type, and a `destroyed` without `self`. | The checker gives every function of a class its type before it asks for a teardown, and it refuses a `destroyed` without `self` with `` `Object` already has `destroyed` ``. |
+| `own_field_in_chain`, `destruct_in_chain` and `destroyed_in_chain` of `src/antic/sema_value.c` | A chain that starts at `NULL`, and a `destruct` of the root in the chain. | Every caller passes a class, and no class of a chain holds a function of the root, whose entries `sema_table_of` of `src/antic/sema_class.c` adds apart. |
+| `owning_field` and `owns_reason` of `src/antic/sema_value.c` | A walk that starts at `NULL`, and an element of a tuple whose name has no `_` before its number. | The caller passes the type of a value, and the checker names every element of a tuple `_0` upwards. |
+| `sema_owns_phrase` and `sema_type_owns` of `src/antic/sema_value.c` | A type that is `NULL`. | Every caller passes the type of a value or of a field. |
+| `moves_own_param`, `sema_literal_moves` and `moves_at_call` of `src/antic/sema_value.c` | A value without a type or of the error type, and a type that needs a teardown and owns nothing. | The checker gives every name its type, and a caller binds no value whose check failed. The one type that needs a teardown and owns nothing is an `own fn`, which the test of a function type returns before, and `sema_note_move` returns for a parameter of function type. |
+| `sema_refuse_own_field_copy` of `src/antic/sema_value.c` | A store into no field, a binary operation other than `??`, and a field read without a type, of the error type, of a type that owns or on a base without a type. | Every caller passes a field it found. Of the binary operators `??` alone gives a pointer, and `sema_require` took the type of the value before. |
+| `sema_check_take` of `src/antic/sema_value.c` | A field that names a symbol. | The checker writes a name of another module, `math.PI`, as a name, so `take` refuses it as no field. |
+| `sema_owned_param` and `sema_note_move` of `src/antic/sema_value.c` | A call without its callee, an index past the `own` marks, an argument without a type, and a callee without its function type. | Every caller passes the function it called, an index of its parameters and an argument the checker typed, and the checker gives every function its type. |
+| `sema_refuse_caller_value` of `src/antic/sema_value.c` | A parameter that a handler binds, and a value without a type. | A handler binds a local, and the checker gives every name its type. |
+| `lower_set_optional` of `src/antic/lower.c` | A type that is `NULL`. | Every caller passes the `?T` it writes. |
+| `min_bits` and `max_bits` of `src/antic/lower.c` | A lock word in a conversion. | The checker refuses `as` between a `Mutex` and another type with `` cannot convert `Mutex` to `int` ``, and `as` to the type of the value converts nothing. |
+| `lower_add_params` of `src/antic/lower.c` | A function type without its result, a result of another type in the IR, and a function without its symbol. | The checker gives every function type its result, each caller made the function from the same type, and each passes its symbol. |
+| `has_context_signature` of `src/antic/lower.c` | A pointer of the context with an aggregate. | A pointer in the IR has no aggregate. |
+| `lower_offset_address` and `lower_field_at` of `src/antic/lower.c` | An offset that is an integer other than 0. | Every caller passes 0 or a symbolic offset that the back end folds. |
+| `lower_range_of` of `src/antic/lower.c` | An enum whose type in the IR lies below `IR_I8`. | The underlying type of an enum is an integer. |
+| `lower_literal_global` of `src/antic/lower.c` | A global of bytes of the module without a NUL at its end. | Each global of bytes that lowering writes under the path of a module ends with a NUL: the literals, the version of the package and the path of the module in `src/antic/lower_desc.c`. |
+| `lower_bound_is_direct` of `src/antic/lower.c` | A bound function without its symbol, and no class. | The checker gives every bound function its symbol, and a bound function is taken of a class. |
+| `known_copy`, `note_generic_copy` and `lower_module` of `src/antic/lower.c` | An item without its symbol or its type, and a copy of a generic whose generic has no symbol or no module. | The checker gives every item that lowering reads its symbol and its type, and a copy is made of a generic it declared. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
