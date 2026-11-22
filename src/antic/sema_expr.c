@@ -283,8 +283,13 @@ bool sema_spell(struct text *out, const struct expr *e)
         text_appendf(out, "%.*s", (int)e->as.name.length, e->as.name.text);
         return true;
     }
-    if (e->kind == EXPR_FIELD && !e->as.field.promoted &&
-        sema_spell(out, e->as.field.base)) {
+    /* A field the checker wrote to reach a base or a promoted name is
+       no part of what the program wrote, so the path skips it, T400 of
+       docs/audit/tests-findings.md. */
+    if (e->kind == EXPR_FIELD && e->as.field.promoted) {
+        return sema_spell(out, e->as.field.base);
+    }
+    if (e->kind == EXPR_FIELD && sema_spell(out, e->as.field.base)) {
         text_appendf(out, ".%.*s", (int)e->as.field.name.length,
                      e->as.field.name.text);
         return true;

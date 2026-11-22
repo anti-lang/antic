@@ -25,9 +25,5 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
-matrix_classes_inherited_own_field_copied_into_another_refused T400 A field the program reaches through a base has no spelling for the checker.
-matrix_classes_inherited_own_field_given_itself_dev T400 A field the program reaches through a base has no spelling for the checker.
-matrix_classes_inherited_own_field_given_itself_memory_checks T400 A field the program reaches through a base has no spelling for the checker.
-matrix_classes_inherited_own_field_given_itself_release T400 A field the program reaches through a base has no spelling for the checker.
 matrix_classes_copy_of_a_class_that_holds_one_that_replaces_destroyed_refused T401 The refusal of a copy of a class that replaces `destroyed` says it has `own` fields.
 matrix_classes_copy_of_a_class_that_replaces_destroyed_refused T401 The refusal of a copy of a class that replaces `destroyed` says it has `own` fields.
