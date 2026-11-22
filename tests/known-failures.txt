@@ -25,4 +25,3 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
-matrix_threads_compare_swap_of_an_unchecked_own_field_refused T390 compare_swap stores a pointer into an own field and moves no owner.

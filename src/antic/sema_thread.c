@@ -130,6 +130,17 @@ static bool unchecked_swap(struct checker *c, struct expr *e,
     if (f == NULL || f->form != FIELD_PLAIN) {
         return false;
     }
+    /* An `own` field owns what it holds. A swap would store a pointer
+       that the field then owns while the place it came from still holds
+       it, and it frees nothing it replaces, by T390 of
+       docs/audit/tests-findings.md. */
+    if (f->owned) {
+        sema_error_at(c, callee->pos, "`compare_swap` takes an atomic field "
+                      "or a plain one, and `%.*s` is an `own` field",
+                      (int)f->name.length, f->name.text);
+        *out = sema_builtin(c, TYPE_ERROR);
+        return true;
+    }
     home = f->home;
     if (home == NULL || home->safety != SAFETY_CONCURRENT ||
         !(f->unchecked || home->unchecked_fields)) {
