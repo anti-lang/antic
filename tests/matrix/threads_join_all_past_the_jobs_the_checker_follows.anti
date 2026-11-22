@@ -1,0 +1,25 @@
+//! `join_all` of 65 jobs, one more than the checker follows for a second `join`
+//! of one of them. The checker follows none of them then, and the program joins
+//! each job once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub done: int = 0,
+}
+
+worker fn mark(t: *Task, k: int)
+{
+	t.done += k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { };
+	let jobs = [dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1), dispatch t -> mark(1)];
+	join_all(jobs[0..65]);
+	printf("joined %d\n".ptr, jobs.len as c_int);
+	delete(t);
+	return 0;
+}

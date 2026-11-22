@@ -1,0 +1,21 @@
+//! A generic worker named with its type arguments takes as many arguments as it
+//! has parameters beside the object. One more is refused.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add<T>(t: *Task, k: T) -> int
+{
+	return t.n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 1 };
+	let job = dispatch t -> add<int>(2, 3);
+	join(job);
+	delete(t);
+	return 0;
+}

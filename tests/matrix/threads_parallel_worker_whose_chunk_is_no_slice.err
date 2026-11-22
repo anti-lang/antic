@@ -1,0 +1,1 @@
+threads_parallel_worker_whose_chunk_is_no_slice.anti:13:32: error: `grow` takes `int` as its chunk, and the slice is `[]int`

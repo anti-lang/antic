@@ -1,0 +1,1 @@
+threads_worker_refuses_a_pointer_before_plain_arguments.anti:19:31: error: an argument of a worker has type `*int`, which holds a pointer. A worker takes and returns values alone

@@ -1,0 +1,8 @@
+//! `send` to a name that is not declared gets the message of the name alone,
+//! and none that the operand is no channel.
+
+fn main() -> int
+{
+	send(nope, 1);
+	return 0;
+}

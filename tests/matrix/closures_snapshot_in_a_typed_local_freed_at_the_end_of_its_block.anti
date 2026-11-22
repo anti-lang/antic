@@ -1,0 +1,23 @@
+//! A `let` that names the type of its local owns the snapshot it gives, as a
+//! `let` without a type does, by 4 of "Answers of 2026-11-21". The local frees
+//! it at the end of its block, and a local of a loop at the end of each turn.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn anti_rt_snapshots_alive() -> int;
+
+fn main() -> int
+{
+	let x = 4;
+	{
+		let g: fn() -> int = snapshot fn() -> int { return x + 1; };
+		printf("block %d %d\n".ptr, g() as c_int,
+			anti_rt_snapshots_alive() as c_int);
+	}
+	printf("after %d\n".ptr, anti_rt_snapshots_alive() as c_int);
+	for i in 0..3 {
+		let h: fn(int) -> int = snapshot fn(n: int) -> int { return n + i; };
+		printf("turn %d\n".ptr, h(10) as c_int);
+	}
+	printf("loop %d\n".ptr, anti_rt_snapshots_alive() as c_int);
+	return 0;
+}

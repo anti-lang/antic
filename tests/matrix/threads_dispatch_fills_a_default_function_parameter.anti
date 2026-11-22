@@ -1,0 +1,27 @@
+//! A `dispatch` that leaves out a parameter of function type takes its default,
+//! by R088 of the rules of 2026-10-13. A function value holds no pointer a
+//! worker shares, so the default is no argument with a pointer.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn apply(t: *Task, k: int, f: ?fn(int) -> int = none) -> int
+{
+	if let g = f {
+		return g(t.n + k);
+	}
+	return t.n + k;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 1 };
+	let job = dispatch t -> apply(2);
+	printf("%d\n".ptr, join(job) as c_int);
+	delete(t);
+	return 0;
+}

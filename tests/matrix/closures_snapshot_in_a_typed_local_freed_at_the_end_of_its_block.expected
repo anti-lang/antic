@@ -1,0 +1,7 @@
+exit 0
+block 5 1
+after 0
+turn 10
+turn 11
+turn 12
+loop 0

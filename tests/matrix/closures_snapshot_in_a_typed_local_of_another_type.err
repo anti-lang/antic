@@ -1,0 +1,1 @@
+closures_snapshot_in_a_typed_local_of_another_type.anti:7:23: error: expected `fn() -> i32`, found `fn() -> int`

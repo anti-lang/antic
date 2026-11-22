@@ -1,0 +1,23 @@
+//! An argument of a worker that holds a pointer is refused, and the plain
+//! arguments after it, written or filled in from a default, are checked on and
+//! pass. The `dispatch` gets the one message.
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn read(t: *Task, v: *int, u: int, w: int = 0) -> int
+{
+	return t.n + u + w;
+}
+
+fn main() -> int
+{
+	let n = 5;
+	let t = alloc Task { };
+	let job = dispatch t -> read(&n, 3);
+	let got = join(job);
+	delete(t);
+	return got;
+}

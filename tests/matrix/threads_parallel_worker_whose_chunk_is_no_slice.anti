@@ -1,0 +1,15 @@
+//! `parallel` hands each worker a chunk of the slice, so the first parameter of
+//! the worker is a slice of its elements. A worker that takes an `int` there is
+//! refused.
+
+worker fn grow(n: int) -> int
+{
+	return n + 1;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3];
+	let ys = parallel xs[0..3] -> grow();
+	return 0;
+}

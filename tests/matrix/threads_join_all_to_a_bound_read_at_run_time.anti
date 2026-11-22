@@ -1,0 +1,33 @@
+//! `join_all` of a slice whose end the program reads at run time. The checker
+//! follows the jobs of constant bounds alone, so it refuses nothing here, and
+//! the job after the slice is joined once.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn add(t: *Task, k: int) -> int
+{
+	return t.n + k;
+}
+
+fn count(n: int) -> int
+{
+	return n;
+}
+
+fn main() -> int
+{
+	let t = alloc Task { n: 1 };
+	let u = alloc Task { n: 1 };
+	let jobs = [dispatch t -> add(5), dispatch u -> add(6)];
+	join_all(jobs[0..count(1)]);
+	let last = join(jobs[1]);
+	printf("%d\n".ptr, last as c_int);
+	delete(t);
+	delete(u);
+	return 0;
+}
