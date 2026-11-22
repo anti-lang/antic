@@ -1,0 +1,25 @@
+//! The program lists two types of the library in a direct import, the class
+//! before the struct, and names the struct without its module, so the message
+//! names its locks so as well.
+
+import com.example.locks.{Counter, Pair, forward};
+
+fn backward(p: *Pair, c: *Counter)
+{
+	c.bump();
+	sync p.b {
+		sync p.a {
+			p.n += 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = locks.pair();
+	let c = alloc Counter { };
+	forward(&p);
+	backward(&p, c);
+	free(c);
+	return 0;
+}

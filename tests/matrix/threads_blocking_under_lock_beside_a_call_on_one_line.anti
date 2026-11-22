@@ -1,0 +1,27 @@
+//! C5 on a line that holds a call of a function that does not wait beside a
+//! `recv` that may wait, inside a `sync` block. The call gets no warning, and
+//! the `recv` gets its own.
+
+struct Gate
+{
+	m: Mutex,
+	n: int,
+}
+
+fn twice(k: int) -> int
+{
+	return 2 * k;
+}
+
+fn main() -> int
+{
+	let g = Gate { n: 0 };
+	let c = chan int(1);
+	let zero = 0;
+	send(c, 3);
+	sync g.m {
+		g.n = twice(1) + *(recv(c) ?? &zero);
+	}
+	delete(c);
+	return g.n - 5;
+}

@@ -4469,6 +4469,7 @@ foreach(case
         "modules_lock_order|lock_orders|"
         "modules_lock_order_of_a_copy_of_a_generic|lock_sides|"
         "modules_lock_order_of_a_direct_import|lock_orders|"
+        "modules_lock_order_of_a_direct_import_of_two_types|lock_orders|"
         "modules_lock_order_of_a_module_alias|lock_orders|"
         "modules_lock_order_of_a_module_not_imported|lock_sides|"
         "modules_lock_order_of_a_synchronized_class|lock_orders|"

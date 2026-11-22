@@ -1,0 +1,1 @@
+threads_blocking_under_lock_beside_a_call_on_one_line.anti:23:22: error: `recv` may wait while the `sync` of line 22 holds its lock [blocking-under-lock]

@@ -1,0 +1,14 @@
+//! C2 refuses an index of a slice literal by the name its `len` takes: `s[n]`
+//! of `[]int { ptr: p, len: n }` stands past the end on every path.
+
+fn at_length(p: *int, n: int) -> int
+{
+	let s = []int { ptr: p, len: n };
+	return s[n];
+}
+
+fn main() -> int
+{
+	let x = 5;
+	return at_length(&x, 1);
+}

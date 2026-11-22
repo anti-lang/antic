@@ -1,0 +1,19 @@
+//! C2 lets through a sum of the variables of two loops, whose turns the check
+//! does not pair, and a dev build checks the index.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let xs = [1, 2, 3, 4];
+	let total = 0;
+	for i in 0..2 {
+		for j in 0..3 {
+			total += xs[i + j];
+		}
+	}
+	printf("two loops: %d\n".ptr, total);
+	return 0;
+}

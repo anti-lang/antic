@@ -1,0 +1,42 @@
+//! C4 where the code holds one lock three times, `c` of three objects, when it
+//! takes `d`. The three give one edge from `c` to `d`, and `back` takes `c`
+//! while it holds `d`, which closes the cycle.
+
+struct Locks
+{
+	c: Mutex,
+	d: Mutex,
+	n: int,
+}
+
+fn three(x: *Locks, y: *Locks, z: *Locks)
+{
+	sync x.c {
+		sync y.c {
+			sync z.c {
+				sync x.d {
+					x.n += 1;
+				}
+			}
+		}
+	}
+}
+
+fn back(p: *Locks)
+{
+	sync p.d {
+		sync p.c {
+			p.n -= 1;
+		}
+	}
+}
+
+fn main() -> int
+{
+	let p = Locks { n: 0 };
+	let q = Locks { n: 0 };
+	let r = Locks { n: 0 };
+	three(&p, &q, &r);
+	back(&p);
+	return p.n;
+}
