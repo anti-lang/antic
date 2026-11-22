@@ -1,1 +1,1 @@
-modules_export_function_that_may_fail_gives_a_tuple_of_a_str.anti:6:29: error: the result of export fn `pair` has type `(c_int, str)`, which C cannot represent
+modules_export_function_that_may_fail_gives_a_tuple_of_a_str.anti:6:29: error: the result of export fn `pair` has type `(i32, str)`, which C cannot represent

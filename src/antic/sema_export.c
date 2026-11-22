@@ -468,6 +468,18 @@ static void check_c_name_once(struct checker *c, const struct item *it,
     }
 }
 
+/* The result that a declaration of the function type t writes, or NULL
+   for none. A `may fail` function returns `?*Error` and gives what it
+   computed through its out pointer, its last parameter, so C reads the
+   result there, T402 of docs/audit/tests-findings.md. */
+static const struct type *written_result(const struct type *t)
+{
+    if (t->has_out) {
+        return t->params[t->param_count - 1]->element;
+    }
+    return t->may_fail || t->result->kind == TYPE_VOID ? NULL : t->result;
+}
+
 /* DESIGN: an export item has a C symbol and appears in a C header. Its
    types have a C representation, its name is not main, and no other module
    exports the same name. Its name is none that a header the generated
@@ -481,6 +493,7 @@ void sema_check_export(struct checker *c, struct item *it)
 {
     const struct type *t = it->symbol->type;
     const char *header = c_library_header(&it->name);
+    const struct type *gives;
     char what[160];
     size_t i;
     size_t j;
@@ -516,11 +529,11 @@ void sema_check_export(struct checker *c, struct item *it)
             check_c_type(c, it->params[i].pos, what, t->params[i], false,
                          NULL);
         }
-        if (it->result != NULL && t->kind == TYPE_FN &&
-            t->result->kind != TYPE_VOID) {
+        gives = t->kind == TYPE_FN ? written_result(t) : NULL;
+        if (it->result != NULL && gives != NULL) {
             text_format(what, sizeof what, "the result of export fn `%.*s`",
                         (int)it->name.length, it->name.text);
-            check_c_type(c, it->result->pos, what, t->result, false, NULL);
+            check_c_type(c, it->result->pos, what, gives, false, NULL);
         }
         for (i = 0; i < c->library_count; i++) {
             const struct interface *lib = c->libraries[i];
