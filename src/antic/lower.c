@@ -800,27 +800,19 @@ const struct ir_function *lower_provider_signature(struct lowerer *l)
     return f != NULL ? f : declare_signature(l, count, IR_PTR, IR_NO_AGG);
 }
 
+/* The object comes first, and the parameters and the result of t follow
+   as has_signature compares them. Their IR types alone gave a struct of
+   one word and one of four floats, or an `i8` and a `u8`, one signature,
+   T396 of docs/audit/tests-findings.md. */
 static bool fits_bound(struct lowerer *l, const struct ir_function *g,
                        const struct type *t)
 {
     size_t at = 1;
-    size_t k;
 
-    (void)l; /* find_signature fixes the signature */
-    if (g->param_count == 0 || g->params[0].type != IR_PTR ||
-        g->result != lower_ir_type_of(t->result)) {
-        return false;
-    }
-    for (k = 0; k < t->param_count; k++) {
-        size_t words = lower_is_context(t->params[k]) ? 2 : 1;
-        if (at + words > g->param_count ||
-            (words == 1 &&
-             g->params[at].type != lower_ir_type_of(t->params[k]))) {
-            return false;
-        }
-        at += words;
-    }
-    return at == g->param_count;
+    return g->param_count > 0 && g->params[0].type == IR_PTR &&
+           g->result == lower_ir_type_of(t->result) &&
+           g->result_agg == lower_result_agg(l, t->result) &&
+           has_params(l, g, t, &at) && at == g->param_count;
 }
 
 /* The signature of a call through a bound function, which takes the
