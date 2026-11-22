@@ -200,6 +200,12 @@ static void owns_reason(char *out, size_t size, const struct type *t)
         text_format(out, size, "has a `destruct`");
         return;
     }
+    /* A class that replaces the hook has a teardown by R115, and it may
+       have no `own` field, T401 of docs/audit/tests-findings.md. */
+    if (t->kind == TYPE_CLASS && destroyed_in_chain(t)) {
+        text_format(out, size, "replaces `" ROOT_DESTROYED "`");
+        return;
+    }
     if (t->kind == TYPE_VARIANT) {
         text_format(out, size, "owns what its parts own");
         return;
