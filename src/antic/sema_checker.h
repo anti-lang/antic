@@ -763,6 +763,9 @@ bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e);
    refuses a name of a function as well while the functions have no
    types. True when it refused. */
 bool sema_refuse_value_parts(struct checker *c, const struct expr *e);
+/* Whether e, a constant expression, names a function of the module or of
+   the body of a type of the module. */
+bool sema_names_function(struct checker *c, const struct expr *e);
 bool sema_const_symbol(struct checker *c, struct symbol *sym,
                        struct pos use);
 

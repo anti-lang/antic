@@ -1748,6 +1748,11 @@ bool sema_refuse_runtime_parts(struct checker *c, const struct expr *e)
     }
 }
 
+bool sema_names_function(struct checker *c, const struct expr *e)
+{
+    return function_in(c, e) != NULL;
+}
+
 /* The value of an enum, the width of a bitfield and the N of `align(N)`
    are numbers, read before the functions have their types. The check of
    a name of a function there finds no type and gives no message, as that

@@ -5,7 +5,7 @@ class Maker
 {
 	pub n: int = 0,
 
-	fn make() -> int
+	pub fn make() -> int
 	{
 		return 1;
 	}

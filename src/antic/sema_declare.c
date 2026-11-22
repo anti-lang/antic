@@ -1520,6 +1520,12 @@ static void check_field_defaults(struct checker *c, struct item *it)
             sema_refuse_runtime_parts(c, it->params[j].value)) {
             continue;
         }
+        /* The check of a name of a function finds no type before the
+           functions have theirs, so check_function_defaults takes such a
+           default after them, by T395 of docs/audit/tests-findings.md. */
+        if (sema_names_function(c, it->params[j].value)) {
+            continue;
+        }
         sema_enter_sized(c, &sized);
         if (sema_require(c, it->params[j].value,
                          sema_check_expr(c, it->params[j].value, f->type),
@@ -1533,6 +1539,30 @@ static void check_field_defaults(struct checker *c, struct item *it)
         sema_leave(c, &sized);
     }
     sema_generic_defaults(c, t);
+}
+
+/* The defaults of the fields of it that name a function, which
+   check_field_defaults leaves until the functions have their types. Each
+   is checked against the type of its field. A name of a function is no
+   constant, so lowering writes it from the expression. */
+static void check_function_defaults(struct checker *c, struct item *it)
+{
+    struct type *t = it->symbol->type;
+    size_t base_fields = it->kind == ITEM_CLASS ? 1 : 0;
+    size_t j;
+
+    for (j = 0; j < it->param_count && base_fields + j < t->field_count;
+         j++) {
+        struct expr *value = it->params[j].value;
+        struct type *ft = t->fields[base_fields + j].type;
+        struct context sized;
+        if (value == NULL || !sema_names_function(c, value)) {
+            continue;
+        }
+        sema_enter_sized(c, &sized);
+        sema_require(c, value, sema_check_expr(c, value, ft), ft);
+        sema_leave(c, &sized);
+    }
 }
 
 /* Refuse a struct, a union, a class or a variant t that contains
@@ -1788,6 +1818,17 @@ void sema_declare_all_members(struct checker *c)
         struct item *it = module->items[i];
         if (it->symbol != NULL && it->kind == ITEM_CONST) {
             sema_const_symbol(c, it->symbol, it->name_pos);
+        }
+    }
+    for (i = 0; i < module->item_count; i++) {
+        struct item *it = module->items[i];
+        if (it->symbol != NULL && it->symbol->type != NULL &&
+            (it->kind == ITEM_STRUCT || it->kind == ITEM_UNION ||
+             it->kind == ITEM_CLASS)) {
+            struct context outer;
+            sema_enter_within(c, it, &outer);
+            check_function_defaults(c, it);
+            sema_leave(c, &outer);
         }
     }
     /* DESIGN: a static field and a constant of a body hold values of
