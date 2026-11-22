@@ -748,11 +748,12 @@ static struct type *resolve_named(struct checker *c, struct type_expr *t)
             sema_nested_own(sym->type) == 0) {
             return sym->type;
         }
+        /* A type nested in a generic class takes its own parameters
+           alone, by T392 of docs/audit/tests-findings.md. */
         if (t->arg_count == 0) {
+            size_t own = sema_nested_own(sym->type);
             sema_error_at(c, t->pos, "`%s` takes %zu type argument%s",
-                          sema_tn(sym->type),
-                          sym->type->type_param_count,
-                          sym->type->type_param_count == 1 ? "" : "s");
+                          sema_tn(sym->type), own, own == 1 ? "" : "s");
             return sema_builtin(c, TYPE_ERROR);
         }
         return sema_copy_of(c, sym->type, t->args, t->arg_count, t->pos);
