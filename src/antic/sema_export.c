@@ -585,7 +585,11 @@ void sema_check_export(struct checker *c, struct item *it)
                 ft->kind != TYPE_FN) {
                 continue;
             }
-            for (j = m->has_self ? 1 : 0; j < ft->param_count; j++) {
+            /* The out pointer of the `may fail` form carries the
+               result, which the refusal names as the result, T403 of
+               docs/audit/tests-findings.md. */
+            for (j = m->has_self ? 1 : 0;
+                 j < ft->param_count - (ft->has_out ? 1 : 0); j++) {
                 text_format(what, sizeof what,
                             "the parameter %zu of `%.*s.%.*s`",
                             j, (int)it->name.length, it->name.text,
@@ -593,11 +597,12 @@ void sema_check_export(struct checker *c, struct item *it)
                 check_c_type(c, m->name_pos, what, ft->params[j], false,
                              NULL);
             }
-            if (ft->result->kind != TYPE_VOID) {
+            gives = written_result(ft);
+            if (gives != NULL) {
                 text_format(what, sizeof what, "the result of `%.*s.%.*s`",
                             (int)it->name.length, it->name.text,
                             (int)m->name.length, m->name.text);
-                check_c_type(c, m->name_pos, what, ft->result, false, NULL);
+                check_c_type(c, m->name_pos, what, gives, false, NULL);
             }
         }
         return;
