@@ -911,7 +911,8 @@ static void walk_if(struct free_walk *w, const struct stmt *s)
 }
 
 /* The arms of a `switch` and of a `select`, each from the state before
-   it. A switch without `else` may match no arm, so the state before it
+   it. none_matched says a value may match no arm, as one of a `switch`
+   on an integer or a `str` without `else` may, so the state before it
    joins the arms there. */
 static void walk_arms(struct free_walk *w, const struct switch_arm *arms,
                       size_t count, const struct stmt *otherwise,
@@ -1234,7 +1235,7 @@ static void walk_stmt(struct free_walk *w, const struct stmt *s)
     case STMT_SWITCH:
         walk_expr(w, s->as.switch_stmt.value);
         walk_arms(w, s->as.switch_stmt.arms, s->as.switch_stmt.count,
-                  s->as.switch_stmt.otherwise, true);
+                  s->as.switch_stmt.otherwise, !sema_switch_runs_an_arm(s));
         return;
     case STMT_SELECT:
         walk_arms(w, s->as.select.arms, s->as.select.count, NULL, false);

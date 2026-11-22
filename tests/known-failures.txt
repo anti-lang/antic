@@ -28,7 +28,6 @@ matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387
 error_modules_export_class_under_a_class T404 An export class, enum or variant whose C name another module exports is not refused.
 error_modules_export_struct_under_a_class T404 An export class, enum or variant whose C name another module exports is not refused.
 error_modules_export_enum_under_a_struct T404 An export class, enum or variant whose C name another module exports is not refused.
-matrix_checks_use_after_free_after_a_switch_on_every_case_refused T406 E2 takes a switch on an enum without else as one that may run no arm.
 matrix_checks_uninitialized_read_at_an_index_changed_through_a_pointer_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_call_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_closure_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
