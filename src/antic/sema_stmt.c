@@ -238,6 +238,14 @@ static bool switch_ends(const struct stmt *s,
            ends(otherwise);
 }
 
+bool sema_switch_runs_an_arm(const struct stmt *s)
+{
+    const struct type *over = s->as.switch_stmt.value->type;
+
+    return over != NULL &&
+           (over->kind == TYPE_ENUM || over->kind == TYPE_VARIANT);
+}
+
 static bool finds_exit(void *data, const struct stmt *s)
 {
     bool *found = data;

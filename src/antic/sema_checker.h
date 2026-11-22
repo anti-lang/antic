@@ -803,6 +803,11 @@ void sema_check_test_block(struct checker *c, struct item *it);
 bool sema_block_returns(const struct block *b);
 /* Whether s is a call of a function that returns `never`. */
 bool sema_calls_never(const struct stmt *s);
+/* Whether the `switch` s without `else` runs one of its arms for every
+   value, as switch_ends reads it: one on an enum or a variant, whose
+   every value the checker makes an arm name. T288 and T405 of
+   docs/audit/tests-findings.md. */
+bool sema_switch_runs_an_arm(const struct stmt *s);
 struct type *sema_declared_result(struct checker *c);
 
 /* sema_closure.c */
