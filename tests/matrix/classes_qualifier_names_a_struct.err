@@ -1,0 +1,1 @@
+classes_qualifier_names_a_struct.anti:12:14: error: `Point` is no base and no interface of `Thing`

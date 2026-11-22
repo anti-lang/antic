@@ -1,0 +1,15 @@
+//! A class that names a function of the module as its base.
+
+fn helper() -> int
+{
+	return 1;
+}
+
+class Thing inherits helper
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

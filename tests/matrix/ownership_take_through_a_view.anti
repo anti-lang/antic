@@ -1,0 +1,31 @@
+//! `take` of an `own` field of an object reached through a view, a pointer made
+//! by `as`. The field holds `none` afterwards, and the taken node keeps its
+//! value.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub value: int = 0,
+}
+
+class Holder
+{
+	pub own head: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { head: alloc Node { value: 7 } };
+	let raw = h as *byte;
+	let n = take((raw as *Holder).head);
+	let got = n else {
+		return 1;
+	};
+	printf("%d %d\n".ptr, got.value as c_int, (h.head == none) as c_int);
+	delete(got);
+	delete(h);
+	return 0;
+}

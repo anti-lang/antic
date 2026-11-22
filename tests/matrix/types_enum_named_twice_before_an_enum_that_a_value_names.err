@@ -1,0 +1,1 @@
+types_enum_named_twice_before_an_enum_that_a_value_names.anti:15:6: error: `Twice` is already declared

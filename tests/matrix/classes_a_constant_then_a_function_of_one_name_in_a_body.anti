@@ -1,0 +1,18 @@
+//! A constant and then a function of one name in a class body.
+
+class Limits
+{
+	pub n: int = 0,
+
+	const MOST: int = 1;
+
+	fn MOST(self) -> int
+	{
+		return 2;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

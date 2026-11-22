@@ -1,0 +1,13 @@
+//! The value of an enum that names a name that is no value of the enum and
+//! nothing else of the module.
+
+enum Mode
+{
+	A = 1,
+	B = missing + 1,
+}
+
+fn main() -> int
+{
+	return 0;
+}

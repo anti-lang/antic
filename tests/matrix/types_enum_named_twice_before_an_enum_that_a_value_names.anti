@@ -1,0 +1,28 @@
+//! An enum declared twice before the enum that the value of an earlier enum
+//! names. The second declaration is the one message, and the value finds the
+//! later enum.
+
+enum First
+{
+	X = Second.Y as i32,
+}
+
+enum Twice
+{
+	P,
+}
+
+enum Twice
+{
+	Q,
+}
+
+enum Second
+{
+	Y = 2,
+}
+
+fn main() -> int
+{
+	return 0;
+}

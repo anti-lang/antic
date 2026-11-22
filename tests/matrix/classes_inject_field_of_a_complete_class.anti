@@ -1,0 +1,16 @@
+//! An `inject` field of a pointer to a class that has no open function.
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+class User
+{
+	inject p: *Plain,
+}
+
+fn main() -> int
+{
+	return 0;
+}

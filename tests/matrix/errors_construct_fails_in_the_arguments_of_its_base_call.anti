@@ -1,0 +1,76 @@
+//! A `construct` that fails in the arguments of the call of its base's
+//! `construct`, three levels deep. The middle level and the level below it take
+//! arguments and were never built, so neither `destruct` runs and no object is
+//! left behind. The call that succeeds builds every level and tears each down
+//! once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Base
+{
+	pub n: int = 0,
+
+	fn construct(self, n: int)
+	{
+		self.n = n;
+	}
+
+	fn destruct(self)
+	{
+		printf("base destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+class Middle inherits Base
+{
+	pub m: int = 0,
+
+	fn construct(self, n: int)
+	{
+		self.super.construct(n);
+		self.m = n * 2;
+	}
+
+	fn destruct(self)
+	{
+		printf("middle destruct %d\n".ptr, self.m as c_int);
+	}
+}
+
+class Top inherits Middle
+{
+	pub t: int = 0,
+
+	fn construct(self, n: int) may fail
+	{
+		self.super.construct(try checked(n));
+		self.t = n * 3;
+	}
+}
+
+fn checked(n: int) -> int may fail
+{
+	if n < 0 {
+		fail lang.Error.new(5, "negative");
+	}
+	return n;
+}
+
+fn make(n: int) -> int
+{
+	let t = alloc Top(n) catch e {
+		return -e.code;
+	};
+	let got = t.n + t.m + t.t;
+	delete(t);
+	return got;
+}
+
+fn main() -> int
+{
+	printf("%d\n".ptr, make(-1) as c_int);
+	printf("%d\n".ptr, make(2) as c_int);
+	return 0;
+}

@@ -1,0 +1,21 @@
+//! A qualified `concrete fn` whose qualifier names a struct of the module.
+
+struct Point
+{
+	x: int,
+}
+
+class Thing
+{
+	pub n: int = 0,
+
+	concrete fn Point::f(self) -> int
+	{
+		return 1;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

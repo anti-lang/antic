@@ -1,0 +1,15 @@
+//! A class that names a base that is not generic with a type argument.
+
+class Base
+{
+	pub n: int = 0,
+}
+
+class Thing inherits Base<int>
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

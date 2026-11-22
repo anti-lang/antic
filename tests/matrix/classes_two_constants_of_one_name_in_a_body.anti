@@ -1,0 +1,14 @@
+//! Two constants of one name in a class body.
+
+class Limits
+{
+	pub n: int = 0,
+
+	const MOST: int = 1;
+	const MOST: int = 2;
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,1 @@
+classes_two_constants_of_one_name_in_a_body.anti:8:8: error: `Limits` declares `MOST` twice

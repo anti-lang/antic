@@ -1,0 +1,2 @@
+modules_provides_a_class_with_an_open_function.anti:10:7: error: `Half` has the open function `more` and must be `abstract`
+modules_provides_a_class_with_an_open_function.anti:20:19: error: `Half` is abstract, and a `provides` line names a complete class

@@ -1,0 +1,1 @@
+classes_inherits_a_class_that_is_not_generic_with_an_argument.anti:8:13: error: `Base` is not generic

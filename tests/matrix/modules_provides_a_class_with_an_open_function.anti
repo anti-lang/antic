@@ -1,0 +1,25 @@
+//! A `provides` line that names a class not marked `abstract` that declares an
+//! open function. The class must be `abstract`, and the line names a complete
+//! class.
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Half inherits Shape
+{
+	concrete fn area(self) -> int
+	{
+		return 1;
+	}
+
+	abstract fn more(self) -> int;
+}
+
+provides Shape as Half;
+
+fn main() -> int
+{
+	return 0;
+}
