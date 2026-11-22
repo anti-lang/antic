@@ -597,16 +597,25 @@ static struct range range_of(struct index_walk *w, const struct expr *e)
 
 /* Whether every turn of the `for` s runs to the end of its body. A turn
    may end early by `break`, `continue`, `return`, `fail` or `yield`, by
-   a call whose failure leaves the loop or ends the program, and by a
-   call of a function that returns `never`. A `while`, a `do` and a walk
-   of a collection may not end. A `for` over a range always ends, and a
-   `break` or a `continue` inside one ends that loop alone. */
+   a call whose failure leaves the loop or ends the program, by a `let`
+   whose `catch fatal` ends the program where its value is `none`, T389,
+   and by a call of a function that returns `never`. A `while`, a `do`
+   and a walk of a collection may not end. A `for` over a range always
+   ends, and a `break` or a `continue` inside one ends that loop alone. */
 struct whole_walk {
     int nested;                     /* the ranges inside the loop */
     bool whole;
 };
 
 static bool whole_stmt(void *data, const struct stmt *s);
+
+/* Whether the handler h hands an error on: through `try`, to the handler
+   of a `try` block, or to `catch fatal`, which ends the program. */
+static bool hands_on(const struct handler *h)
+{
+    return h->kind == HANDLE_TRY || h->kind == HANDLE_ENCLOSING ||
+           h->kind == HANDLE_FATAL;
+}
 
 static bool whole_expr(void *data, const struct expr *e)
 {
@@ -618,9 +627,7 @@ static bool whole_expr(void *data, const struct expr *e)
     }
     if (e->kind == EXPR_CALL) {
         callee = e->as.call.callee != NULL ? e->as.call.callee->type : NULL;
-        if (e->as.call.handler.kind == HANDLE_TRY ||
-            e->as.call.handler.kind == HANDLE_ENCLOSING ||
-            e->as.call.handler.kind == HANDLE_FATAL ||
+        if (hands_on(&e->as.call.handler) ||
             (callee != NULL && callee->kind == TYPE_FN && callee->never)) {
             ww->whole = false;
         }
@@ -635,6 +642,13 @@ static bool whole_stmt(void *data, const struct stmt *s)
 
     v.data = ww;
     switch (s->kind) {
+    case STMT_LET:
+        /* The checker moves the handler of a call that gives a `?*T`
+           onto the guard of its `let`. */
+        if (hands_on(&s->as.let.guard)) {
+            ww->whole = false;
+        }
+        break;
     case STMT_BREAK:
     case STMT_CONTINUE:
         if (ww->nested == 0) {
