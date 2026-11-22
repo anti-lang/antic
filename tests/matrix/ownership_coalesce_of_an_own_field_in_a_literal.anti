@@ -1,0 +1,22 @@
+//! `b.one ?? alloc Node { }` as the value of an `own` field in a class literal.
+//! The value may be the pointer `b.one` owns, so the new object would own it as
+//! well, and it is refused as `Box { two: b.one }` is.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: ?*Node = none,
+	pub own two: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	b.one = alloc Node { n: 1 };
+	let c = Box { two: b.one ?? alloc Node { n: 2 } };
+	return 0;
+}

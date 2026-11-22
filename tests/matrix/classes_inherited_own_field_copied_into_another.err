@@ -1,0 +1,1 @@
+classes_inherited_own_field_copied_into_another.anti:25:10: error: `b.one` is held by an `own` field, use `take` to move it or `dup` to copy it

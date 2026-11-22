@@ -1,0 +1,48 @@
+//! Bound functions whose results have one type in the IR, a struct of one word
+//! and a struct of four words. Each call takes the result as its own function
+//! gives it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Small
+{
+	a: int,
+}
+
+struct Big
+{
+	a: int,
+	b: int,
+	c: int,
+	d: int,
+}
+
+class Giver
+{
+	pub n: int = 1,
+
+	pub fn small(self) -> Small
+	{
+		return Small { a: self.n };
+	}
+
+	pub fn big(self) -> Big
+	{
+		return Big { a: 1, b: 2, c: 3, d: self.n };
+	}
+}
+
+fn main() -> int
+{
+	let g = Giver { n: 100 };
+	let small = g.small;
+	let big = g.big;
+	let s = small();
+	let b = big();
+	printf("small %d\n".ptr, s.a as c_int);
+	printf("big %d %d %d %d\n".ptr, b.a as c_int, b.b as c_int, b.c as c_int,
+		b.d as c_int);
+	return 0;
+}

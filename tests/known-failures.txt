@@ -25,3 +25,38 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
+matrix_classes_bound_functions_give_two_structs_dev T396 A call through a bound function takes the signature of another whose IR types agree.
+matrix_classes_bound_functions_give_two_structs_memory_checks T396 A call through a bound function takes the signature of another whose IR types agree.
+matrix_classes_bound_functions_give_two_structs_release T396 A call through a bound function takes the signature of another whose IR types agree.
+matrix_classes_bound_functions_take_two_structs_and_two_signs_dev T396 A call through a bound function takes the signature of another whose IR types agree.
+matrix_classes_bound_functions_take_two_structs_and_two_signs_memory_checks T396 A call through a bound function takes the signature of another whose IR types agree.
+matrix_classes_bound_functions_take_two_structs_and_two_signs_release T396 A call through a bound function takes the signature of another whose IR types agree.
+matrix_ownership_coalesce_of_an_own_field_in_a_literal_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_an_own_field_into_another_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_held_values_assigned_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_held_values_in_a_let_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_held_values_in_a_tuple_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_held_values_returned_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_held_values_to_an_own_parameter_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_optional_read_of_an_own_field_into_another_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
+matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_dev T398 The fresh value that `??` takes is never torn down where the statement drops it.
+matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_memory_checks T398 The fresh value that `??` takes is never torn down where the statement drops it.
+matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_release T398 The fresh value that `??` takes is never torn down where the statement drops it.
+matrix_ownership_coalesce_of_fresh_values_dropped_dev T398 The fresh value that `??` takes is never torn down where the statement drops it.
+matrix_ownership_coalesce_of_fresh_values_dropped_memory_checks T398 The fresh value that `??` takes is never torn down where the statement drops it.
+matrix_ownership_coalesce_of_fresh_values_dropped_release T398 The fresh value that `??` takes is never torn down where the statement drops it.
+matrix_ownership_array_literal_of_owning_values_dropped_dev T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_array_literal_of_owning_values_dropped_memory_checks T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_array_literal_of_owning_values_dropped_release T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_cast_of_a_fresh_value_dropped_dev T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_cast_of_a_fresh_value_dropped_memory_checks T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_cast_of_a_fresh_value_dropped_release T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_dup_of_a_value_dropped_dev T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_dup_of_a_value_dropped_memory_checks T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_ownership_dup_of_a_value_dropped_release T399 A fresh copy, cast or array literal that the statement drops is never torn down.
+matrix_classes_inherited_own_field_copied_into_another_refused T400 A field the program reaches through a base has no spelling for the checker.
+matrix_classes_inherited_own_field_given_itself_dev T400 A field the program reaches through a base has no spelling for the checker.
+matrix_classes_inherited_own_field_given_itself_memory_checks T400 A field the program reaches through a base has no spelling for the checker.
+matrix_classes_inherited_own_field_given_itself_release T400 A field the program reaches through a base has no spelling for the checker.
+matrix_classes_copy_of_a_class_that_holds_one_that_replaces_destroyed_refused T401 The refusal of a copy of a class that replaces `destroyed` says it has `own` fields.
+matrix_classes_copy_of_a_class_that_replaces_destroyed_refused T401 The refusal of a copy of a class that replaces `destroyed` says it has `own` fields.

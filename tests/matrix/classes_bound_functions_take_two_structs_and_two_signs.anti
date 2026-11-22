@@ -1,0 +1,59 @@
+//! Bound functions whose parameters have one type in the IR and differ beside
+//! it: a struct of one word and a struct of four floats, and an `u8` and an
+//! `i8`. Each call passes its argument as its own function takes it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Small
+{
+	a: int,
+}
+
+struct Big
+{
+	a: f64,
+	b: f64,
+	c: f64,
+	d: f64,
+}
+
+class Taker
+{
+	pub n: int = 1,
+
+	pub fn small(self, s: Small) -> int
+	{
+		return s.a + self.n;
+	}
+
+	pub fn big(self, b: Big) -> int
+	{
+		return (b.a + b.b + b.c + b.d) as int + self.n;
+	}
+
+	pub fn unsigned(self, x: u8) -> int
+	{
+		return x as int;
+	}
+
+	pub fn signed(self, x: i8) -> int
+	{
+		return x as int;
+	}
+}
+
+fn main() -> int
+{
+	let t = Taker { n: 100 };
+	let small = t.small;
+	let big = t.big;
+	let unsigned = t.unsigned;
+	let signed = t.signed;
+	printf("small %d\n".ptr, small(Small { a: 7 }) as c_int);
+	printf("big %d\n".ptr, big(Big { a: 1.0, b: 2.0, c: 3.0, d: 4.0 }) as c_int);
+	printf("unsigned %d\n".ptr, unsigned(200 as u8) as c_int);
+	printf("signed %d\n".ptr, signed(-3 as i8) as c_int);
+	return 0;
+}

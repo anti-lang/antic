@@ -1,0 +1,1 @@
+classes_copy_of_a_class_that_replaces_destroyed.anti:16:10: error: `Plain` replaces `destroyed`, use `dup` instead of `=`

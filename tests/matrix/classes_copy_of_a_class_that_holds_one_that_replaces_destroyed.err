@@ -1,0 +1,1 @@
+classes_copy_of_a_class_that_holds_one_that_replaces_destroyed.anti:21:10: error: `Holder` holds `Plain` in `p`, which replaces `destroyed`, use `dup` instead of `=`

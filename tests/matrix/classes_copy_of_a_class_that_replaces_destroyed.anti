@@ -1,0 +1,18 @@
+//! `let q = p;` of a class whose only teardown is the `destroyed` hook it
+//! replaces. The refusal names the hook, since the class has no `own` field.
+
+class Plain
+{
+	pub n: int = 0,
+
+	concrete fn destroyed(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let p = Plain { n: 2 };
+	let q = p;
+	return q.n as int;
+}

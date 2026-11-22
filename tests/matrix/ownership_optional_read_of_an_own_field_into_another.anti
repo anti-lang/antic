@@ -1,0 +1,23 @@
+//! `p?.one` stored into another `own` field. The value is the pointer that the
+//! field `one` owns, so `b.two` would own it as well, and it is refused as
+//! `b.two = b.one;` is.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: ?*Node = none,
+	pub own two: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	b.one = alloc Node { n: 1 };
+	let p: ?*Box = &b;
+	b.two = p?.one;
+	return 0;
+}

@@ -1,0 +1,36 @@
+//! `make(1) as Owner` of a fresh class value with a `destruct`, passed to a
+//! parameter that is not `own` and read through a field. `as` to the type a
+//! value has gives that value, so the statement drops a fresh value and tears
+//! it down after the call and at the end of the statement, as a call is.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Owner
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn make(n: int) -> Owner
+{
+	return Owner { n: n };
+}
+
+fn show(x: Owner)
+{
+	printf("show %d\n".ptr, x.n as c_int);
+}
+
+fn main() -> int
+{
+	show(make(1) as Owner);
+	let n = (make(2) as Owner).n;
+	printf("n %d\n".ptr, n as c_int);
+	return 0;
+}

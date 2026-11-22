@@ -1,0 +1,31 @@
+//! An array literal of class values with a `destruct`, passed to a parameter
+//! that is not `own` and indexed. The statement drops the fresh array, so each
+//! element is torn down after the call and at the end of the statement, as a
+//! struct literal is.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Owner
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn show(x: [2]Owner)
+{
+	printf("show %d\n".ptr, x[1].n as c_int);
+}
+
+fn main() -> int
+{
+	show([Owner { n: 1 }, Owner { n: 2 }]);
+	let n = [Owner { n: 3 }, Owner { n: 4 }][0].n;
+	printf("n %d\n".ptr, n as c_int);
+	return 0;
+}

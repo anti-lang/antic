@@ -1,0 +1,1 @@
+ownership_coalesce_of_held_values_to_an_own_parameter.anti:23:14: error: `Owner` has a `destruct`, and a value that stays where it is does not move into `keep`, use `dup`

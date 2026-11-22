@@ -1,0 +1,21 @@
+//! `a ?? b` of two locals of a class with a `destruct` as the value of `=`. The
+//! value is the one `a` or `b` holds, so `=` would give it a second owner, and
+//! it is refused as `c = b;` is.
+
+class Owner
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let a: ?Owner = Owner { n: 1 };
+	let b = Owner { n: 2 };
+	let c = Owner { n: 3 };
+	c = a ?? b;
+	return c.n as int;
+}

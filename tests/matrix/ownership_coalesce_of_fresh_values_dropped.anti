@@ -1,0 +1,44 @@
+//! `a ?? b` of two fresh values of a class with a `destruct`, passed to a
+//! parameter that is not `own` and read through a field. The statement drops
+//! the value it takes, so the value is torn down after the call and at the end
+//! of the statement, whichever side gave it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Owner
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn some(n: int) -> ?Owner
+{
+	return Owner { n: n };
+}
+
+fn nothing() -> ?Owner
+{
+	return none;
+}
+
+fn show(x: Owner)
+{
+	printf("show %d\n".ptr, x.n as c_int);
+}
+
+fn main() -> int
+{
+	show(some(1) ?? Owner { n: 2 });
+	show(nothing() ?? Owner { n: 3 });
+	let n = (some(4) ?? Owner { n: 5 }).n;
+	printf("n %d\n".ptr, n as c_int);
+	let m = (nothing() ?? Owner { n: 6 }).n;
+	printf("m %d\n".ptr, m as c_int);
+	return 0;
+}

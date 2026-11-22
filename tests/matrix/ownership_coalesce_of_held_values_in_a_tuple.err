@@ -1,0 +1,1 @@
+ownership_coalesce_of_held_values_in_a_tuple.anti:18:11: error: `Owner` has a `destruct`, use `dup` instead of `=`

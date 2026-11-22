@@ -1,0 +1,20 @@
+//! `a ?? b` of two locals of a class with a `destruct` as a part of a tuple
+//! literal. The value is the one `a` or `b` holds, so the tuple would give it a
+//! second owner.
+
+class Owner
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+	}
+}
+
+fn main() -> int
+{
+	let a: ?Owner = Owner { n: 1 };
+	let b = Owner { n: 2 };
+	let t = (a ?? b, 5);
+	return t.1 as int;
+}

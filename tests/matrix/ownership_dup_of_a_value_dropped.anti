@@ -1,0 +1,32 @@
+//! `dup(b)` of a class value with a `destruct`, passed to a parameter that is
+//! not `own` and read through a field. The copy is a fresh value that the
+//! statement drops, so it is torn down after the call and at the end of the
+//! statement, as a literal is.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Owner
+{
+	pub n: int = 0,
+
+	pub fn destruct(self)
+	{
+		printf("destruct %d\n".ptr, self.n as c_int);
+	}
+}
+
+fn show(x: Owner)
+{
+	printf("show %d\n".ptr, x.n as c_int);
+}
+
+fn main() -> int
+{
+	let b = Owner { n: 2 };
+	show(dup(b));
+	let n = dup(b).n;
+	printf("n %d\n".ptr, n as c_int);
+	return 0;
+}

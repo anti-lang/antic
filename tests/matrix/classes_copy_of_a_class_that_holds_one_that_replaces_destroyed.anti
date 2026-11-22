@@ -1,0 +1,23 @@
+//! `let q = h;` of a class with a field of a class whose only teardown is the
+//! `destroyed` hook it replaces. The refusal follows the field to the hook.
+
+class Plain
+{
+	pub n: int = 0,
+
+	concrete fn destroyed(self)
+	{
+	}
+}
+
+class Holder
+{
+	pub p: Plain = Plain { },
+}
+
+fn main() -> int
+{
+	let h = Holder { };
+	let q = h;
+	return q.p.n as int;
+}

@@ -1,0 +1,6 @@
+exit 0
+show 2
+destruct 2
+destruct 2
+n 2
+destruct 2

@@ -1,0 +1,27 @@
+//! `b.two = b.one` of two `own` fields that `Crate` inherits from `Box`. The
+//! refusal names the field as the program writes it, as it does for the fields
+//! of `Box` itself.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: ?*Node = none,
+	pub own two: ?*Node = none,
+}
+
+class Crate inherits Box
+{
+	pub k: int = 0,
+}
+
+fn main() -> int
+{
+	let b = Crate { };
+	b.one = alloc Node { n: 1 };
+	b.two = b.one;
+	return 0;
+}
