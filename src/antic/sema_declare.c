@@ -1001,6 +1001,12 @@ static void resolve_base(struct checker *c, struct item *it)
         if (base != NULL && base->item != NULL &&
             base->item->kind == ITEM_TYPE) {
             base_type = sema_alias_type(c, base);
+            /* An alias of the error type had its message where it was
+               declared, as a base of another module of the error type
+               had, by T393 of docs/audit/tests-findings.md. */
+            if (sema_is_error(base_type)) {
+                return;
+            }
         }
     }
     /* A generic base is named with its arguments,
