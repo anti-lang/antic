@@ -1646,6 +1646,41 @@ headings above stand as they were.
 | `sema_check_sync_op` of `src/antic/sema_thread.c` | An operation other than `chan`, `send` and `recv`. | The parser writes those three alone. The checker writes `close`, `Mutex.new()`, `destroy` and the `delete` of a channel from a call it typed, and checks the node once. |
 | `worker_callee` and `worker_args` of `src/antic/sema_thread.c` | A worker without a symbol, and a parameter of a function bound to an object. | The checker gives the name of every worker its symbol, and no parameter type a program writes is a bound function. |
 
+## The sides of batch 3ap
+
+Batch 3ap of the third phase read the types of a compilation in
+`src/antic/types.c` and the helpers of the checker in `src/antic/sema.c`,
+each against the specifications and the DESIGN comments of its file. It
+fixed T391 in `src/antic/sema_stmt.c` and T392 in `src/antic/sema.c`. The
+rows of the two files under their own headings above stand as they were.
+The fix of T391 adds one side that no input reaches, in the last row.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `depth_above` of `src/antic/types.c` | A part that stands `UINT32_MAX` levels deep. | The checker refuses a type that nests deeper than `TYPES_NEST_MAX` levels, far below it. |
+| `lent_form`, `types_holds_lent`, `types_is_lent`, `types_is_nullable`, `types_with_none` and `types_is_maybe_match` of `src/antic/types.c` | A type that is NULL. | Every caller passes the type of a value, a field or a parameter, which the checker gave it. |
+| `types_plain_parts` and `print_fn` of `src/antic/types.c` | A function bound to an object. | No type a program writes is a bound function, and a bound function stands as the callee of a call alone. |
+| `types_symbolic_print` of `src/antic/types.c` | A unary minus before an integer that is unsigned or below 2 to the 63. | The checker folds a unary minus of an integer, and a symbolic value stays one where `size_of` stands below it. |
+| `types_symbolic_print` and `types_primary_member` and `types_interface_member` of `src/antic/types.c`, `resolve_type_inner` of `src/antic/sema.c` | A value of an enum that the switch does not name. | Each switch names every value of its enum. |
+| `types_job` of `src/antic/types.c` | A struct of the same result whose name is not that of `Job`. | A struct carries a result when it is a `Job` alone. |
+| `same_literal` of `src/antic/types.c` | A match of a literal met before the plain match, when the plain one is asked for. | The checker declares the plain `Match` and `ByteMatch` of `anti.lang` before it checks any literal. |
+| `types_is_chan`, `types_is_flags`, `types_is_job`, `types_is_simd` and `types_is_mask` of `src/antic/types.c` | A type of `anti.lang` of that name without its element, with a result, without one, or a simd struct without lanes. | The compiler makes each of those types itself, with its part, and the parser refuses a simd struct without fields. |
+| `types_cases_from_fields` and `types_case_index` of `src/antic/types.c` | A variant of a library file with no field or more than two, and a variant without its tag. | The writer of a library file writes every variant as its tag and, when a case holds fields, its union, so only a damaged file holds another. Every variant the checker declares has its tag. |
+| `types_signature` of `src/antic/types.c` | A signature with `self` of a function without parameters. | A function with `self` has it as its first parameter. |
+| `types_copy_name` of `src/antic/types.c` | A copy nested in a generic whose name holds no dot after the name of the class around it. | The checker names a nested type `Outer.Inner`. |
+| `pointer_free` of `src/antic/types.c` | A field without a type. | The checker gives every field its type, the type of an error among them. |
+| `sema_is_error`, `sema_has_body`, `sema_within`, `nested_find` and `sema_std_item` of `src/antic/sema.c` | A type that is NULL, a function without a symbol, an item without an owner, a nested type without a symbol, and an item of the standard library without a type. | The checker gives every value a type and every item it declared a symbol before these tests. |
+| `package_shared` of `src/antic/sema.c` | A compilation without a package, and a library file without the name of its package. | `sema_check` takes the module name as the package when no `--package` names one, and every library file carries the name of its package. |
+| `sema_direct_item` of `src/antic/sema.c` | A module of a direct import that the scope holds with a home. | A module in the scope has no home. The one caller that may meet a module tests for it first. |
+| `sema_warn_catch_shadow` of `src/antic/sema.c` | A `catch` without a name. | The checker calls it for a handler that binds a name alone. |
+| `sema_enter_scope` of `src/antic/sema.c` | A scope opened with none around it. | The scope of the module stands around every scope a function opens. |
+| `resolve_named` of `src/antic/sema.c` | A struct whose type is an error, named with type arguments. | The checker gives the symbol of a type a type of its kind, and names `NULL` alone while the declaration resolves. |
+| `sema_param_form` of `src/antic/sema.c` | A function bound to an object. | No parameter type a program writes is a bound function. |
+| `sema_std_function`, `sema_error_class`, `sema_location_type`, `sema_lang_error_or_null` and `allocator_pointer` of `src/antic/sema.c` | An item of the standard library of another kind than the one the compiler names. | The standard library is part of the package, and its items have the kinds the compiler names. |
+| `check_member_functions` of `src/antic/sema.c` | A function of a class body without a symbol. | The checker declares every function of a body it checks. |
+| `named_by_refused_base` and `report_program` of `src/antic/sema.c` | A class without a symbol or without a type, a worker without a body and an abstract class without a type. | The checker declares every class and gives it its type, and the parser gives every worker its body. |
+| `check_switch` of `src/antic/sema_stmt.c` | An `if let` on a value of the error type whose arm without a binding is no name. | The parser writes the arm of every `if let` as a name. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
