@@ -1681,6 +1681,40 @@ The fix of T391 adds one side that no input reaches, in the last row.
 | `named_by_refused_base` and `report_program` of `src/antic/sema.c` | A class without a symbol or without a type, a worker without a body and an abstract class without a type. | The checker declares every class and gives it its type, and the parser gives every worker its body. |
 | `check_switch` of `src/antic/sema_stmt.c` | An `if let` on a value of the error type whose arm without a binding is no name. | The parser writes the arm of every `if let` as a name. |
 
+## The sides of batch 3aq
+
+Batch 3aq of the third phase read the owning values of lowering in
+`src/antic/lower_owning.c` and the declarations of the checker in
+`src/antic/sema_declare.c`, each against the specifications and the
+DESIGN comments of its file. It fixed T393 and T395 in
+`src/antic/sema_declare.c` and T394 in `src/antic/sema_const.c`. The rows
+of the two files under their own headings above stand as they were. The
+fixes of T394 and T395 add the sides of the last four rows.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_destroy_owned`, `lower_clear_owned`, `lower_init_owned`, `lower_copy_owned` and `lower_copies_parts` of `src/antic/lower_owning.c` | A field of a struct or a tuple that is a `use` field, a base, a table or an interface. | A struct body holds plain fields alone, by "Structs" in `docs/anti-object-model.md`, and a tuple holds its elements. |
+| `lower_init_owned` of `src/antic/lower_owning.c` | A variant without a case. | The checker refuses a variant without a case, with `variant ... has no case`. |
+| `lower_copy_owned` of `src/antic/lower_owning.c` | A function value without `own` in a part that a copy reaches. | `lower_copies_parts` enters a function value when it is an `own fn` alone. |
+| `lower_own_field` of `src/antic/lower_owning.c` | An `=` to a field that names an item, and a field that the chain of its class does not hold. | A constant takes no `=`, and a static field is atomic and takes no `=` either. The checker resolved every field of a class through its chain. |
+| `lower_chain_unbuilds` and `unbuild_base` of `src/antic/lower_owning.c` | A level of the chain that is no class, and a chain without its root. | The base of a class is a class, and every chain ends at `anti.lang.Object`, whose base is none, where both loops stop. |
+| `lower_unbuild` of `src/antic/lower_owning.c` | A class without a base. | Every class has a base, `anti.lang.Object` at the least, and the `construct` of `Object` cannot fail. |
+| `prepare` of `src/antic/lower_owning.c` | A level of a class without fields after a constant of the class. | Every level of a class holds its base or its table as field 0. |
+| `imports_module` of `src/antic/sema_declare.c` | A library file whose import names no library file of the compilation. | The driver refuses such a file when it loads it, with `needs module`. |
+| `bitfield_width`, `alignment` and `check_enum_value` of `src/antic/sema_declare.c` | A width, an N of `align(N)` or the value of an enum that the check takes and the evaluation refuses. | The check of an integer expression folds every operator and refuses what does not fold, and the walk refuses a call and, since T394, a function. |
+| `declare_enum_values` of `src/antic/sema_declare.c` | A folded value of an enum that is neither an integer nor a value computed from `size_of`. | The check holds the value to the integer base of the enum. |
+| `check_defaults` of `src/antic/sema_declare.c` | A function whose type is missing, is the error type or has fewer parameters than the item. | `function_type_of` of `src/antic/sema.c` gives every function a type of its parameters, and the error type when one parameter has it, as the row of `check_owned` says. |
+| `sema_check_provides` of `src/antic/sema_declare.c` | A class of the module without a type. | The checker gives every class it declared its type before it checks a `provides` line. |
+| `module_operator` of `src/antic/sema_declare.c` | An `operator fn` among the items of a module that has an owner. | An `operator fn` of a class body is a member of the class and no item of the module. |
+| `first_type_name` of `src/antic/sema_declare.c` | A parameter without a type. | The parser gives every parameter of an `operator fn` its type. |
+| `resolve_base` of `src/antic/sema_declare.c` | A base whose symbol is a struct of the error type. | The checker gives the symbol of a type a type of its kind. |
+| `check_own_field`, `check_transient_field` and `resolve_fields` of `src/antic/sema_declare.c` | A field of a function type bound to an object. | No type a program writes is a bound function. |
+| `check_field_defaults` and `check_function_defaults` of `src/antic/sema_declare.c` | A declared field past the fields of its type. | `declare_fields` gives the type every declared field, after the base. |
+| `declare_members` of `src/antic/sema_declare.c` | A qualifier that names a struct symbol without a type, and a function of the body of a struct. | The checker gives every struct symbol its type, and a struct body holds fields alone. |
+| `sema_declare_all_members` of `src/antic/sema_declare.c` | A singleton, a struct, a union or a class without a type, and a constant of a body without a symbol. | The loops above give every item and every member its symbol and its type. |
+| `function_in` of `src/antic/sema_const.c` | A part that is `NULL`. | The parser gives every operand, element and field of a literal its expression. |
+| `sema_refuse_value_parts` of `src/antic/sema_const.c` | A place read after the functions have their types, and a refusal that `fail_const` takes back. | Each caller reads its place before, and `sema_const_symbol` calls it before alone. `fail_const` gives `false` always. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

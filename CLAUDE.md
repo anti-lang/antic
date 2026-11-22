@@ -1017,6 +1017,20 @@ not re-open a settled decision without asking Eddie.
   to test 8174. It ran each sanitizer suite in the six parts of `asan`,
   the last up to test 8172: `asan` 244 s, 179 s, 262 s, 170 s, 119 s and
   601 s, `ubsan` 255 s, 184 s, 271 s, 175 s, 138 s and 643 s.
+  Batch 3aq of the third phase of coverage measured `host` in the same
+  three parts: 379 s, 275 s and 379 s before the commit of the tests of
+  the sides, up to test 8198, 382 s, 279 s and 375 s before the commit of
+  T393 and T394, up to test 8205, 380 s, 278 s and 378 s before the fix
+  of T393, 378 s, 275 s and 343 s before a first fix of T394, where 45
+  tests failed on the defaults of fields of function type, 380 s, 278 s
+  and 380 s before the commit of T395, up to test 8206, 381 s, 278 s and
+  378 s before the fix of T394, 311 s, 271 s and 375 s before that of
+  T395, where `emit_identity` failed on the moved texts, which ran again
+  alone once the manifest stood written, and 376 s, 276 s and 370 s
+  before the commit of eight more sides, up to test 8214. It ran each
+  sanitizer suite in the six parts of `asan`, the last up to test 8212:
+  `asan` 249 s, 180 s, 265 s, 166 s, 131 s and 614 s, `ubsan` 254 s,
+  181 s, 267 s, 166 s, 140 s and 640 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1627,12 +1641,12 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8174 ctest tests pass on the development Mac, and two of them, the
+- 8214 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
   carry `host=windows`, the three lines of T385, which wait for Eddie's
   choice, and the three lines of T387, which wait for his answer.
-  The ASan and the UBSan builds run 8172 each
+  The ASan and the UBSan builds run 8212 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
