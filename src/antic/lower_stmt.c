@@ -1380,10 +1380,26 @@ static void lower_stmt_kind(struct lowerer *l, const struct stmt *s);
 
 bool lower_is_fresh(const struct expr *e)
 {
-    return e->kind == EXPR_CALL || e->kind == EXPR_STRUCT_LIT ||
-           e->kind == EXPR_TUPLE ||
-           (e->kind == EXPR_NAME && e->symbol != NULL &&
-            e->symbol->kind == SYMBOL_CONST && sema_holds_class(e->type));
+    /* `dup(x)` of a value, an array literal and `as` to the type a fresh
+       value has make a value as a literal does, T399 of
+       docs/audit/tests-findings.md. */
+    switch (e->kind) {
+    case EXPR_OBJECT:
+        return e->as.object.op == TOKEN_DUP && e->type != NULL &&
+               e->type->kind != TYPE_POINTER;
+    case EXPR_ARRAY_LIT:
+        return true;
+    case EXPR_CAST:
+        return !e->as.cast.test && e->type != NULL &&
+               e->type == e->as.cast.operand->type &&
+               lower_is_fresh(e->as.cast.operand);
+    default:
+        return e->kind == EXPR_CALL || e->kind == EXPR_STRUCT_LIT ||
+               e->kind == EXPR_TUPLE ||
+               (e->kind == EXPR_NAME && e->symbol != NULL &&
+                e->symbol->kind == SYMBOL_CONST &&
+                sema_holds_class(e->type));
+    }
 }
 
 /* DESIGN: a fresh value that a statement reads through a field or passes

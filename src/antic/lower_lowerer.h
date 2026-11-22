@@ -738,8 +738,9 @@ void lower_push_own_action(struct lowerer *l, const struct symbol *param);
 struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
 void lower_clear_moved(struct lowerer *l, const struct expr *value);
-/* Whether e makes a fresh value at each use: a call, a literal, or a
-   class literal that defaults a parameter. */
+/* Whether e makes a fresh value at each use: a call, a literal, a class
+   literal that defaults a parameter, `dup(x)` of a value or `as` of a
+   fresh value to its own type. */
 bool lower_is_fresh(const struct expr *e);
 /* Keep the fresh value that expression e gave at address to the end of
    its statement, when e is a call result or a literal whose type has a
