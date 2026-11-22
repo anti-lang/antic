@@ -1,0 +1,1 @@
+threads_compare_swap_of_an_unchecked_own_field.anti:20:12: error: `compare_swap` takes an atomic field or a plain one, and `top` is an `own` field

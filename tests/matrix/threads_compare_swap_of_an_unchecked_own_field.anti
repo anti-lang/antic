@@ -1,0 +1,24 @@
+//! `compare_swap` takes a plain field of one word that `unchecked` marks, by
+//! the entry of 2026-09-24 under "Concurrent classes". An `own` field owns what
+//! it holds, and a swap moves no owner into it, so the program would free `n`
+//! twice. The call is refused, T390.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+concurrent class Slot
+{
+	pub own top: ?*Node = none unchecked(unguarded-field, "lock-free"),
+}
+
+fn main() -> int
+{
+	let s = alloc Slot { };
+	let n = alloc Node { n: 7 };
+	let put = s.top.compare_swap(none, n);
+	delete(n);
+	delete(s);
+	return 0;
+}
