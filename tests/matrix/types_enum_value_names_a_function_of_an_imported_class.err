@@ -1,0 +1,1 @@
+types_enum_value_names_a_function_of_an_imported_class.anti:8:6: error: cannot convert `fn() -> Builder` to `i32`

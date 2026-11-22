@@ -1,0 +1,14 @@
+//! The value of an enum that names a function of a class that a direct import
+//! names. Its type is known, so the conversion is refused.
+
+import anti.text.{Builder};
+
+enum Mode
+{
+	A = Builder.new as i32,
+}
+
+fn main() -> int
+{
+	return Mode.A as int;
+}

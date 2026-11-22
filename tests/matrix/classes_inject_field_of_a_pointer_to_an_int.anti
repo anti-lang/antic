@@ -1,0 +1,11 @@
+//! An `inject` field of a pointer to an `int`, which is no abstract class.
+
+class User
+{
+	inject p: *int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

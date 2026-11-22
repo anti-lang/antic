@@ -1,0 +1,1 @@
+types_enum_value_holds_a_function_in_a_struct_literal.anti:17:16: error: a function is not a constant expression

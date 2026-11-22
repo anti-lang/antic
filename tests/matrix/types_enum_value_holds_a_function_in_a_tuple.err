@@ -1,0 +1,1 @@
+types_enum_value_holds_a_function_in_a_tuple.anti:11:7: error: a function is not a constant expression

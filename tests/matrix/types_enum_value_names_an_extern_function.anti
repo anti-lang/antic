@@ -1,0 +1,13 @@
+//! The value of an enum that names an `extern fn`.
+
+extern fn abs(n: c_int) -> c_int;
+
+enum Mode
+{
+	A = abs as i32,
+}
+
+fn main() -> int
+{
+	return Mode.A as int;
+}

@@ -1,0 +1,23 @@
+//! The value of an enum that reads a struct literal whose first field is a
+//! function of the module.
+
+struct Pair
+{
+	f: fn() -> int,
+	n: i32,
+}
+
+fn helper() -> int
+{
+	return 1;
+}
+
+enum Mode
+{
+	A = Pair { f: helper, n: 2 }.n,
+}
+
+fn main() -> int
+{
+	return Mode.A as int;
+}

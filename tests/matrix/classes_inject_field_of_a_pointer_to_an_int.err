@@ -1,0 +1,1 @@
+classes_inject_field_of_a_pointer_to_an_int.anti:5:2: error: `inject` needs a pointer to an abstract class, and `p` has type `*int`

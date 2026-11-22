@@ -1,0 +1,16 @@
+//! The value of an enum that adds a number to a function of the module.
+
+fn helper() -> int
+{
+	return 1;
+}
+
+enum Mode
+{
+	A = helper + 1,
+}
+
+fn main() -> int
+{
+	return Mode.A as int;
+}
