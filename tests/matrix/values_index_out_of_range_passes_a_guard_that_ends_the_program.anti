@@ -1,0 +1,31 @@
+//! C2 counts a `let` whose `catch fatal` guards a `?*T` as a statement that may
+//! end the turn of a `for`. `pick` gives `none` on the last turn, so the
+//! program ends there before the index of `xs` reaches its length.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Box
+{
+	n: int,
+}
+
+fn pick(boxes: []Box, k: int) -> ?*Box
+{
+	if k < boxes.len {
+		return &boxes[k];
+	}
+	return none;
+}
+
+fn main() -> int
+{
+	let xs = [1, 2, 3, 4];
+	let boxes = [Box { n: 1 }, Box { n: 2 }, Box { n: 3 }, Box { n: 4 }];
+	for i in 0..xs.len + 1 {
+		let b = pick(boxes[0..4], i) catch fatal;
+		printf("turn %d: %d\n".ptr, i, xs[i] + b.n);
+	}
+	return 0;
+}

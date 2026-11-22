@@ -1,0 +1,18 @@
+//! C2 follows a local that the flags form `(r, f) = e;` assigns. `r` holds 9
+//! after its `let`, and the flags form gives it 3 before the index, so the
+//! index of `xs` by `r` stays inside the array.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let xs = [1, 2, 3, 4];
+	let x = 1;
+	let (q, f) = x + 1;
+	let r = 9;
+	(r, f) = x + 2;
+	printf("element: %d\n".ptr, xs[r] + q);
+	return 0;
+}
