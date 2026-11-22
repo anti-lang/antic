@@ -1,0 +1,1 @@
+types_enum_value_names_a_constant_that_names_a_function.anti:9:16: error: a function is not a constant expression

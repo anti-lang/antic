@@ -1,0 +1,19 @@
+//! The value of an enum that names a constant whose value names a function of
+//! the module, which is no constant expression.
+
+fn helper() -> int
+{
+	return 1;
+}
+
+const N: int = helper;
+
+enum Mode
+{
+	A = N as i32,
+}
+
+fn main() -> int
+{
+	return Mode.A as int;
+}

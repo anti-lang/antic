@@ -1,0 +1,18 @@
+//! The default of a field of a class that names a function of the module, which
+//! is no constant expression.
+
+fn helper() -> int
+{
+	return 1;
+}
+
+class Box
+{
+	pub n: int = helper,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	return b.n;
+}

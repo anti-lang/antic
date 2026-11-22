@@ -1,0 +1,23 @@
+//! The default of a field of a class that names a function of a class body,
+//! which is no constant expression.
+
+class Maker
+{
+	pub n: int = 0,
+
+	fn make() -> int
+	{
+		return 1;
+	}
+}
+
+class Box
+{
+	pub n: int = Maker.make,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	return b.n;
+}

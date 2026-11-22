@@ -1,0 +1,17 @@
+//! The N of `align(N)` that names a function of the module, which is no
+//! constant expression.
+
+fn helper() -> int
+{
+	return 1;
+}
+
+struct Wide align(helper)
+{
+	a: int,
+}
+
+fn main() -> int
+{
+	return size_of(Wide) as int;
+}

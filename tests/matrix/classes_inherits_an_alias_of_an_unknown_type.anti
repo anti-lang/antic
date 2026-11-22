@@ -1,0 +1,13 @@
+//! A class whose base is an alias of an unknown type. The unknown type is the
+//! one message, and the base gets no second one.
+
+type Alias = Nope;
+
+class Thing inherits Alias
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

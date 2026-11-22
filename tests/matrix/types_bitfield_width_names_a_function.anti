@@ -1,0 +1,18 @@
+//! The width of a bitfield that names a function of the module, which is no
+//! constant expression.
+
+fn helper() -> int
+{
+	return 1;
+}
+
+struct Flags
+{
+	a: u8 : helper,
+	b: u8 : 3,
+}
+
+fn main() -> int
+{
+	return size_of(Flags) as int;
+}

@@ -25,3 +25,10 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
+matrix_classes_inherits_an_alias_of_an_unknown_type_refused T393 A base named by an alias of the error type gets a second message.
+matrix_types_enum_value_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_types_bitfield_width_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_types_align_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_classes_field_default_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_classes_field_default_names_a_function_of_a_class_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_types_enum_value_names_a_constant_that_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
