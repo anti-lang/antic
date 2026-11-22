@@ -1,5 +1,5 @@
-//! The default of a field of a class that names a function of a class body,
-//! which is no constant expression.
+//! The default of an `int` field of a class that names a function of a class
+//! body.
 
 class Maker
 {

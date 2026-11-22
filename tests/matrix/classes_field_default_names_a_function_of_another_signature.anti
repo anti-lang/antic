@@ -1,0 +1,18 @@
+//! The default of a field of function type that names a function of the module
+//! of another signature.
+
+fn wrong(s: str) -> int
+{
+	return s.len;
+}
+
+class Box
+{
+	pub call: fn(int) -> int = wrong,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	return b.call(5);
+}

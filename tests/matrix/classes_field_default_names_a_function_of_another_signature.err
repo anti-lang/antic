@@ -1,0 +1,1 @@
+classes_field_default_names_a_function_of_another_signature.anti:11:29: error: expected `fn(int) -> int`, found `fn(str) -> int`

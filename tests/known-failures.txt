@@ -28,6 +28,7 @@ matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387
 matrix_types_enum_value_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
 matrix_types_bitfield_width_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
 matrix_types_align_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
-matrix_classes_field_default_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
-matrix_classes_field_default_names_a_function_of_a_class_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_classes_field_default_names_a_function_refused T395 A default of a field that names a function is never checked against the type of the field.
+matrix_classes_field_default_names_a_function_of_a_class_refused T395 A default of a field that names a function is never checked against the type of the field.
 matrix_types_enum_value_names_a_constant_that_names_a_function_refused T394 A name of a function read before the functions have their types gives no message.
+matrix_classes_field_default_names_a_function_of_another_signature_refused T395 A default of a field that names a function is never checked against the type of the field.

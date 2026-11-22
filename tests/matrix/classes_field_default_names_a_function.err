@@ -1,1 +1,1 @@
-classes_field_default_names_a_function.anti:11:15: error: a function is not a constant expression
+classes_field_default_names_a_function.anti:11:15: error: expected `int`, found `fn() -> int`
