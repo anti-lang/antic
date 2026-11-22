@@ -1,0 +1,13 @@
+//! The name of a function stands where a type does. It names no type, so the
+//! message is that of an unknown type.
+
+fn f() -> int
+{
+	return 1;
+}
+
+fn main() -> int
+{
+	let x: f = 0;
+	return 0;
+}

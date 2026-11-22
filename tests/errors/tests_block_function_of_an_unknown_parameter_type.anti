@@ -1,0 +1,10 @@
+//! A function of a `tests` block with a parameter of a type that is not
+//! declared gets the message of the type alone, and none of the shape of a
+//! test.
+
+tests
+{
+	fn reads(x: Nope)
+	{
+	}
+}

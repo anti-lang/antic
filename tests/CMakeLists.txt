@@ -5861,6 +5861,7 @@ foreach(case "layout|-S,--target,linux-x86_64,-o,${LISTINGS}/layout.s,layout.ant
         "tests_block_twice|--front-end,--tests,tests_block_twice.anti"
         "tests_block_without_a_brace|--front-end,--tests,tests_block_without_a_brace.anti"
         "tests_block_function_without_a_name|--front-end,--tests,tests_block_function_without_a_name.anti"
+        "tests_block_function_of_an_unknown_parameter_type|--front-end,--tests,tests_block_function_of_an_unknown_parameter_type.anti"
         "checks_escaping_local_in_a_tests_block|--front-end,--tests,checks_escaping_local_in_a_tests_block.anti"
         "checks_use_after_free_in_a_tests_block|--front-end,--tests,checks_use_after_free_in_a_tests_block.anti"
         "checks_uninitialized_read_in_a_tests_block|--front-end,--tests,checks_uninitialized_read_in_a_tests_block.anti"
