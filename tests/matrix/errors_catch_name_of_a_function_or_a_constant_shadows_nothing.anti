@@ -1,0 +1,33 @@
+//! The name a `catch` binds may be the name of a function or a constant of the
+//! module. Neither is a variable, so neither gets the warning `shadowed-catch`.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn pick(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn shown() -> int
+{
+	return 7;
+}
+
+const LIMIT: int = 3;
+
+fn main() -> int
+{
+	let a = pick(-1) catch shown {
+		yield 2;
+	};
+	let b = pick(-1) catch LIMIT {
+		yield 4;
+	};
+	printf("%d %d %d %d\n".ptr, a as c_int, b as c_int, shown() as c_int, LIMIT as c_int);
+	return 0;
+}

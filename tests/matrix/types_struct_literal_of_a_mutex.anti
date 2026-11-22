@@ -1,0 +1,8 @@
+//! A struct literal of `Mutex` is refused. The compiler declares the type, and
+//! `Mutex.new()` makes one, so no literal builds it.
+
+fn main() -> int
+{
+	let m = Mutex { };
+	return 0;
+}

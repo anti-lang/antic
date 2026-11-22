@@ -1,0 +1,1 @@
+types_type_arguments_on_an_unknown_type_of_a_module.anti:8:9: error: `text` has no public struct `Nope`

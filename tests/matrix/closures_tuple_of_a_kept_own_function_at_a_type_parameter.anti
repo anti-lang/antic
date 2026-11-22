@@ -1,0 +1,24 @@
+//! A tuple that holds a `keep own` parameter of function type stands at a
+//! parameter of a type parameter. The tuple takes the snapshot over, and the
+//! copy of the generic frees it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn second<T>(x: T) -> int
+{
+	return 5;
+}
+
+fn hold(keep own g: fn() -> int) -> int
+{
+	return second((g, 1));
+}
+
+fn main() -> int
+{
+	let s = snapshot fn() -> int {
+		return 3;
+	};
+	printf("%d\n".ptr, hold(s) as c_int);
+	return 0;
+}

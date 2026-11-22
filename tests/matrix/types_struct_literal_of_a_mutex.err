@@ -1,0 +1,1 @@
+types_struct_literal_of_a_mutex.anti:6:10: error: unknown struct `Mutex`

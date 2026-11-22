@@ -1,0 +1,33 @@
+//! A struct names a copy of a generic before the generic. The copy is filled
+//! there, and its fields name a copy of a generic and a struct, both declared
+//! after it. The nesting of each is measured once all are filled.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Top
+{
+	b: Box<int>,
+}
+
+struct Box<T>
+{
+	w: Wrap<T>,
+	p: Plain,
+}
+
+struct Wrap<T>
+{
+	v: T,
+}
+
+struct Plain
+{
+	n: int,
+}
+
+fn main() -> int
+{
+	let t = Top { b: Box<int> { w: Wrap<int> { v: 4 }, p: Plain { n: 5 } } };
+	printf("%d %d\n".ptr, t.b.w.v as c_int, t.b.p.n as c_int);
+	return 0;
+}

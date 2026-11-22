@@ -1,0 +1,11 @@
+//! A `sync` inside a `sync`, both on a name that is not declared, gets the
+//! message of each name, and none of a nested `sync` on one place.
+
+fn main() -> int
+{
+	sync nope {
+		sync nope {
+		}
+	}
+	return 0;
+}

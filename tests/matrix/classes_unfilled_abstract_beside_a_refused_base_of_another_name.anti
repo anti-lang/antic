@@ -1,0 +1,16 @@
+//! A class whose base is refused and names another class leaves the warning of
+//! an abstract class that nothing fills, beside the refusal of the base.
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> int;
+}
+
+class Thing inherits Nope
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,10 @@
+//! Type arguments after a type that the module named does not hold get the
+//! message of the missing type alone, and none that the type is not generic.
+
+import anti.text;
+
+fn main() -> int
+{
+	let x: text.Nope<int> = 0;
+	return 0;
+}

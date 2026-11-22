@@ -1,0 +1,22 @@
+//! A tuple that holds an array whose length `size_of` computes stands at a
+//! parameter of a type parameter. The type argument keeps the length.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct H
+{
+	a: i64,
+}
+
+fn second<T>(x: T) -> int
+{
+	return 5;
+}
+
+fn main() -> int
+{
+	let a: [size_of(H)]u8 = [7; size_of(H)];
+	let t = (a, 1);
+	printf("%d %d %d %d\n".ptr, second(t) as c_int, t.0[0] as c_int, t.0.len as c_int, t.1 as c_int);
+	return 0;
+}

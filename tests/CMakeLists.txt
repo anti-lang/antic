@@ -3909,6 +3909,14 @@ antic_modules_test(variant
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/variants")
 
+# A variant of a library whose cases hold no fields, so its library file
+# carries the tag alone and no union.
+antic_modules_test(variant_without_fields
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/variant_without_fields"
+    LIBRARIES modes
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/variant_without_fields")
+
 # A public class of a library whose layout holds types nested in it,
 # which another module lays out, builds and calls.
 antic_modules_test(nested

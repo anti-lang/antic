@@ -1,0 +1,18 @@
+//! The length `-(~size_of(H))` prints without the parentheses, since the text
+//! after the unary minus starts with `~`, by R046 of "Rules of 2026-10-13".
+
+struct H
+{
+	a: i64,
+}
+
+struct S
+{
+	cells: [-(~size_of(H))]int,
+}
+
+fn main() -> int
+{
+	let s = S { cells: [1, 2] };
+	return 0;
+}

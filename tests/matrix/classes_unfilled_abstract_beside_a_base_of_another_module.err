@@ -1,0 +1,1 @@
+classes_unfilled_abstract_beside_a_base_of_another_module.anti:6:16: error: `Shape` is abstract and no class fills it [unfilled-abstract]

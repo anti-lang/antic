@@ -1,0 +1,7 @@
+//! `main` with a parameter of a type that is not declared gets the message of
+//! the type alone, and none of the signature of `main`.
+
+fn main(xs: Nope) -> int
+{
+	return 0;
+}

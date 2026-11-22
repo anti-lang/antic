@@ -1,0 +1,2 @@
+ownership_deferred_uses_on_one_line_after_a_delete.anti:20:15: error: `a` was deleted on line 21 [use-after-free]
+ownership_deferred_uses_on_one_line_after_a_delete.anti:20:26: error: `b` was deleted on line 22 [use-after-free]

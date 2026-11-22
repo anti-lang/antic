@@ -1,0 +1,18 @@
+//! A class whose base stands in another module names no class of this one, so
+//! an abstract class that nothing fills still gets its warning.
+
+import anti.mem;
+
+abstract class Shape
+{
+	pub abstract fn area(self) -> int;
+}
+
+class Arena inherits mem.ArenaAllocator
+{
+}
+
+fn main() -> int
+{
+	return 0;
+}

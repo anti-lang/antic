@@ -1,0 +1,46 @@
+//! A `defer` that reads a deleted object, in a function with two exits, after a
+//! warning of another name. The use gets its message once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box
+{
+	pub n: int = 0,
+}
+
+fn show(n: int)
+{
+	printf("%d\n".ptr, n as c_int);
+}
+
+fn pick(n: int) -> int may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+	return n;
+}
+
+fn run(k: int) -> int
+{
+	let e = 4;
+	let got = pick(k) catch e {
+		yield 3;
+	};
+	let a = alloc Box { n: got + e };
+	defer {
+		show(a.n);
+	}
+	delete(a);
+	if k > 0 {
+		return 1;
+	}
+	return 0;
+}
+
+fn main() -> int
+{
+	return run(0);
+}

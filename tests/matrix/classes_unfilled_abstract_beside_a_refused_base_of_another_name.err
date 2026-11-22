@@ -1,0 +1,2 @@
+classes_unfilled_abstract_beside_a_refused_base_of_another_name.anti:9:13: error: `Nope` is not a class
+classes_unfilled_abstract_beside_a_refused_base_of_another_name.anti:4:16: error: `Shape` is abstract and no class fills it [unfilled-abstract]

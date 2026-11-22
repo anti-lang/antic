@@ -1,0 +1,14 @@
+//! A `sync` on `-m` inside a `sync` on `m` gets the message of the operator
+//! alone, and none of a nested `sync` on one place.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let m = Mutex.new();
+	sync m {
+		sync -m {
+		}
+	}
+	return 0;
+}

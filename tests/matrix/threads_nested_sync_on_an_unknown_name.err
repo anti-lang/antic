@@ -1,0 +1,2 @@
+threads_nested_sync_on_an_unknown_name.anti:6:7: error: unknown name `nope`
+threads_nested_sync_on_an_unknown_name.anti:7:8: error: unknown name `nope`

@@ -1,0 +1,10 @@
+//! Type arguments after an alias of a type that is not declared get the message
+//! of the alias alone, and none that the alias is not generic.
+
+type Alias = Nope;
+
+fn main() -> int
+{
+	let x: Alias<int> = 0;
+	return 0;
+}

@@ -1,0 +1,1 @@
+types_length_of_an_operator_and_a_size_at_a_parameter.anti:10:11: error: a length computed from `size_of` is allowed only in a struct field or a local variable

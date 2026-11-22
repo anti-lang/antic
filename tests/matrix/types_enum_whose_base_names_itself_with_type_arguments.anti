@@ -1,0 +1,12 @@
+//! An enum whose base names the enum itself with type arguments is refused as a
+//! type that names itself in its own declaration.
+
+enum A: A<int>
+{
+	x = 1,
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,18 @@
+//! A length that adds 1 to `size_of` stands at a parameter, where a length
+//! computed from `size_of` is refused.
+
+struct S
+{
+	a: int,
+	b: int,
+}
+
+fn f(xs: [size_of(S) + 1]int) -> int
+{
+	return xs[0];
+}
+
+fn main() -> int
+{
+	return 0;
+}

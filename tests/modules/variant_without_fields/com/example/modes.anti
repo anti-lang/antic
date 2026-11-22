@@ -1,0 +1,19 @@
+//! A library whose public variant has no case with fields, so the library file
+//! carries its tag alone.
+
+/// A switch that is on or off.
+pub variant Mode
+{
+	On,
+	Off,
+}
+
+pub fn flip(m: Mode) -> Mode
+{
+	let r = Mode.On;
+	switch m {
+		On => r = Mode.Off,
+		Off => r = Mode.On,
+	}
+	return r;
+}

@@ -1,0 +1,1 @@
+types_enum_whose_base_names_itself_with_type_arguments.anti:4:9: error: `A` names itself in its own declaration

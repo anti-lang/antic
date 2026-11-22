@@ -1,0 +1,2 @@
+ownership_deferred_use_after_a_delete_beside_another_warning.anti:29:26: error: `e` shadows the outer `e` [shadowed-catch]
+ownership_deferred_use_after_a_delete_beside_another_warning.anti:34:8: error: `a` was deleted on line 36 [use-after-free]

@@ -1,0 +1,21 @@
+//! A program that switches on a variant of another module whose cases hold no
+//! fields, and tests it with `is` and `if let`.
+
+import com.example.modes;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let m = modes.flip(modes.Mode.On);
+	switch m {
+		On => printf("on\n".ptr),
+		Off => printf("off\n".ptr),
+	}
+	printf("is %d tag %d\n".ptr, (m is modes.Mode.Off) as c_int, m.tag as c_int);
+	if let Off = m {
+		printf("if let off\n".ptr);
+	}
+	printf("size %d\n".ptr, size_of(modes.Mode) as c_int);
+	return 0;
+}
