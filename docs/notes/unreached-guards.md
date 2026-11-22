@@ -1581,6 +1581,35 @@ field of a type of no fixed width, and in `offsets_apart` the pairs of
 offsets that are no two fields of one struct, no start and field of the
 struct of the slot and no two elements of one array.
 
+## The sides of batch 3an
+
+Batch 3an of the third phase read the safety check `index-out-of-range`
+in `src/antic/sema_index.c` against C2 of "Compile-time checks of
+2026-10-20" in `docs/decisions.md` and its `[provisional]` entries, and
+the safety check `lock-order` and the warning `blocking-under-lock` in
+`src/antic/sema_lock.c` against C4 and C5 there and their `[provisional]`
+entries. It fixed T388 and T389 in `src/antic/sema_index.c`. The rows of
+the two files under their own headings above stand as they were.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `collect_stmt` and `collect_expr` of `src/antic/sema_index.c` | A name of a `let`, of a `for` or of an anonymous function without its symbol, a `let` of one name without its symbol, a `for` over a range that destructures, an anonymous function without its item, and a `let` of a local that a statement before it changed. | The checker declares every name of a body it checks without an error, the parser gives every anonymous function its item, a `for` over a range names its counter alone, and the walk reads the statements in the order of the text, where no statement names a local before its `let`. |
+| `is_length_base`, `length_of_symbol` and `range_of` of `src/antic/sema_index.c` | A symbol without a type, a name without a symbol, a `.len` whose base is missing or has no type, and an expression that is missing. | The checker gives every name its symbol and every expression its type, and the parser gives every part of a slice both of its bounds. |
+| `name_range` of `src/antic/sema_index.c` | A constant whose value folds to no integer, and a local that is neither a parameter nor given a value by its `let` and never changes. | Every constant the checker takes in an integer expression folds to an integer, `size_of` among them. A local whose `let` gives it no value takes one by an assignment, which marks it changed. |
+| `name_range` and `length_of_symbol` of `src/antic/sema_index.c` | A local whose value is read while its value is being read. | A `let` cannot name the local it declares, and the bounds of a `for` cannot name its counter, so no value reaches itself. |
+| `length_of_symbol` of `src/antic/sema_index.c` | A local that is no slice or `str`, a slice or a `str` that is neither a parameter nor given a value by its `let`, and a literal `str` given to a local of another type. | Its callers ask for a name of a slice or a `str`, and a slice that a `let` copies from a name is a slice, since an array gives one through a part alone. A local without a value changes by an assignment, and the checker refuses a literal `str` where another type stands. |
+| `whole_expr`, `sure_stmt`, `sure_block`, `check_index` and `visit_index` of `src/antic/sema_index.c` | A call without a callee or whose callee has no type of a function, an `if` without a branch, a block that is missing, an index without its base or a type of it, and an anonymous function without its item. | The checker gives every call a callee of a function type and every base its type, and the parser gives every `if` its first branch, every statement that holds a block that block, and every anonymous function its item. |
+| `refuse` of `src/antic/sema_index.c` | An index of a slice that is no name. | `length_of` knows the length of a slice through its name alone, so no other slice is refused. |
+| `same_text` of `src/antic/sema_lock.c` | Two names of length 0. | Every lock names its field, its type and its module, each of one byte or more. |
+| `declaring` and `field_lock` of `src/antic/sema_lock.c` | A type that is missing or has no name, and a walk of the chain past a level that does not declare the field. | Every caller passes the type of a struct or a class, which has a name, and the first level holds the field, as the row of `declaring` above says. |
+| `mutex_lock` of `src/antic/sema_lock.c` | A place of no type or of a type that is no Mutex, and a static field. | The checker refuses a `sync` on anything but a Mutex or a synchronized object, and the second goes to `object_lock`. The static field stands in the row of `mutex_lock` above. |
+| `synchronized_class` of `src/antic/sema_lock.c` | A symbol of no function, a function without a type or a first parameter, a `self` that is no pointer and a `self` of no class. | A function with `self` is a function of a class, whose `self` is a pointer to that class. |
+| `library_locks`, `library_wait` and `take_call` of `src/antic/sema_lock.c` | A function of no library, a call without a callee and a name without a symbol. | `take_call` asks for a function of a library alone, and the checker gives every call a callee and every name its symbol. |
+| `walk_args` and `walk_expr` of `src/antic/sema_lock.c` | A `dispatch` or a `parallel` without its call, and an anonymous function without its item or its body. | The parser gives each of them its parts. |
+| `generic_item`, `collect` and `read_function` of `src/antic/sema_lock.c` | A function of a generic class that names no class around it, a function without a symbol or with the type of an error, and a hidden lock that has no index. | A function of a class names that class as the class around it, the pass runs after a checker that found no error, and a synchronized class has a name. |
+| `warned_before` of `src/antic/sema_lock.c` | A site at the place of an earlier site that reaches no wait. | Two sites stand at one place in two copies of one generic alone, and each copy calls the same functions by name. A call whose function differs between copies goes through a table or a constraint, which the pass does not follow. |
+| `find_path`, `module_spelling` and `keep_facts` of `src/antic/sema_lock.c` | A path from a lock to itself, a lock of a type without a module, and a function without a symbol. | `find_cycles` skips an edge from a lock to itself, every type names its module, and the pass reads functions with a symbol, apart from anonymous ones, which `keep_facts` skips first. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
