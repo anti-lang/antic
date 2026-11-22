@@ -1,0 +1,47 @@
+//! A `dispatch` whose argument is `a ?? b` of a `?Box` and a `Box` that the
+//! caller holds, at a parameter that is not `own`. The value is the one `a`
+//! holds, so the job holds a `dup` of it, and the caller ends `a` and `b`
+//! before the job runs. A new cell may take the memory of the one the caller
+//! tore down. The program runs with --anti.threads=1, so the job starts when it
+//! is joined.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell
+{
+	pub v: int = 0,
+}
+
+class Box
+{
+	pub own p: *Cell,
+}
+
+class Runner
+{
+	pub n: int = 0,
+}
+
+worker fn read(r: *Runner, b: Box) -> int
+{
+	return b.p.v + r.n;
+}
+
+fn main() -> int
+{
+	let r = alloc Runner { n: 1 };
+	let job = dispatch r -> read(Box { p: alloc Cell { v: 0 } });
+	let first = join(job);
+	{
+		let a: ?Box = Box { p: alloc Cell { v: 41 } };
+		let b = Box { p: alloc Cell { v: 9 } };
+		job = dispatch r -> read(a ?? b);
+	}
+	let other = alloc Cell { v: 7 };
+	printf("%d %d\n".ptr, first as c_int, join(job) as c_int);
+	delete(other);
+	free(r);
+	return 0;
+}

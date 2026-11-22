@@ -311,7 +311,7 @@ fn owned()
 		let copy = dup(&m);
 		let key = Id.of(4);
 		let missing = Id.of(-1);
-		let four = m.get(key) ?? missing;
+		let four = m.get(key) ?? dup(missing);
 		let removed = copy.remove_all(fn(e) {
 			return e.0.value() < 100;
 		});

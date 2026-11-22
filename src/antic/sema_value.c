@@ -292,6 +292,27 @@ bool sema_reads_existing(const struct expr *e)
     }
 }
 
+/* Whether the value of e is one that already lives somewhere, which a
+   copy gives a second owner: what sema_reads_existing names, `a ?? b`
+   where either side is such a value and `p?.x`. The result of `??` and
+   of `?.` stands in no place of its own, so `sync` reads the place with
+   sema_reads_existing alone. T397 of docs/audit/tests-findings.md. */
+bool sema_copies_existing(const struct expr *e)
+{
+    if (e->kind == EXPR_BINARY && e->as.binary.op == TOKEN_QUESTION_QUESTION) {
+        return sema_copies_existing(e->as.binary.left) ||
+               sema_copies_existing(e->as.binary.right);
+    }
+    if (e->kind == EXPR_OPTIONAL) {
+        return sema_copies_existing(e->as.optional.access);
+    }
+    if (e->kind == EXPR_CAST && !e->as.cast.test && e->type != NULL &&
+        e->type == e->as.cast.operand->type) {
+        return sema_copies_existing(e->as.cast.operand);
+    }
+    return sema_reads_existing(e);
+}
+
 /* DESIGN: an `own` parameter owns its value, so `=`, `let`, `if let` and
    `let ... else` move one that owns memory or has a teardown rather than
    copy it, and the function tears it down no more. A copy would run the
@@ -367,7 +388,7 @@ void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
     struct ptr_set answered;
     const struct type *found;
 
-    if (sema_is_error(t) || !sema_reads_existing(value)) {
+    if (sema_is_error(t) || !sema_copies_existing(value)) {
         return;
     }
     memset(&answered, 0, sizeof answered);
@@ -402,7 +423,7 @@ void sema_refuse_owned_copy(struct checker *c, const struct expr *value,
     if (sema_refuse_caller_value(c, value)) {
         return;
     }
-    if (!sema_is_error(t) && sema_type_owns(t) && sema_reads_existing(value)) {
+    if (!sema_is_error(t) && sema_type_owns(t) && sema_copies_existing(value)) {
         sema_error_at(c, value->pos, "`%s` %s, use `dup` instead of `=`",
                       sema_tn(t), sema_owns_phrase(t));
     }
@@ -422,18 +443,34 @@ void sema_refuse_own_field_copy(struct checker *c,
                                 const struct expr *value,
                                 const struct expr *target)
 {
+    const struct expr *read = value;
     const struct type *s;
     const struct struct_field *from;
     struct text spelled = {0};
     struct text place = {0};
 
-    if (into == NULL || !into->owned || value->kind != EXPR_FIELD ||
-        value->type == NULL || sema_is_error(value->type) ||
-        sema_type_owns(value->type) || value->as.field.base->type == NULL) {
+    if (into == NULL || !into->owned) {
         return;
     }
-    s = sema_struct_of(value->as.field.base->type);
-    from = s != NULL ? types_find_field(s, &value->as.field.name) : NULL;
+    /* `a ?? b` gives the pointer of either side, and `p?.f` reads the
+       field f, so each is refused where the field it reads would be,
+       T397 of docs/audit/tests-findings.md. */
+    if (value->kind == EXPR_BINARY &&
+        value->as.binary.op == TOKEN_QUESTION_QUESTION) {
+        sema_refuse_own_field_copy(c, into, value->as.binary.left, target);
+        sema_refuse_own_field_copy(c, into, value->as.binary.right, target);
+        return;
+    }
+    if (value->kind == EXPR_OPTIONAL) {
+        read = value->as.optional.access;
+    }
+    if (read->kind != EXPR_FIELD || value->type == NULL ||
+        sema_is_error(value->type) || sema_type_owns(value->type) ||
+        read->as.field.base->type == NULL) {
+        return;
+    }
+    s = sema_struct_of(read->as.field.base->type);
+    from = s != NULL ? types_find_field(s, &read->as.field.name) : NULL;
     if (from == NULL || !from->owned) {
         return;
     }
@@ -652,7 +689,7 @@ void sema_refuse_lock_copy(struct checker *c, const struct expr *value,
                            const struct type *t)
 {
     if (!sema_is_error(t) && sema_holds_mutex(t) &&
-        sema_reads_existing(value)) {
+        sema_copies_existing(value)) {
         if (types_is_mutex(t)) {
             sema_error_at(c, value->pos, "a `" LANG_MUTEX "` cannot be "
                           "copied, pass a pointer to it");
@@ -956,7 +993,7 @@ void sema_note_move(struct checker *c, const struct symbol *callee,
         sema_move_local(c, arg, &into, &by);
         return;
     }
-    if (sema_type_owns(arg->type) && sema_reads_existing(arg)) {
+    if (sema_type_owns(arg->type) && sema_copies_existing(arg)) {
         sema_error_at(c, arg->pos, "`%s` %s, and a value that stays where it "
                       "is does not move into `%.*s`, use `dup`",
                       sema_tn(arg->type), sema_owns_phrase(arg->type),

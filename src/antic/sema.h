@@ -360,6 +360,10 @@ bool sema_needs_teardown(const struct type *t);
    an element, `*p` or an `as` to the type the value has. A literal, a
    call and `dup(x)` make a fresh one instead. */
 bool sema_reads_existing(const struct expr *e);
+/* Whether a copy of the value of e gives a value that lives somewhere a
+   second owner: what sema_reads_existing names, and `a ?? b` and `p?.x`
+   that give such a value. */
+bool sema_copies_existing(const struct expr *e);
 /* The largest `align(N)` of t and of the parts it holds in place, or 0. */
 uint64_t sema_declared_align(const struct type *t);
 

@@ -50,7 +50,7 @@ static const struct type *job_copy(const struct expr *call, size_t i)
     if (arg->moves || arg->to_iface != NULL || arg->to_context ||
         t->kind == TYPE_POINTER || t->kind == TYPE_FN ||
         (i + 1 < sym->owned_count && sym->owned[i + 1]) ||
-        !sema_reads_existing(arg) || !sema_needs_teardown(t)) {
+        !sema_copies_existing(arg) || !sema_needs_teardown(t)) {
         return NULL;
     }
     return t;

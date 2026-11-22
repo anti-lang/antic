@@ -25,14 +25,6 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
-matrix_ownership_coalesce_of_an_own_field_in_a_literal_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_coalesce_of_an_own_field_into_another_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_coalesce_of_held_values_assigned_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_coalesce_of_held_values_in_a_let_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_coalesce_of_held_values_in_a_tuple_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_coalesce_of_held_values_returned_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_coalesce_of_held_values_to_an_own_parameter_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
-matrix_ownership_optional_read_of_an_own_field_into_another_refused T397 A `??` or `?.` that gives a value that lives somewhere copies it to a second owner.
 matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_dev T398 The fresh value that `??` takes is never torn down where the statement drops it.
 matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_memory_checks T398 The fresh value that `??` takes is never torn down where the statement drops it.
 matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_release T398 The fresh value that `??` takes is never torn down where the statement drops it.
