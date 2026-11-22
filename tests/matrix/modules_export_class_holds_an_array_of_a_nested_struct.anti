@@ -1,0 +1,17 @@
+//! A type nested in an `export class` that a field reaches through an array
+//! crosses to C with the class, so its fields follow the export rule.
+
+export class Catalog
+{
+	struct Entry
+	{
+		title: str,
+	}
+
+	entries: [2]Entry = [Entry { title: "a" }, Entry { title: "b" }],
+}
+
+fn main() -> int
+{
+	return 0;
+}

@@ -1,0 +1,5 @@
+exit 0
+two names: 2
+a name changed: 5
+a computed index: 3
+a defer that never returns

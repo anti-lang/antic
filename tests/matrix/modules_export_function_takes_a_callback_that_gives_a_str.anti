@@ -1,0 +1,12 @@
+//! A parameter of an `export fn` has a type that C can hold, and a callback
+//! whose result is a `str` is none, since C calls it and reads the result.
+
+export fn run(cb: fn() -> str) -> c_int
+{
+	return cb().len as c_int;
+}
+
+fn main() -> int
+{
+	return 0;
+}

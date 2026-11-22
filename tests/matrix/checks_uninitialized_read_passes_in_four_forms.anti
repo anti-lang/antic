@@ -1,0 +1,74 @@
+//! C1 lets four reads pass: a read at the second of two indices that locals
+//! name, the same after `=` changes the first local, a read after a loop that
+//! writes at a computed index, and a read before an exit whose `defer` of an
+//! inner block calls a function that returns `never`.
+
+import anti.io;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn two_names(i: int, j: int) -> int
+{
+	let p = alloc(int, 4) else {
+		return 0;
+	};
+	p[i] = 1;
+	p[j] = 2;
+	let a = p[j];
+	free(p);
+	return a;
+}
+
+fn one_changes() -> int
+{
+	let i = 0;
+	let j = 1;
+	let p = alloc(int, 4) else {
+		return 0;
+	};
+	p[i] = 1;
+	p[j] = 2;
+	i = 3;
+	let a = p[j];
+	free(p);
+	return a + i;
+}
+
+fn computed() -> int
+{
+	let p = alloc(int, 4) else {
+		return 0;
+	};
+	for i in 0..4 {
+		p[3 - i] = i;
+	}
+	let a = p[0];
+	free(p);
+	return a;
+}
+
+fn stop() -> never
+{
+	printf("a defer that never returns\n".ptr);
+	io.exit(0);
+}
+
+fn main() -> int
+{
+	printf("two names: %d\n".ptr, two_names(0, 1) as c_int);
+	printf("a name changed: %d\n".ptr, one_changes() as c_int);
+	printf("a computed index: %d\n".ptr, computed() as c_int);
+	let p = alloc(int, 2) else {
+		return 1;
+	};
+	defer {
+		free(p);
+	}
+	{
+		defer {
+			stop();
+		}
+		p[0] = 1;
+		return p[0];
+	}
+}

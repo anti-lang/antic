@@ -1,0 +1,12 @@
+//! A parameter of an `export fn` has a type that C can hold, and a `Match`
+//! holds a handle of the runtime, which C has no declaration of.
+
+export fn first(m: Match) -> c_int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

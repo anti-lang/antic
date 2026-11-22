@@ -1,0 +1,13 @@
+//! A field of an `export struct` whose type is unknown gets the one message of
+//! the unknown type, and no message of the export rule.
+
+export struct Pair
+{
+	a: Nope,
+	b: c_int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

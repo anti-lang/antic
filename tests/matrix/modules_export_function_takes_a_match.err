@@ -1,0 +1,1 @@
+modules_export_function_takes_a_match.anti:4:17: error: the parameter `m` of export fn `first` has type `Match`, which C cannot represent

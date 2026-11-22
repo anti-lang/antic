@@ -1,0 +1,1 @@
+modules_export_class_holds_an_array_of_a_nested_struct.anti:8:3: error: the field `title` of `Catalog.Entry`, which export class `Catalog` holds, has type `str`, which C cannot represent
