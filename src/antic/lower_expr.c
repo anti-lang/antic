@@ -859,11 +859,20 @@ static struct ir_operand short_circuit(struct lowerer *l, const struct expr *e)
    set and v otherwise. The value lies at offset 0 of o, so the result
    reads it there. The result has a slot of its own, so a later write to
    o leaves it as it is. */
+/* A side that is fresh beside one that lives somewhere leaves the slot
+   the one owner of what it gave. The checker refuses to move such a
+   value, so the statement drops it, and the end of the statement tears
+   it down on the path of that side alone, T398 of
+   docs/audit/tests-findings.md. Where both sides are fresh the statement
+   decides, as for any fresh value. */
 static struct ir_operand coalesce_value(struct lowerer *l,
                                         const struct expr *e)
 {
     const struct type *t = e->type;
     const struct type *from = e->as.binary.left->type;
+    bool left_fresh = lower_is_fresh(e->as.binary.left);
+    bool right_fresh = lower_is_fresh(e->as.binary.right);
+    bool owned = left_fresh != right_fresh && sema_needs_teardown(t);
     struct ir_operand left = lower_expr(l, e->as.binary.left);
     struct ir_operand held = lower_optional_flag(l, from, left);
     struct ir_block *have = lower_new_block(l);
@@ -886,6 +895,9 @@ static struct ir_operand coalesce_value(struct lowerer *l,
     l->b = have;
     if (result == 0) {
         ir_memcopy(l->f, l->b, slot, left, lower_vtype_of(l, t));
+        if (owned && left_fresh) {
+            lower_keep_value(l, t, slot);
+        }
     } else {
         ir_assign(l->f, l->b, result,
                   lower_temp(l, ir_load(l->f, l->b, lower_ir_type_of(t),
@@ -895,6 +907,9 @@ static struct ir_operand coalesce_value(struct lowerer *l,
     l->b = rest;
     if (result == 0) {
         lower_build_into(l, e->as.binary.right, slot);
+        if (owned && right_fresh && l->b != NULL) {
+            lower_keep_value(l, t, slot);
+        }
     } else {
         struct ir_operand v = lower_expr(l, e->as.binary.right);
         if (l->b != NULL) {

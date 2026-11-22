@@ -1382,7 +1382,9 @@ bool lower_is_fresh(const struct expr *e)
 {
     /* `dup(x)` of a value, an array literal and `as` to the type a fresh
        value has make a value as a literal does, T399 of
-       docs/audit/tests-findings.md. */
+       docs/audit/tests-findings.md. `a ?? b` of a `?T` writes the value
+       of the side it takes into a slot of its own, which is fresh where
+       both sides are, T398. */
     switch (e->kind) {
     case EXPR_OBJECT:
         return e->as.object.op == TOKEN_DUP && e->type != NULL &&
@@ -1393,6 +1395,12 @@ bool lower_is_fresh(const struct expr *e)
         return !e->as.cast.test && e->type != NULL &&
                e->type == e->as.cast.operand->type &&
                lower_is_fresh(e->as.cast.operand);
+    case EXPR_BINARY:
+        return e->as.binary.op == TOKEN_QUESTION_QUESTION &&
+               e->as.binary.left->type != NULL &&
+               e->as.binary.left->type->kind == TYPE_OPTIONAL &&
+               lower_is_fresh(e->as.binary.left) &&
+               lower_is_fresh(e->as.binary.right);
     default:
         return e->kind == EXPR_CALL || e->kind == EXPR_STRUCT_LIT ||
                e->kind == EXPR_TUPLE ||
@@ -1413,19 +1421,25 @@ bool lower_is_fresh(const struct expr *e)
 void lower_keep_temp(struct lowerer *l, const struct expr *e,
                      struct ir_operand address)
 {
-    struct statement_temp *t;
-
     if (l->b == NULL || e == NULL || e->type == NULL ||
         !lower_is_fresh(e) ||
         (e->kind == EXPR_CALL && e->as.call.hashes) ||
         e->type->kind == TYPE_POINTER || !sema_needs_teardown(e->type)) {
         return;
     }
+    lower_keep_value(l, e->type, address);
+}
+
+void lower_keep_value(struct lowerer *l, const struct type *type,
+                      struct ir_operand address)
+{
+    struct statement_temp *t;
+
     l->temps = alloc_grow(l->temps, &l->temp_capacity, l->temp_count,
                           sizeof *l->temps);
     t = &l->temps[l->temp_count++];
     t->holder = ir_entry_zero_slot(l->f);
-    t->type = e->type;
+    t->type = type;
     ir_store(l->f, l->b, IR_PTR, address, lower_temp(l, t->holder));
 }
 

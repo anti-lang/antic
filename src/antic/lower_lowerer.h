@@ -739,14 +739,18 @@ struct ir_operand lower_move_argument(struct lowerer *l, const struct expr *arg,
                                       struct ir_operand value);
 void lower_clear_moved(struct lowerer *l, const struct expr *value);
 /* Whether e makes a fresh value at each use: a call, a literal, a class
-   literal that defaults a parameter, `dup(x)` of a value or `as` of a
-   fresh value to its own type. */
+   literal that defaults a parameter, `dup(x)` of a value, `as` of a
+   fresh value to its own type or `a ?? b` of two fresh sides. */
 bool lower_is_fresh(const struct expr *e);
 /* Keep the fresh value that expression e gave at address to the end of
    its statement, when e is a call result or a literal whose type has a
    teardown. */
 void lower_keep_temp(struct lowerer *l, const struct expr *e,
                      struct ir_operand address);
+/* Keep the value of type type at address to the end of its statement,
+   which tears it down, on the path that reaches this point alone. */
+void lower_keep_value(struct lowerer *l, const struct type *type,
+                      struct ir_operand address);
 /* The value of type t that a `recv` gave into its slot, whose address
    the slot holder holds, belongs to the block that holds the `recv`. */
 void lower_push_received(struct lowerer *l, uint32_t holder,

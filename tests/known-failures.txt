@@ -25,12 +25,6 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
-matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_dev T398 The fresh value that `??` takes is never torn down where the statement drops it.
-matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_memory_checks T398 The fresh value that `??` takes is never torn down where the statement drops it.
-matrix_ownership_coalesce_of_a_fresh_and_a_held_value_dropped_release T398 The fresh value that `??` takes is never torn down where the statement drops it.
-matrix_ownership_coalesce_of_fresh_values_dropped_dev T398 The fresh value that `??` takes is never torn down where the statement drops it.
-matrix_ownership_coalesce_of_fresh_values_dropped_memory_checks T398 The fresh value that `??` takes is never torn down where the statement drops it.
-matrix_ownership_coalesce_of_fresh_values_dropped_release T398 The fresh value that `??` takes is never torn down where the statement drops it.
 matrix_classes_inherited_own_field_copied_into_another_refused T400 A field the program reaches through a base has no spelling for the checker.
 matrix_classes_inherited_own_field_given_itself_dev T400 A field the program reaches through a base has no spelling for the checker.
 matrix_classes_inherited_own_field_given_itself_memory_checks T400 A field the program reaches through a base has no spelling for the checker.
