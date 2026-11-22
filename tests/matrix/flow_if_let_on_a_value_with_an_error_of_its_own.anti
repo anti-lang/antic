@@ -1,0 +1,12 @@
+//! `if let` on a value that has an error of its own, whose block reads the name
+//! it binds. The error gets its message, and the name gets none.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	if let got = nope() {
+		printf("%d\n".ptr, got as c_int);
+	}
+	return 0;
+}

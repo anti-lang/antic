@@ -25,3 +25,6 @@ matrix_checks_escaping_local_passes_a_tuple_part_with_an_outer_reference_memory_
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_dev T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_release T387 A fresh argument of a dispatch whose object is in flight is never torn down.
 matrix_threads_dispatch_in_flight_tears_down_a_fresh_argument_memory_checks T387 A fresh argument of a dispatch whose object is in flight is never torn down.
+matrix_flow_if_let_on_a_value_with_an_error_of_its_own_refused T391 An if let on a value the checker refused declares no name, so a read of it gets a second message.
+matrix_types_if_let_on_a_value_that_is_no_variant_whose_name_is_read_refused T391 An if let on a value the checker refused declares no name, so a read of it gets a second message.
+matrix_classes_nested_generic_named_without_its_type_argument_refused T392 The message of a nested generic named without arguments counts the parameters of the class around it.

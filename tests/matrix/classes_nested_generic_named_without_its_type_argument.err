@@ -1,0 +1,1 @@
+classes_nested_generic_named_without_its_type_argument.anti:16:12: error: `Outer.Inner` takes 1 type argument

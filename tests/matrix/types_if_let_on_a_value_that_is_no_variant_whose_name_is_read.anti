@@ -1,0 +1,13 @@
+//! `if let` on an `int`, whose block reads the name it binds. The value gets
+//! the message of `if let`, and the name gets none.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let n = 5;
+	if let got = n {
+		printf("%d\n".ptr, got as c_int);
+	}
+	return 0;
+}

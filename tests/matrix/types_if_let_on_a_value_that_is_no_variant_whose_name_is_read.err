@@ -1,0 +1,1 @@
+types_if_let_on_a_value_that_is_no_variant_whose_name_is_read.anti:9:15: error: `if let` takes a variant or a value that may be `none`, found `int`

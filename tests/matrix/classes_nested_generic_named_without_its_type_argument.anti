@@ -1,0 +1,25 @@
+//! A type nested in a generic class with a type parameter of its own, named
+//! without arguments in the body of the class. The message counts the one
+//! argument the name takes there, since the class gives its own.
+
+class Outer<T>
+{
+	pub v: int = 0,
+
+	class Inner<U>
+	{
+		pub u: int = 0,
+	}
+
+	pub fn make(self) -> int
+	{
+		let i: ?*Inner = none;
+		return 0;
+	}
+}
+
+fn main() -> int
+{
+	let o = Outer<int> { };
+	return o.make();
+}
