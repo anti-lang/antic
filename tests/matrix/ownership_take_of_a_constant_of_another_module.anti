@@ -1,0 +1,10 @@
+//! `take(math.PI)` of a constant of another module. The checker reads the
+//! qualified name as a name, which is no field.
+
+import anti.math;
+
+fn main() -> int
+{
+	let n = take(math.PI);
+	return 0;
+}

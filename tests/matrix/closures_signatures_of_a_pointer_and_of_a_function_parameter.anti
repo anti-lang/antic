@@ -1,0 +1,41 @@
+//! Calls through a function value of type `fn(*int, int) -> int` and one of
+//! type `fn(fn() -> int) -> int`. The second takes a function in two words, the
+//! code and the context, where the first takes a pointer and an `int`, so the
+//! two calls have two signatures.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn add(p: *int, n: int) -> int
+{
+	return *p + n;
+}
+
+fn seven() -> int
+{
+	return 7;
+}
+
+fn twice(f: fn() -> int) -> int
+{
+	return f() * 2;
+}
+
+fn call_add(f: fn(*int, int) -> int, p: *int) -> int
+{
+	return f(p, 1);
+}
+
+fn call_twice(g: fn(fn() -> int) -> int) -> int
+{
+	return g(seven);
+}
+
+fn main() -> int
+{
+	let x = 4;
+	printf("add %d\n".ptr, call_add(add, &x) as c_int);
+	printf("twice %d\n".ptr, call_twice(twice) as c_int);
+	return 0;
+}

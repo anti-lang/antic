@@ -1,0 +1,33 @@
+//! An enum over `c_long` passed to a function and returned from one. A type
+//! whose width differs between the targets gives no range to the value of a
+//! parameter or of a result.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+enum Wide: c_long
+{
+	A = 1,
+	B = 2,
+}
+
+fn pick(w: Wide) -> int
+{
+	return w as int;
+}
+
+fn other(w: Wide) -> Wide
+{
+	if w == Wide.A {
+		return Wide.B;
+	}
+	return Wide.A;
+}
+
+fn main() -> int
+{
+	printf("pick %d\n".ptr, pick(Wide.B) as c_int);
+	printf("other %d\n".ptr, pick(other(Wide.A)) as c_int);
+	return 0;
+}

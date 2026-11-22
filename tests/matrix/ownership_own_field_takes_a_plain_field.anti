@@ -1,0 +1,30 @@
+//! A pointer of a plain field stored into an `own` field. The plain field owns
+//! nothing, so the `own` field takes the node over, and the program sets the
+//! plain field to `none` before the teardown of `b` frees the node once.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: ?*Node = none,
+	pub spare: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let b = Box { };
+	b.spare = alloc Node { n: 4 };
+	b.one = b.spare;
+	b.spare = none;
+	if let got = b.one {
+		printf("one %d\n".ptr, got.n as c_int);
+	}
+	return 0;
+}

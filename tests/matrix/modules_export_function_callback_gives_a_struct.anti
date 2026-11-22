@@ -1,0 +1,28 @@
+//! An `export fn` that takes a function in two words, whose result is a struct
+//! of three `c_int`, called with a closure. The thunk that holds the function
+//! of C hands the struct back as the callback gave it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+export struct Point
+{
+	x: c_int,
+	y: c_int,
+	z: c_int,
+}
+
+export fn apply(f: fn(c_int) -> Point) -> c_int
+{
+	let p = f(3);
+	return p.x + p.y + p.z;
+}
+
+fn main() -> int
+{
+	let k: c_int = 10;
+	let got = apply(fn(n) { return Point { x: n, y: k, z: 100 }; });
+	printf("got %d\n".ptr, got);
+	return 0;
+}

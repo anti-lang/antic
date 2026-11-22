@@ -1,0 +1,18 @@
+//! An `extern fn remove` of C beside `fs.remove` of `anti.fs`. The two share a
+//! name and live in two modules, so each call reaches its own function.
+
+import anti.lang;
+import anti.fs;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+extern fn remove(path: ?*byte) -> c_int;
+
+fn main() -> int
+{
+	let gone = remove("/nonexistent/anti/c-remove".ptr);
+	printf("c %d\n".ptr, gone);
+	fs.remove("/nonexistent/anti/fs-remove") catch {
+		printf("fs failed\n".ptr);
+	};
+	return 0;
+}

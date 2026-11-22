@@ -1,0 +1,52 @@
+//! A class value that inherits `TraceHandler` and replaces its `destroyed`,
+//! beside a class that replaces the hook of `Object`. The handler takes the
+//! object as well, so its `destroyed` is no hook of its own class, and only the
+//! second value runs one at its end.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Watch inherits lang.TraceHandler
+{
+	pub n: int = 0,
+
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object)
+	{
+		printf("handler destroyed\n".ptr);
+	}
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+class Plain
+{
+	pub n: int = 0,
+
+	concrete fn destroyed(self)
+	{
+		printf("plain destroyed\n".ptr);
+	}
+}
+
+fn main() -> int
+{
+	let w = Watch { n: 1 };
+	let p = Plain { n: 2 };
+	printf("end %d\n".ptr, w.n as c_int);
+	return 0;
+}

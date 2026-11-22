@@ -1,0 +1,23 @@
+//! `boxes[0].two = b.one`, an `own` field of an element given an `own` field of
+//! a local. The place has no spelling, so the refusal compares no name with it
+//! and names the field it reads.
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box
+{
+	pub own one: ?*Node = none,
+	pub own two: ?*Node = none,
+}
+
+fn main() -> int
+{
+	let boxes = [Box { }, Box { }];
+	let b = Box { };
+	b.one = alloc Node { n: 1 };
+	boxes[0].two = b.one;
+	return 0;
+}

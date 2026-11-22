@@ -1,0 +1,13 @@
+//! `take(Mode.A)` of a value of an enum. An enum holds no `own` field.
+
+enum Mode
+{
+	A,
+	B,
+}
+
+fn main() -> int
+{
+	let n = take(Mode.A);
+	return 0;
+}

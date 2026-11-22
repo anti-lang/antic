@@ -1,0 +1,1 @@
+ownership_take_of_a_constant_of_another_module.anti:8:15: error: `take` takes an `own` field, and `PI` is no field

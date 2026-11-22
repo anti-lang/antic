@@ -1,0 +1,13 @@
+//! `let y = x;` of an `own` parameter whose type is unknown. The parameter has
+//! the error type, so the `let` moves nothing and adds no message.
+
+fn f(own x: Nope) -> int
+{
+	let y = x;
+	return 0;
+}
+
+fn main() -> int
+{
+	return 0;
+}

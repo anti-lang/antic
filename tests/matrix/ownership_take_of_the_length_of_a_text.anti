@@ -1,0 +1,8 @@
+//! `take(s.len)` of a `str`. The length is no `own` field.
+
+fn main() -> int
+{
+	let s = "abc";
+	let n = take(s.len);
+	return 0;
+}

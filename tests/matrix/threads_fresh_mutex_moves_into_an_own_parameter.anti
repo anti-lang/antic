@@ -1,0 +1,19 @@
+//! A fresh `Mutex` passed to an `own` parameter. A Mutex is a handle and moves
+//! into the parameter, which holds it in a `sync` block.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn keep(own m: Mutex) -> int
+{
+	sync m {
+		printf("held\n".ptr);
+	}
+	return 1;
+}
+
+fn main() -> int
+{
+	return keep(Mutex.new()) - 1;
+}
