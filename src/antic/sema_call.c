@@ -2734,6 +2734,13 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (m->kind == ITEM_CONST && m->symbol->type != NULL) {
         return sema_member_type_in(c, m->symbol->type, m->owner, t);
     }
+    /* So has a function of a copy without type parameters of its own,
+       `fn(*Wrap<i16>) -> i16` of `Wrap<i16>.f`, by T419 of
+       docs/audit/tests-findings.md. */
+    if (m->kind == ITEM_FN && m->type_param_count == 0 &&
+        m->symbol->type != NULL) {
+        return sema_member_type_in(c, m->symbol->type, m->owner, t);
+    }
     return m->symbol->type != NULL ? m->symbol->type
                                    : sema_builtin(c, TYPE_ERROR);
 }
