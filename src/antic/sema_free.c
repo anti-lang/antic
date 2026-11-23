@@ -883,8 +883,7 @@ static void walk_assign(struct free_walk *w, const struct stmt *s)
     if (!named) {
         return;
     }
-    if (held.field != NULL && !w->quiet && !w->deferred &&
-        dead(w, &held) != NULL) {
+    if (held.field != NULL && !w->quiet && dead(w, &held) != NULL) {
         ((struct stmt *)s)->as.assign.tears_nothing = true;
     }
     revive(w, &held);
