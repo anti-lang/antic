@@ -1,0 +1,23 @@
+//! A library built against the interface of the program.
+
+import anti.lang;
+import net.example.meter;
+
+provides net.example.meter.Meter as Fancy;
+
+/// The meter of the library.
+pub class Fancy
+{
+	implements m: meter.Meter,
+	/// The samples the meter took.
+	pub samples: int = 1,
+
+	/// The reading.
+	pub concrete fn read(self) -> int may fail
+	{
+		if self.samples == 0 {
+			fail "no samples";
+		}
+		return 8;
+	}
+}

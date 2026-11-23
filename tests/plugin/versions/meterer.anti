@@ -1,0 +1,30 @@
+//! A host that loads the library its first argument names and prints the
+//! reading of its meter. A refused load prints its reason instead.
+
+import anti.io;
+import anti.text;
+import anti.plugin;
+import net.example.meter;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let m = lib.instance(meter.Meter) catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let n = m.read() catch e {
+		io.println(e.message);
+		return 1;
+	};
+	let reading = f"{n}";
+	io.println(reading);
+	free(reading.ptr);
+	delete(m);
+	lib.unload() catch fatal;
+	delete(lib);
+	return 0;
+}

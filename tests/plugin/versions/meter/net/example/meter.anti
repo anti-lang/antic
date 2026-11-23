@@ -1,0 +1,12 @@
+//! An interface whose entry may fail. The structural hash names the result the
+//! entry declares, so a version whose entry gives another type of the same
+//! width is another interface.
+
+import anti.lang;
+
+/// A meter a program reads.
+pub abstract class Meter
+{
+	/// The reading, or the error of a meter that has none.
+	pub abstract fn read(self) -> int may fail;
+}

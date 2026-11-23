@@ -1,0 +1,4 @@
+//! A float constant whose digits printf writes with an exponent.
+
+/// A large distance.
+pub const FAR: f64 = 100000000000000000000.0;

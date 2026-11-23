@@ -1,0 +1,11 @@
+//! The interface of the program's name, whose `read` gives a float of the same
+//! width.
+
+import anti.lang;
+
+/// A meter a program reads.
+pub abstract class Meter
+{
+	/// The reading, or the error of a meter that has none.
+	pub abstract fn read(self) -> f64 may fail;
+}

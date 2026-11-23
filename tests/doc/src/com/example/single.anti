@@ -1,0 +1,8 @@
+//! A class with one instance.
+
+/// The one configuration of a program.
+pub singleton class Config
+{
+	/// A count.
+	pub n: int = 0,
+}

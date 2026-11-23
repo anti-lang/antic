@@ -1,0 +1,8 @@
+//! A function whose parameter has a type of another module.
+
+import anti.log;
+
+/// Write nothing to `to`.
+pub fn note(to: *log.Logger)
+{
+}

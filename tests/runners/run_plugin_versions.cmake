@@ -21,6 +21,9 @@
 #   PARTS     optional. The run then builds the interface of a floor of
 #             nine parts alone and loads a library built for a version
 #             below it, which the check of the floor refuses
+#   FAILING   optional. The run then builds the interface of an entry
+#             that may fail alone and loads a library built for a
+#             version whose entry gives another result
 #
 # A Windows library links against the import library of its host, so
 # each host there takes a library of its own.
@@ -79,6 +82,27 @@ if(DEFINED PARTS)
                 -I "${versions}" -I "${SOURCES}" -I "${WORK}/parts-2"
                 -o "${WORK}/parts${EXE}" "${versions}/reader.anti")
     loads(parts parts-1 no "this program takes 1.0.0.0.0.0.0.0.2 and above")
+    return()
+endif()
+
+# An entry that may fail hashes the result it declares, as the text of
+# `reflect.call` names it, T408 of docs/audit/tests-findings.md. A
+# library built against the interface of the program loads. One built
+# against an interface whose `read` gives an `f64` where the program's
+# gives an `int` is another interface, and the chains differ there.
+if(DEFINED FAILING)
+    foreach(name meter meter_result)
+        file(MAKE_DIRECTORY "${WORK}/${name}/net/example")
+        antic_build(-c --runtime "${RUNTIME}" -I "${versions}/${name}"
+                    -o "${WORK}/${name}/net/example/meter.antl"
+                    "${versions}/${name}/net/example/meter.anti")
+        set(root_${name} "${versions}/${name}")
+    endforeach()
+    antic_build(--runtime "${RUNTIME}" -I "${WORK}/meter"
+                -o "${WORK}/meterer${EXE}" "${versions}/meterer.anti")
+    loads(meterer meter yes "^8\n$")
+    loads(meterer meter_result no
+          "`net.example.meter.Meter` of .* is not the interface this program carries")
     return()
 endif()
 

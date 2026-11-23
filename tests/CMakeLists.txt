@@ -3154,6 +3154,16 @@ add_test(NAME plugin_versions_parts
         "-DPARTS=yes"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions-parts"
         -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
+# T408. An entry that may fail, whose result changes between versions.
+add_test(NAME plugin_versions_failing
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DFAILING=yes"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-versions-failing"
+        -P "${ANTIC_RUNNERS}/run_plugin_versions.cmake")
 # The table of stubs of a load when memory runs out, as the cases of
 # <host>.faults above.
 if(ANTIC_FAULTS AND NOT ANTIC_HOST_OS STREQUAL "windows")
@@ -8097,7 +8107,12 @@ endforeach()
 # index renders as the page of the module does. fenced holds a fence on
 # the line after the first paragraph of the module, which ends the
 # paragraph of the index as it ends the one of the page, and listed an
-# item of a list there, which ends it as well.
+# item of a list there, which ends it as well. signs holds an enum with a
+# value below zero, T409 of docs/audit/tests-findings.md. floats holds a
+# constant of more digits than six and huge one that printf writes with
+# an exponent, T410. single holds a singleton class, T411. foreign holds a
+# parameter whose type another module declares, which the source spells
+# with the module, T412.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
@@ -8108,7 +8123,12 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "marks_index||marks|index.html|marks.index.expected.html"
              "cut_index||cut|index.html|cut.index.expected.html"
              "fenced_index||fenced|index.html|fenced.index.expected.html"
-             "listed_index||listed|index.html|listed.index.expected.html")
+             "listed_index||listed|index.html|listed.index.expected.html"
+             "signs_markdown|--markdown|signs|com.example.signs.md|signs.expected.md"
+             "floats_markdown|--markdown|floats|com.example.floats.md|floats.expected.md"
+             "huge_markdown|--markdown|huge|com.example.huge.md|huge.expected.md"
+             "single_markdown|--markdown|single|com.example.single.md|single.expected.md"
+             "foreign_markdown|--markdown|foreign|com.example.foreign.md|foreign.expected.md")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)

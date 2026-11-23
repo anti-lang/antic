@@ -1,0 +1,8 @@
+//! An enum whose base is signed, with a value below zero.
+
+/// A direction along one axis.
+pub enum Sign: i8
+{
+	Down = -1,
+	Up = 1,
+}
