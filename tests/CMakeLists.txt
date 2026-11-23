@@ -8120,7 +8120,8 @@ endforeach()
 # nothing, a function of C that takes a function, the float constants of
 # the forms of float_literal, a base of `anti.lang` other than the root,
 # and the functions of a synchronized class that run under its lock and
-# those that do not.
+# those that do not. fields holds the four marks of a field that a page
+# writes, by 2 of the answers of 2026-11-23.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
@@ -8139,6 +8140,7 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "foreign_markdown|--markdown|foreign|com.example.foreign.md|foreign.expected.md"
              "foreign_private|--markdown\\|--private|foreign|com.example.foreign.md|foreign.private.expected.md"
              "sides_markdown|--markdown|sides|com.example.sides.md|sides.expected.md"
+             "fields_markdown|--markdown|fields|com.example.fields.md|fields.expected.md"
              "sides_private|--markdown\\|--private|sides|com.example.sides.md|sides.private.expected.md")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")

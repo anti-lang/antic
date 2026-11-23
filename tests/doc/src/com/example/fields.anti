@@ -1,0 +1,22 @@
+//! The marks of the fields of a class.
+
+import anti.log;
+import anti.time;
+
+/// A class whose fields a provider fills, and one that holds a count.
+pub concurrent class Filled
+{
+	/// The logger a provider gives.
+	pub inject log: *log.Logger,
+	/// The clock the run-time configuration may not replace.
+	pub inject final clock: *time.Clock,
+	/// A count that more than one thread adds to.
+	pub atomic count: int = 0,
+}
+
+/// The one instance of the settings.
+pub singleton class Settings
+{
+	/// A field that a function of the module may write.
+	pub mutable level: int = 0,
+}

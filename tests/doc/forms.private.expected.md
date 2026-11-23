@@ -218,7 +218,7 @@ pub concurrent class Counted
 
 A class of atomic fields.
 
-- `n: int`
+- `atomic n: int`
 
 ## printf
 

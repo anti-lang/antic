@@ -78,6 +78,10 @@ names. A copy writes its arguments by the records as well. The base after
 `inherits` keeps the whole path of its module. The format version was 100
 then.
 
+A field stands with its marks, by 2 of "Answers of 2026-11-23": `inject` or
+`inject final`, then `own`, `mutable` and `atomic`, in the order the parser
+reads them. The library file carries each of them in the marks of the field.
+
 A backtick name such as `forms.Level` links to the item of the page. The last
 segment of the documented module stands there as the last segment of an import
 does. A name after it that is no item stays text.

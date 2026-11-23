@@ -427,8 +427,12 @@ static void type_signature(struct text *out, const char *lead,
     }
 }
 
-/* The declaration of a field, with the word of its form. The base of a
-   class and its table pointer are no fields a program wrote. */
+/* The declaration of a field, with the word of its form and its marks.
+   The base of a class and its table pointer are no fields a program
+   wrote. DESIGN: by 2 of "Answers of 2026-11-23" in docs/decisions.md a
+   page writes the four marks `inject`, `inject final`, `atomic` and
+   `mutable`, in the order the parser reads them, with `own` between the
+   first and the other two. The library file carries each of them. */
 static bool field_signature(struct text *out, const struct struct_field *f,
                             bool with_visibility)
 {
@@ -443,8 +447,19 @@ static bool field_signature(struct text *out, const struct struct_field *f,
     } else if (f->form == FIELD_IMPL) {
         text_append(out, "implements ");
     }
+    if (f->inject_final) {
+        text_append(out, "inject final ");
+    } else if (f->injected) {
+        text_append(out, "inject ");
+    }
     if (f->owned) {
         text_append(out, "own ");
+    }
+    if (f->writable) {
+        text_append(out, "mutable ");
+    }
+    if (f->atomic) {
+        text_append(out, "atomic ");
     }
     text_appendf(out, "%.*s: ", (int)f->name.length, f->name.text);
     doc_type_name(out, f->type);
