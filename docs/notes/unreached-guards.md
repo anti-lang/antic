@@ -1902,6 +1902,39 @@ name the lines of its own run.
 | `one_turn` of `src/antic/sema_free.c`, line 1003 | A loop other than `for` with its statement. | `walk_for` alone gives the loop its statement. |
 | `walk_stmt` of `src/antic/sema_free.c`, line 1196 | No statement. | Every caller passes a statement of a block, of an arm or of a pending list, and `walk_arms` passes `else` only where it stands. |
 
+## The sides of batch 3aw
+
+Batch 3aw of the third phase read the compiled copies of generics in
+`src/antic/sema_copies.c` and the lexer in `src/antic/lexer.c`. It found
+T419 and T420 and fixed both in `src/antic/sema_call.c`. The rows of
+`sema_copies.c` and of `lexer.c` under their own headings above stand as
+they were. The line numbers are those of the coverage run after the
+batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `ty` of `src/antic/sema_copies.c`, line 132 | A map without arguments that names the class it copies. | `own_params_copy` alone sets the class of a map, and its map holds the arguments of the class and of the function. |
+| `xf` of `src/antic/sema_copies.c`, line 222 | A level of the chain without its copy, and a copy with fewer fields than its generic. | `ty` gives a copy of every level, and a copy has the fields of its generic in their order. |
+| `symbol_open` and `xsym` of `src/antic/sema_copies.c`, lines 234, 235, 262 and 269 | A symbol that is no constant, a constant without its value or without its symbolic value, and a substitution that gives none. | `xsym` asks about a constant alone, the checker gives every constant its value before the copies are made, a symbolic value holds its expression, and `sema_subst_symbolic` gives NULL for NULL alone. |
+| `xsym` of `src/antic/sema_copies.c`, line 259 | The frame of a local that the clone has not mapped. | The frame is the function or the anonymous function that declares the local, and the clone maps each before it walks its body: `make_body` maps the function, and `xi` maps the anonymous function first. |
+| `type_item` of `src/antic/sema_copies.c`, lines 492 and 496 | A constant without its symbol, and a member that is no function and no constant, or one without its symbol. | The members of a type are its functions, its constants and its static fields, each declared with its symbol. A field stands in the type and a nested type among the nested items. |
+| `copy_function` of `src/antic/sema_copies.c`, line 541 | Two copies of one generic with counts of arguments that differ. | A generic has one count: the parameters of its class and its own. |
+| `member_of_receiver` of `src/antic/sema_copies.c`, lines 639, 643 and 646 | A `construct` whose copy no type gives, a literal of the generic class itself without an argument, a copy that keeps a parameter, and a class that lacks the member. | The checker gives every literal the copy it builds, the call reaches `member_of_receiver` from a copy of the class alone, and the copy has the members of its generic. |
+| `callee_copy` of `src/antic/sema_copies.c`, lines 722 and 760 | A call without a symbol, and a class without type parameters after the test that let a function of one through. | `direct_callee` passes a callee with a symbol, and the test at the start returns for a function of a class without type parameters that has none of its own. |
+| `direct_callee` of `src/antic/sema_copies.c`, line 789 | A field callee whose symbol is no function. | A field of a value carries no symbol, a static field is atomic and holds no function, and a constant holds no function. |
+| `member_of_copy` of `src/antic/sema_copies.c`, lines 823 and 830 | A member that is no constant and no function, a function with a symbol of another kind, and a copy without its item. | The members of a type are its functions and its constants, each function has a function symbol, and `type_item` gives an item to every copy of a generic of the program. |
+| `walked_param` and `is_param` of `src/antic/sema_copies.c`, lines 1009 and 1016 | No type, and a walk of a pointer that may be `none`. | Every node of a checked tree has a type, and the checker refuses `for x in p` of a `?*T` with `` `for` walks a range, a slice, an array, a collection or an iterator, found `?*T` ``. |
+| `xcall` of `src/antic/sema_copies.c`, line 1086 | The receiver of an interface of the constraints outside a copy. | The checker sets the type of the receiver in a generic body alone, which `walk_plain` never walks. |
+| `xe` of `src/antic/sema_copies.c`, line 1301 | `chan T(n)` without its type or of another type. | The checker gives every `chan T(n)` the type of a channel of `T`. |
+| `xassign` of `src/antic/sema_copies.c`, line 1353 | A `set_index` that leaves the statement an assignment. | `sema_set_index` writes the statement as the call of `set_index` whenever it takes it. |
+| `xfor` of `src/antic/sema_copies.c`, line 1387 | A walk of a type parameter outside a copy. | `walk_plain` walks code that is not generic, where no value has the type of a parameter. |
+| `xi` of `src/antic/sema_copies.c`, lines 1595 and 1603 | An anonymous function without its symbol or without the function around it, and one whose enclosing function the clone has not mapped. | The checker gives every anonymous function both, and the clone maps the enclosing function before it walks the body that holds the anonymous one. |
+| `defaults_of_copies` of `src/antic/sema_copies.c`, line 1704 | A failure while the defaults of the copies are made. | The loop of `sema_compile_copies` stops before it asks once a copy failed, and no default of a class whose generic passed the checker fails. |
+| `digit_run` of `src/antic/lexer.c`, line 706 | No buffer for the digits. | Each of its three callers passes the buffer of the literal. |
+| `interpolated` of `src/antic/lexer.c`, line 1413 | A doubled brace whose second brace is the closing quote. | The character after the first brace is a brace, and the closing quote is no brace, so the test before decides. |
+| `check_type_member` of `src/antic/sema_call.c`, lines 2758, 2759 and 2762 | A member that is no function after the test of a constant, and a function without its type. | The members a type reaches are its functions and its constants, and the checker gives every function its type where it declares it. |
+| `check_member_name` of `src/antic/sema_call.c`, line 2860 | A call that reaches the bound function. | A call of a function on a value takes the path of a method call and never reaches the bound function, so `c->callee` differs from the name there, as at the test after it. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

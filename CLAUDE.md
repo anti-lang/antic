@@ -1095,6 +1095,19 @@ not re-open a settled decision without asking Eddie.
   ran each sanitizer suite in the six parts of `asan`, the last up to
   test 8393: `asan` 262 s, 184 s, 277 s, 177 s, 111 s and 743 s, `ubsan`
   270 s, 187 s, 274 s, 169 s, 119 s and 740 s.
+  Batch 3aw of the third phase of coverage measured `host` in the same
+  three parts: 418 s, 304 s and 467 s before the commit of T419 and
+  T420, up to test 8401, where `fmt_canonical` failed on the four new
+  programs, which passed alone once they stood in their canonical form,
+  414 s, 298 s and 453 s before the fix of T419, 417 s, 302 s and 449 s
+  before that of T420, 417 s, 308 s and 446 s before the commit of the
+  tests of the sides, up to test 8404, and 416 s, 304 s and 460 s once
+  it held two more, up to test 8407. It ran each sanitizer suite in the
+  six parts of `asan`, the last up to test 8405: `asan` 269 s, 191 s,
+  283 s, 173 s, 112 s and 711 s, `ubsan` 269 s, 192 s, 284 s, 175 s,
+  123 s and 764 s, where `matrix_values_text_literals_dev` reached its
+  limit of 60 s while `fseventsd` of the Mac ran beside it, and 754 s
+  once the sixth part ran again.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1705,11 +1718,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8395 ctest tests pass on the development Mac, and two of them, the
+- 8407 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
   carry `host=windows`.
-  The ASan and the UBSan builds run 8393 each
+  The ASan and the UBSan builds run 8405 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
