@@ -1,1 +1,1 @@
-modules_use_after_free_of_a_field_moved_into_a_library_function.anti:19:11: error: `self.a` was moved into `pick` on line 18 [use-after-free]
+modules_use_after_free_of_a_field_moved_into_a_library_function.anti:13:14: error: `self.a` was moved into `take` on line 12 [use-after-free]

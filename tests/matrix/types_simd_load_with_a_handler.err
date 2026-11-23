@@ -1,0 +1,1 @@
+types_simd_load_with_a_handler.anti:16:35: error: this call cannot fail, so it has no error to handle

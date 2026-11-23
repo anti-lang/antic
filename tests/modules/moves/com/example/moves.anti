@@ -1,0 +1,14 @@
+//! A function of a library with an `own` parameter that is no copy of a
+//! generic, for the refusals at the boundary of a module.
+
+pub class Node
+{
+	pub n: int = 0,
+}
+
+pub fn take(own n: *Node) -> int
+{
+	let k = n.n;
+	delete(n);
+	return k;
+}

@@ -1,23 +1,16 @@
 //! E2 and an `own` field of `self` passed to an `own` parameter of a function
 //! of a library: the field moves into it, and naming it after is refused.
 
-import com.example.items;
+import com.example.moves;
 
-class Node
+class Holder
 {
-	pub n: int = 0,
-}
+	pub own a: *moves.Node,
 
-class Pair
-{
-	pub own a: *Node,
-	pub own b: *Node,
-
-	pub fn first(self) -> *Node
+	pub fn drop(self) -> int
 	{
-		let n = items.pick(self.a, self.b, true);
-		let m = self.a.n;
-		return n;
+		let k = moves.take(self.a);
+		return k + self.a.n;
 	}
 }
 

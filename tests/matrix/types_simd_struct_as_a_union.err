@@ -1,0 +1,1 @@
+types_simd_struct_as_a_union.anti:23:10: error: cannot convert `Vec4` to `Bits`, a `simd struct` converts to an array or a plain struct of the same bytes

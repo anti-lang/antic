@@ -4445,6 +4445,7 @@ antic_library_files(externs LIBRARIES first second)
 antic_library_files(lock_orders LIBRARIES locks)
 antic_library_files(lock_sides LIBRARIES pairs left right top)
 antic_library_files(waits LIBRARIES waits)
+antic_library_files(moves LIBRARIES moves)
 
 # The refusals at the boundary of a module, one message each. A case names
 # the program of tests/errors, the tree of its library files and the
@@ -4529,7 +4530,7 @@ foreach(case
         "modules_type_called|items|"
         "modules_type_nested_in_a_generic_class|generic_limits|"
         "modules_type_nested_in_a_generic_class_passed_on|generic_limits|"
-        "modules_use_after_free_of_a_field_moved_into_a_library_function|items|"
+        "modules_use_after_free_of_a_field_moved_into_a_library_function|moves|"
         "modules_variadic_function_as_a_value|items|")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

@@ -1,0 +1,25 @@
+//! `as` from a simd struct to a union of the same bytes is refused, since a
+//! union is no plain struct.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+union Bits
+{
+	lanes: [4]f32,
+	word: [2]u64,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let b = v as Bits;
+	return b.word[0] as int;
+}
