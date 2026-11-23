@@ -35,3 +35,27 @@ Take a logger and give back its allocator.
 - `pub fn with(self, to: *log.Logger, from: *m.Allocator) -> *m.Allocator`
   The allocator of `to`.
 
+## Quiet
+
+```anti
+pub abstract class Quiet inherits log.Logger
+```
+
+A logger of its own.
+
+## Counting
+
+```anti
+pub abstract class Counting inherits m.Allocator
+```
+
+An allocator of its own.
+
+## Still
+
+```anti
+pub abstract class Still inherits Clock
+```
+
+A clock of its own.
+

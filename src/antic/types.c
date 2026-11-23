@@ -1978,6 +1978,41 @@ static bool name_same(struct name a, struct name b)
            (a.length == 0 || memcmp(a.text, b.text, a.length) == 0);
 }
 
+/* The record of the type that the source spells `qualifier.name`, where
+   type is what the spelling names and no record names its type yet. */
+static void qualifier_add(struct qualifiers *q, const struct type *type,
+                          struct name qualifier, struct name name)
+{
+    const struct type *named;
+    size_t j;
+
+    /* A nested type of the item's own module reads `Outer.Inner`, whose
+       first part is the name of a type and stands in its name already,
+       and a `type` of another module may stand for a type of a third,
+       so a record names the type that the name names alone. */
+    if (qualifier.length == 0 || type == NULL ||
+        (type->kind != TYPE_STRUCT && type->kind != TYPE_CLASS &&
+         type->kind != TYPE_ENUM && type->kind != TYPE_VARIANT)) {
+        return;
+    }
+    named = type->generic != NULL ? type->generic : type;
+    if (!name_same(named->name, name)) {
+        return;
+    }
+    for (j = 0; j < q->count; j++) {
+        if (name_same(q->list[j].module, named->module) &&
+            name_same(q->list[j].name, named->name)) {
+            return;
+        }
+    }
+    q->list = alloc_grow(q->list, &q->capacity, q->count + 1,
+                         sizeof *q->list);
+    q->list[q->count].module = named->module;
+    q->list[q->count].name = named->name;
+    q->list[q->count].qualifier = qualifier;
+    q->count++;
+}
+
 static void type_expr_qualifiers(struct qualifiers *q,
                                  const struct type_expr *t)
 {
@@ -1986,32 +2021,9 @@ static void type_expr_qualifiers(struct qualifiers *q,
     if (t == NULL) {
         return;
     }
-    /* A name with a module before it names a type of that module. A
-       nested type of the item's own module reads `Outer.Inner`, whose
-       first part is the name of a type and stands in its name already,
-       and a `type` of another module may stand for a type of a third,
-       so a record names the type that the name names alone. */
-    if (t->kind == TYPEX_NAMED && t->module.length > 0 && t->type != NULL &&
-        (t->type->kind == TYPE_STRUCT || t->type->kind == TYPE_CLASS ||
-         t->type->kind == TYPE_ENUM || t->type->kind == TYPE_VARIANT)) {
-        const struct type *named =
-            t->type->generic != NULL ? t->type->generic : t->type;
-        bool known = false;
-        size_t j;
-        if (name_same(named->name, t->name)) {
-            for (j = 0; j < q->count; j++) {
-                known = known || (name_same(q->list[j].module, named->module) &&
-                                  name_same(q->list[j].name, named->name));
-            }
-            if (!known) {
-                q->list = alloc_grow(q->list, &q->capacity, q->count + 1,
-                                     sizeof *q->list);
-                q->list[q->count].module = named->module;
-                q->list[q->count].name = named->name;
-                q->list[q->count].qualifier = t->module;
-                q->count++;
-            }
-        }
+    /* A name with a module before it names a type of that module. */
+    if (t->kind == TYPEX_NAMED) {
+        qualifier_add(q, t->type, t->module, t->name);
     }
     type_expr_qualifiers(q, t->element);
     type_expr_qualifiers(q, t->result);
@@ -2023,7 +2035,8 @@ static void type_expr_qualifiers(struct qualifiers *q,
     }
 }
 
-static void item_qualifiers(struct qualifiers *q, const struct item *it)
+static void item_qualifiers(struct qualifiers *q, const struct item *it,
+                            const struct type *type)
 {
     size_t i;
     size_t j;
@@ -2037,6 +2050,12 @@ static void item_qualifiers(struct qualifiers *q, const struct item *it)
     type_expr_qualifiers(q, it->result);
     type_expr_qualifiers(q, it->type);
     type_expr_qualifiers(q, it->base);
+    /* The base of a class stands in the header as a name and its module,
+       and type->base is the type it names, by "Answers of 2026-11-23,
+       second set" in docs/decisions.md. */
+    if (it->kind == ITEM_CLASS && type != NULL) {
+        qualifier_add(q, type->base, it->base_module, it->base_name);
+    }
     for (i = 0; i < it->base_arg_count; i++) {
         type_expr_qualifiers(q, it->base_args[i]);
     }
@@ -2046,15 +2065,16 @@ static void item_qualifiers(struct qualifiers *q, const struct item *it)
         }
     }
     for (i = 0; i < it->member_count; i++) {
-        item_qualifiers(q, it->members[i]);
+        item_qualifiers(q, it->members[i], NULL);
     }
 }
 
-size_t types_item_qualifiers(const struct item *it, struct type_spelling **out)
+size_t types_item_qualifiers(const struct item *it, const struct type *type,
+                             struct type_spelling **out)
 {
     struct qualifiers q = {NULL, 0, 0};
 
-    item_qualifiers(&q, it);
+    item_qualifiers(&q, it, type);
     *out = q.list;
     return q.count;
 }

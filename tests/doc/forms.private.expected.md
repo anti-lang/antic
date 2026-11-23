@@ -169,7 +169,7 @@ A base.
 ## Leaf
 
 ```anti
-pub final class Leaf inherits com.example.forms.Base
+pub final class Leaf inherits Base
 ```
 
 A class with every kind of field.

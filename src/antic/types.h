@@ -995,9 +995,11 @@ struct type_spelling {
 };
 /* The records of the types the declaration of it spells with a module
    before their name, the first spelling of each type, in the order of
-   the declaration. *out is grown with alloc_grow, and the caller frees
-   it. The walk reads what types_item_spelled reads. */
-size_t types_item_qualifiers(const struct item *it,
+   the declaration. type is the type the checker gave it, NULL for none,
+   whose base the header of a class names. *out is grown with
+   alloc_grow, and the caller frees it. The walk reads what
+   types_item_spelled reads, and the base of a class. */
+size_t types_item_qualifiers(const struct item *it, const struct type *type,
                              struct type_spelling **out);
 /* types_name_spelled, where a struct, a class, an enum or a variant that
    a record of quals names stands with the qualifier of the record. */

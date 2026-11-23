@@ -777,7 +777,7 @@ void sema_interface(const struct module *module, const char *module_name,
         sym->spelled = types_item_spelled(it);
         {
             struct type_spelling *found = NULL;
-            size_t n = types_item_qualifiers(it, &found);
+            size_t n = types_item_qualifiers(it, it->symbol->type, &found);
             struct type_spelling *kept =
                 n > 0 ? types_alloc_array(arena, n, sizeof *kept) : NULL;
             size_t j;

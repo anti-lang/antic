@@ -61,7 +61,7 @@ A value without end, which no literal writes.
 ## Mine
 
 ```anti
-pub class Mine inherits anti.lang.Error
+pub class Mine inherits lang.Error
 ```
 
 An error of the module.

@@ -67,6 +67,22 @@ foreach(page com.example.shapes.html com.example.app.html index.html)
               "the page of the library file ${page}")
 endforeach()
 
+# A type of another module stands as the source spells it, the base after
+# `inherits` among them, by 1 of "Answers of 2026-11-23" and the second
+# set of that day. The page of the library file of foreign is the page of
+# its source.
+set(FOREIGN "${SRC}/com/example/foreign.anti")
+antic_build(-c --runtime "${RUNTIME}" -I "${SRC}" -o
+            "${WORK}/lib/com/example/foreign.antl" "${FOREIGN}")
+run_doc("--markdown;-I;${WORK}/lib;--work;${WORK}/w7;-o;${WORK}/foreign;${WORK}/lib/com/example/foreign.antl"
+        status text)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "doc on the library file of foreign failed with ${status}\n${text}")
+endif()
+same_file("${WORK}/foreign/com.example.foreign.md"
+          "${FIXTURE}/foreign.expected.md"
+          "the page of the library file of foreign")
+
 # Markdown passes the doc text through unchanged.
 run_doc("--markdown;-I;${SRC};--work;${WORK}/w3;-o;${WORK}/md;${SHAPES};${APP}"
         status text)

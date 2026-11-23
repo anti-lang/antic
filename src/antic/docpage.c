@@ -408,7 +408,10 @@ static void type_signature(struct text *out, const char *lead,
         if (t->base != NULL && !(name_is(&t->base->module, LANG_MODULE) &&
                                  name_is(&t->base->name, LANG_OBJECT))) {
             text_append(out, " inherits ");
-            types_name_qualified(out, t->base);
+            /* The base stands as the header spells it, by the records of
+               the item, by "Answers of 2026-11-23, second set" in
+               docs/decisions.md. */
+            doc_type_name(out, t->base);
         }
         break;
     default:
@@ -775,7 +778,7 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
     }
     spelled_now = types_item_spelled(it);
     free(tree_quals);
-    qual_count_now = types_item_qualifiers(it, &tree_quals);
+    qual_count_now = types_item_qualifiers(it, sym->type, &tree_quals);
     quals_now = tree_quals;
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     /* An `operator fn` that shares its name is headed by the name of its

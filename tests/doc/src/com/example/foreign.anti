@@ -29,3 +29,18 @@ pub class Keeper
 		return from;
 	}
 }
+
+/// A logger of its own.
+pub abstract class Quiet inherits log.Logger
+{
+}
+
+/// An allocator of its own.
+pub abstract class Counting inherits m.Allocator
+{
+}
+
+/// A clock of its own.
+pub abstract class Still inherits Clock
+{
+}

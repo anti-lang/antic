@@ -8163,7 +8163,8 @@ endforeach()
 # an exponent, T410. single holds a singleton class, T411. foreign holds
 # types that other modules declare, which the source spells with the last
 # segment of an import, with its alias and bare under a direct import,
-# T412, in the user docs and with --private. sides holds the forms that no other page holds: a
+# T412, in the user docs and with --private. Its three classes name a
+# base that way, by the second set of the answers of 2026-11-23. sides holds the forms that no other page holds: a
 # name of a type that is no copy, a function that may fail and gives
 # nothing, a function of C that takes a function, the float constants of
 # the forms of float_literal, a base of `anti.lang` other than the root,
