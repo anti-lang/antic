@@ -1593,9 +1593,12 @@ static bool names_function(struct checker *c, const struct expr *e)
     const struct expr *base;
     size_t i;
 
+    /* A function of another module, named through a direct import, is
+       none of them, as it is none through the name of its module, by T426
+       of docs/audit/tests-findings.md. */
     if (e->kind == EXPR_NAME) {
         sym = e->qualified ? e->symbol : sema_lookup(c, &e->as.name);
-        return sym != NULL &&
+        return sym != NULL && sym->home == NULL &&
                (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN);
     }
     if (e->kind != EXPR_FIELD) {
