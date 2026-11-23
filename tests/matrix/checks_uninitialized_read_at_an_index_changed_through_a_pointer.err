@@ -1,1 +1,0 @@
-checks_uninitialized_read_at_an_index_changed_through_a_pointer.anti:13:10: error: an element of `p` is read at a computed index before every path from `alloc` on line 6 wrote the whole range [uninitialized-read]

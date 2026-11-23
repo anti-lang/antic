@@ -1,5 +1,9 @@
-//! C1 and a read at the index of a write: the call that takes `&i` sets it to
-//! 3, so the read reads element 3, which no path wrote.
+//! C1 and a read at the index of a write: the call that takes `&i` sets it to 3.
+//! C1 counts a local that a pointer may change as a case it cannot follow, so
+//! the read passes, by 11 of "Answers of 2026-11-23". It reads element 3, which
+//! no path wrote, so the line names the index alone.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
 
 fn bump(n: *int)
 {
@@ -16,5 +20,6 @@ fn main() -> int
 	bump(&i);
 	let x = p[i];
 	free(p);
-	return x;
+	printf("read at index %d\n".ptr, i as c_int);
+	return 0;
 }
