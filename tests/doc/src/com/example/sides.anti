@@ -1,0 +1,77 @@
+//! The forms of an item that the pages of `forms` and `shapes` do not hold.
+
+import anti.lang;
+
+/// A count of things.
+pub type Count = int;
+
+/// Checks `n`, and fails for one below zero.
+pub fn check(n: int) may fail
+{
+	if n < 0 {
+		fail "below zero";
+	}
+}
+
+/// Calls `f` from C.
+pub extern fn call_back(f: fn(c_int) -> c_int) -> c_int;
+
+/// The sum of a tenth and a fifth, which takes seventeen digits.
+pub const THIRD: f64 = 0.30000000000000004;
+
+/// A tenth at the width of an `f32`.
+pub const TENTH: f32 = 0.1;
+
+/// A whole number of type `f64`.
+pub const TWO: f64 = 2.0;
+
+/// A value without end, which no literal writes.
+pub const ENDLESS: f64 = 1.0 / 0.0;
+
+/// An error of the module.
+pub class Mine inherits lang.Error
+{
+}
+
+/// A store under the lock of the object.
+pub synchronized class Store
+{
+	n: int = 0,
+
+	/// Makes the store.
+	pub fn construct(self)
+	{
+		self.n = 1;
+	}
+
+	/// Ends the store.
+	pub fn destruct(self)
+	{
+		self.n = 0;
+	}
+
+	/// Describes the store.
+	pub fn describe(self) -> int
+	{
+		return self.n;
+	}
+
+	/// Makes a count without a store.
+	pub fn zero() -> int
+	{
+		return 0;
+	}
+
+	/// Gives the count of the store whatever `x` is, a function with a type
+	/// parameter of its own.
+	pub fn pick<U>(self, x: U) -> int
+	{
+		return self.n;
+	}
+
+	/// A step of its own.
+	fn step(self) -> int
+	{
+		return self.n + 1;
+	}
+}

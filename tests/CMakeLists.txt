@@ -8112,7 +8112,12 @@ endforeach()
 # constant of more digits than six and huge one that printf writes with
 # an exponent, T410. single holds a singleton class, T411. foreign holds a
 # parameter whose type another module declares, which the source spells
-# with the module, T412.
+# with the module, T412. sides holds the forms that no other page holds: a
+# name of a type that is no copy, a function that may fail and gives
+# nothing, a function of C that takes a function, the float constants of
+# the forms of float_literal, a base of `anti.lang` other than the root,
+# and the functions of a synchronized class that run under its lock and
+# those that do not.
 foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "prose_dev|--markdown\\|--dev|prose|com.example.prose.md|prose.dev.expected.md"
              "wrapped_link||wrapped|com.example.wrapped.html|wrapped.expected.html"
@@ -8128,7 +8133,9 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "floats_markdown|--markdown|floats|com.example.floats.md|floats.expected.md"
              "huge_markdown|--markdown|huge|com.example.huge.md|huge.expected.md"
              "single_markdown|--markdown|single|com.example.single.md|single.expected.md"
-             "foreign_markdown|--markdown|foreign|com.example.foreign.md|foreign.expected.md")
+             "foreign_markdown|--markdown|foreign|com.example.foreign.md|foreign.expected.md"
+             "sides_markdown|--markdown|sides|com.example.sides.md|sides.expected.md"
+             "sides_private|--markdown\\|--private|sides|com.example.sides.md|sides.private.expected.md")
     string(REPLACE "\\|" "!" pair "${pair}")
     string(REPLACE "|" ";" pair "${pair}")
     list(GET pair 0 case)
