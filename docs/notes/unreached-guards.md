@@ -1935,6 +1935,34 @@ batch.
 | `check_type_member` of `src/antic/sema_call.c`, lines 2758, 2759 and 2762 | A member that is no function after the test of a constant, and a function without its type. | The members a type reaches are its functions and its constants, and the checker gives every function its type where it declares it. |
 | `check_member_name` of `src/antic/sema_call.c`, line 2860 | A call that reaches the bound function. | A call of a function on a value takes the path of a method call and never reaches the bound function, so `c->callee` differs from the name there, as at the test after it. |
 
+## The sides of batch 3ax
+
+Batch 3ax of the third phase read the writer of the library file in
+`src/antic/antl_write.c` and the checker's part of hashing and of the
+default `==` in `src/antic/sema_hash.c`. It found T421 to T427 and fixed
+T421, T422, T423, T425 and T426. T424 is no defect, and T427 is open. The
+rows of the two files under their own headings above stand as they were.
+The line numbers are those of the coverage run after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `is_local_struct` of `src/antic/antl_write.c`, line 44 | A type without fields. | `antl_visit_type` and `put_type` ask about a struct, a class or a variant alone, and `put_defaults` asks after `types_has_fields`. |
+| `carried_member` of `src/antic/antl_write.c`, line 60 | A function of a body without its symbol. | The checker declares every function of a body with its symbol, and a module is written once its check passed. |
+| `default_fn` of `src/antic/antl_write.c`, lines 93 to 96 | A name without its symbol, a function without its item, one of a body named alone, a generic function, a function of another module and one without its type. | The checker gives every name its symbol and every function its item and its type. A function of a body named alone is `` unknown name `get` ``, a generic one is `` `pick` is generic, and names a function where it is called ``, and since T426 a function of another module is `a function is not a constant expression`. |
+| `carried_value` of `src/antic/antl_write.c`, lines 115 and 116 | A constant without its symbol or its type, a constant of a copy, and one without its value. | The checker declares each constant and static field of a body with its symbol, its type and its value, and a copy of a generic holds no constant of its own. |
+| `antl_put_symbolic` and `antl_put_value` of `src/antic/antl_write.c`, lines 395 and 714 | A kind that no case names. | The cases name every kind of the enum. |
+| `put_param_type` of `src/antic/antl_write.c`, lines 458 and 461 | A set of a `constraint` without its item. | `declare_params` of `src/antic/sema_generic.c` gives the type of each `constraint` its item, and the reader of a library file gives each set it reads its item. |
+| `put_header` of `src/antic/antl_write.c`, lines 1130, 1131 and 1157 | A package without its name or its version, and a module without its doc text. | `sema_interface` of `src/antic/sema_export.c` gives the package the module path and the default version, and the doc an empty text. |
+| `antl_write` of `src/antic/antl_write.c`, line 1218 | A function of the interface without its item. | `sema_interface` takes the functions of the interface from the items of the module, and no library file that a reader read is written again. |
+| `add_call` of `src/antic/sema_hash.c`, lines 98, 101 and 110 | No hook, a hook that is no function, and a call that the checker refuses. | `walk` calls it where `sema_hook` found the hook, a hook is a function with its type, and the row of `nested_call` gives why the call is never refused. |
+| `sema_is_hash_call` of `src/antic/sema_hash.c`, lines 236, 240 and 241 | A node that is no call, a receiver without a type, and a callee `x.hash` without arguments that neither hashes nor stands on a value of a type parameter. | `open_node` of `src/antic/sema_copies.c` and `callee_read` of `src/antic/antl_verify.c` pass a call. The checker types every receiver, and `method_call` of `src/antic/sema_call.c` writes `x.hash()` of a class or of a type with the hook as a call by name, with the receiver as its first argument. |
+| `sema_hash_without_effects` of `src/antic/sema_hash.c`, line 306 | A node that is no call. | `warn_unused_result` of `src/antic/sema_stmt.c` asks about a call alone. |
+| `nested_eq` of `src/antic/sema_hash.c`, line 343 | A checked `==` of the stand-ins that stays a binary node. | `walk_eq` asks for it where `sema_operator_symbol` found an `operator fn eq` of the type, and the checker writes `==` as the call of that operator or refuses it. |
+| `sema_eq_gap` of `src/antic/sema_hash.c`, line 446 | An object lock in a struct, a tuple or a case. | The hidden lock is a field of a synchronized class alone, whose fields `sema_class_gap` reads. |
+| `declares` of `src/antic/sema_hash.c`, line 462 | A chain that ends before the root. | Every chain ends at `Object`, whose base is none, and the test of the base leaves the loop there. |
+| `default_eq` of `src/antic/sema_hash.c`, line 604 | A simd struct. | `==` on two simd structs compares lane by lane, and `meets_hook` of `src/antic/sema_generic.c` answers for a simd part with `sema_simd_meets` before it asks for the default. |
+| `sema_class_defaults` of `src/antic/sema_hash.c`, lines 688 and 689 | A class without its symbol or its type, and an item of kind class whose type is no class. | The pass runs once the checker passed, over items that each have their symbol and their type, and a class item has a class type. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
