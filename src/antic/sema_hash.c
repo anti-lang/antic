@@ -558,9 +558,13 @@ const struct struct_field *sema_class_gap(struct checker *c, struct type *t)
     for (; t != NULL; t = t->base) {
         for (i = 0; i < t->field_count; i++) {
             const struct struct_field *f = &t->fields[i];
-            /* An `own` pointer compares what it points at, and a class
-               there compares through its own `equals`. */
-            struct type *part = f->owned && f->type->kind == TYPE_POINTER &&
+            /* An `own` pointer compares what it points at, and an `own`
+               slice its elements one by one, by T425 of
+               docs/audit/tests-findings.md. A class there compares
+               through its own `equals`. */
+            struct type *part = f->owned &&
+                                        (f->type->kind == TYPE_POINTER ||
+                                         f->type->kind == TYPE_SLICE) &&
                                         f->type->element->kind != TYPE_CLASS
                                     ? f->type->element
                                     : f->type;
