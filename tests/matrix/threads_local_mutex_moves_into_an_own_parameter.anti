@@ -1,0 +1,239 @@
+//! A local `Mutex` passed to an `own` parameter moves, by 9 of "Answers of
+//! 2026-11-23", in these places: function, method, loop body, switch arm, if
+//! let, defer, undo, catch handler, closure, worker, dispatch, sync block,
+//! select arm, generic body and nested type. The parameter holds the Mutex in a
+//! `sync` block and destroys it. Each place is a function of its own and prints
+//! one line.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+/// Hold `m` once, release it and give `k`.
+fn keep(own m: Mutex, k: int) -> int
+{
+	sync m {
+		k += 0;
+	}
+	m.destroy();
+	return k;
+}
+
+fn held(k: int) -> ?int
+{
+	if k == 0 {
+		return none;
+	}
+	return k;
+}
+
+fn failing(k: int) -> int may fail
+{
+	if k > 0 {
+		fail "refused";
+	}
+	return k;
+}
+
+fn in_function(k: int) -> int
+{
+	let m = Mutex.new();
+	return keep(m, k);
+}
+
+class Places
+{
+	pub base: int = 0,
+
+	class Inner
+	{
+		pub n: int = 0,
+
+		pub fn moved(self, k: int) -> int
+		{
+			let m = Mutex.new();
+			return keep(m, k + self.n);
+		}
+	}
+
+	pub fn in_method(self, k: int) -> int
+	{
+		let m = Mutex.new();
+		return keep(m, k + self.base);
+	}
+
+	pub fn in_nested(self, k: int) -> int
+	{
+		let i = Inner { n: self.base };
+		return i.moved(k);
+	}
+}
+
+fn in_loop(k: int) -> int
+{
+	let sum = 0;
+	for i in 0..2 {
+		let m = Mutex.new();
+		sum += keep(m, k + i);
+	}
+	return sum;
+}
+
+fn in_switch(k: int) -> int
+{
+	switch k {
+		3 => {
+			let m = Mutex.new();
+			return keep(m, k);
+		},
+		else => {
+			return 0;
+		},
+	}
+}
+
+fn in_if_let(k: int) -> int
+{
+	if let v = held(k) {
+		let m = Mutex.new();
+		return keep(m, v);
+	}
+	return 0;
+}
+
+fn in_defer(k: int, out: *int)
+{
+	defer {
+		let m = Mutex.new();
+		*out = keep(m, k);
+	}
+}
+
+fn in_undo(k: int, out: *int) may fail
+{
+	undo {
+		let m = Mutex.new();
+		*out = keep(m, k);
+	}
+	fail "undone";
+}
+
+fn in_catch(k: int) -> int
+{
+	let got = failing(k) catch e {
+		let m = Mutex.new();
+		yield keep(m, k);
+	};
+	return got;
+}
+
+fn call(f: fn(int) -> int, k: int) -> int
+{
+	return f(k);
+}
+
+fn in_closure(k: int) -> int
+{
+	return call(fn(v) {
+		let m = Mutex.new();
+		return keep(m, v);
+	}, k);
+}
+
+class Task
+{
+	pub n: int = 0,
+}
+
+worker fn moving(t: *Task) -> int
+{
+	let m = Mutex.new();
+	return keep(m, t.n);
+}
+
+worker fn taking(t: *Task, own m: Mutex) -> int
+{
+	return keep(m, t.n);
+}
+
+fn in_worker(k: int) -> int
+{
+	let t = alloc Task { n: k };
+	let job = dispatch t -> moving();
+	let got = join(job);
+	delete(t);
+	return got;
+}
+
+fn in_dispatch(k: int) -> int
+{
+	let t = alloc Task { n: k };
+	let m = Mutex.new();
+	let job = dispatch t -> taking(m);
+	let got = join(job);
+	delete(t);
+	return got;
+}
+
+struct Guard
+{
+	lock: Mutex,
+}
+
+fn in_sync(g: *Guard, k: int) -> int
+{
+	sync g.lock {
+		let m = Mutex.new();
+		return keep(m, k);
+	}
+}
+
+fn in_select(c: chan int, k: int) -> int
+{
+	send(c, k);
+	select {
+		c x => {
+			let v = x else {
+				return 0;
+			};
+			let m = Mutex.new();
+			return keep(m, *v);
+		},
+	}
+}
+
+fn in_generic<T>(x: T, k: int) -> int
+{
+	let m = Mutex.new();
+	return keep(m, k);
+}
+
+fn main() -> int
+{
+	let places = Places { base: 100 };
+	let out = 0;
+	printf("function: %d\n".ptr, in_function(1) as c_int);
+	printf("method: %d\n".ptr, places.in_method(2) as c_int);
+	printf("loop body: %d\n".ptr, in_loop(3) as c_int);
+	printf("switch arm: %d\n".ptr, in_switch(3) as c_int);
+	printf("if let: %d\n".ptr, in_if_let(5) as c_int);
+	in_defer(6, &out);
+	printf("defer: %d\n".ptr, out as c_int);
+	in_undo(7, &out) catch {
+		yield;
+	};
+	printf("undo: %d\n".ptr, out as c_int);
+	printf("catch handler: %d\n".ptr, in_catch(8) as c_int);
+	printf("closure: %d\n".ptr, in_closure(9) as c_int);
+	printf("worker: %d\n".ptr, in_worker(10) as c_int);
+	printf("dispatch: %d\n".ptr, in_dispatch(11) as c_int);
+	let g = Guard { lock: Mutex.new() };
+	printf("sync block: %d\n".ptr, in_sync(&g, 12) as c_int);
+	g.lock.destroy();
+	let c = chan int(1);
+	printf("select arm: %d\n".ptr, in_select(c, 13) as c_int);
+	delete(c);
+	printf("generic body: %d\n".ptr, in_generic<int>(0, 14) as c_int);
+	printf("nested type: %d\n".ptr, places.in_nested(15) as c_int);
+	return 0;
+}

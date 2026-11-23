@@ -246,6 +246,24 @@ pub fn run_to_slice(k: int) -> []int
 	return Count { at: k, end: k + 3 }.to_slice();
 }
 
+/// Hold `m` once, release it and give `k`.
+fn hold_mutex(own m: Mutex, k: int) -> int
+{
+	sync m {
+		k += 0;
+	}
+	m.destroy();
+	return k;
+}
+
+/// A local `Mutex` that moves into an `own` parameter, by 9 of "Answers of
+/// 2026-11-23".
+pub fn run_mutex_moves(k: int) -> int
+{
+	let m = Mutex.new();
+	return hold_mutex(m, k);
+}
+
 pub fn gen_to_slice<T>(own x: T, k: int) -> int
 {
 	let all = Count { at: k, end: k + 2 }.to_slice();

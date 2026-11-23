@@ -961,6 +961,17 @@ bool sema_move_caught(struct checker *c, const struct symbol *callee,
     return true;
 }
 
+bool sema_moves_local(const struct symbol *callee, size_t index,
+                      const struct expr *arg)
+{
+    const struct symbol *moved = arg->kind == EXPR_NAME ? arg->symbol : NULL;
+
+    return sema_owned_param(callee, index) && moved != NULL &&
+           (moved->kind == SYMBOL_LOCAL || moved->kind == SYMBOL_PARAM) &&
+           arg->type != NULL && !sema_is_error(arg->type) &&
+           moves_at_call(arg->type);
+}
+
 void sema_note_move(struct checker *c, const struct symbol *callee,
                       size_t index, const struct expr *receiver,
                       struct expr *arg)

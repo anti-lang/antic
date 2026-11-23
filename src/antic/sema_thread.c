@@ -821,7 +821,9 @@ static bool worker_args(struct checker *c, struct expr *call,
                                           sema_owned_param(callee->symbol,
                                                            i + 1)),
                           fn->params[i + 1]) && ok;
-        sema_refuse_lock_copy(c, args[i], param);
+        if (!sema_moves_local(callee->symbol, i + 1, args[i])) {
+            sema_refuse_lock_copy(c, args[i], param);
+        }
         sema_refuse_worker_closure(c, args[i], param);
         if (job && ok) {
             sema_note_move(c, callee->symbol, i + 1, NULL, args[i]);

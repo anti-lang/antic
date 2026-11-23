@@ -10,6 +10,7 @@ destroy 1
 delete 0
 &x and *p 505
 to_slice 3 21
+Mutex moves 6
 alive 0
 generic alloc of a literal 11 1
 generic alloc(T, n) 12 2

@@ -1680,7 +1680,9 @@ static struct type *check_construct(struct checker *c, struct expr *e,
         c->lent_use = LENT_PASSED;
         ok = sema_require(c, arg, got, fn->params[i + 1]) && ok;
         c->lent_use = LENT_STORED;
-        sema_refuse_lock_copy(c, arg, fn->params[i + 1]);
+        if (!sema_moves_local(m->symbol, i + 1, arg)) {
+            sema_refuse_lock_copy(c, arg, fn->params[i + 1]);
+        }
         sema_note_move(c, m->symbol, i + 1, NULL, arg);
     }
     if (!ok) {
@@ -2503,7 +2505,9 @@ static struct type *check_call(struct checker *c, struct expr *e,
                               : LENT_PASSED;
             ok = sema_require(c, arg, t, fn->params[i]) && ok;
             c->lent_use = LENT_STORED;
-            sema_refuse_lock_copy(c, arg, fn->params[i]);
+            if (!sema_moves_local(sym, i, arg)) {
+                sema_refuse_lock_copy(c, arg, fn->params[i]);
+            }
             sema_check_leak_arg(c, e->as.call.callee, arg, fn->params[i]);
             if (sym != NULL && sym->worker) {
                 sema_refuse_worker_closure(c, arg, fn->params[i]);

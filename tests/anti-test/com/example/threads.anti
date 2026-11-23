@@ -18,6 +18,17 @@ struct Guard
 	n: int,
 }
 
+/// Hold `m` once, release it and give `k`. A local `Mutex` moves into the
+/// parameter, by 9 of "Answers of 2026-11-23".
+fn hold(own m: Mutex, k: int) -> int
+{
+	sync m {
+		k += 0;
+	}
+	m.destroy();
+	return k;
+}
+
 worker fn add(t: *Task, k: int) -> int
 {
 	return t.n + k;
@@ -90,6 +101,8 @@ fixtures
 			acc += g.n;
 		}
 		g.lock.destroy();
+		let moved = Mutex.new();
+		acc += hold(moved, 0);
 		return acc;
 	}
 
@@ -248,6 +261,8 @@ tests
 			acc += g.n;
 		}
 		g.lock.destroy();
+		let moved = Mutex.new();
+		acc += hold(moved, 0);
 		assert(acc == 34);
 	}
 

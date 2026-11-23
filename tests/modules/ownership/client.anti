@@ -33,6 +33,7 @@ fn plain()
 	printf("to_slice %d %d\n".ptr, all.len as c_int,
 		(all[0] + all[1] + all[2]) as c_int);
 	free(all.ptr);
+	printf("Mutex moves %d\n".ptr, ownership.run_mutex_moves(6) as c_int);
 }
 
 fn generic()

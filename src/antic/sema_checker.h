@@ -871,6 +871,12 @@ void sema_refuse_concurrent_copy(struct checker *c, const struct expr *value,
 struct type *sema_check_kept(struct checker *c, struct expr *e,
                              struct type *expected, bool kept);
 bool sema_owned_param(const struct symbol *callee, size_t index);
+/* Whether the local or the parameter arg moves into the `own` parameter
+   index of callee, by the rule of moves_at_call. A Mutex that moves is
+   no copy, so sema_refuse_lock_copy passes over it, by 9 of "Answers of
+   2026-11-23" in docs/decisions.md. */
+bool sema_moves_local(const struct symbol *callee, size_t index,
+                      const struct expr *arg);
 bool sema_move_caught(struct checker *c, const struct symbol *callee,
                        struct expr *arg);
 void sema_note_move(struct checker *c, const struct symbol *callee,

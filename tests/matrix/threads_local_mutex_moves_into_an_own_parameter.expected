@@ -1,0 +1,16 @@
+exit 0
+function: 1
+method: 102
+loop body: 7
+switch arm: 3
+if let: 5
+defer: 6
+undo: 7
+catch handler: 8
+closure: 9
+worker: 10
+dispatch: 11
+sync block: 12
+select arm: 13
+generic body: 14
+nested type: 115
