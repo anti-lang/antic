@@ -1070,6 +1070,17 @@ not re-open a settled decision without asking Eddie.
   ran each sanitizer suite in the six parts of `asan`, the last up to
   test 8325: `asan` 249 s, 182 s, 267 s, 163 s, 114 s and 635 s, `ubsan`
   249 s, 182 s, 261 s, 106 s, 85 s and 660 s.
+  Batch 3av of the third phase of coverage measured `host` in the same
+  three parts: 381 s, 278 s and 473 s before the commit of T413 to T418,
+  up to test 8345, 342 s, 235 s and 459 s before the fix of T413, 373 s,
+  278 s and 475 s before that of T414, 299 s, 272 s and 425 s before that
+  of T415, 375 s, 280 s and 478 s before that of T416, 376 s, 280 s and
+  476 s before that of T417, 372 s, 280 s and 481 s before that of T418,
+  377 s, 281 s and 456 s before the commit of the tests of the sides, up
+  to test 8369, and 371 s, 282 s and 472 s before the commit of three more
+  sides, up to test 8372. It ran each sanitizer suite in the six parts of
+  `asan`, the last up to test 8370: `asan` 251 s, 180 s, 270 s, 165 s,
+  113 s and 641 s, `ubsan` 258 s, 183 s, 268 s, 165 s, 126 s and 676 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1680,14 +1691,14 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8327 ctest tests pass on the development Mac, and two of them, the
+- 8372 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
   carry `host=windows`, the three lines of T385, which wait for Eddie's
   choice, the three lines of T387, which wait for his answer, the
   three lines of T404 and of T407 and the line of T412, which wait for
   his answers.
-  The ASan and the UBSan builds run 8325 each
+  The ASan and the UBSan builds run 8370 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which

@@ -1869,6 +1869,39 @@ the batch, at `0ff649a3`.
 | `lower_class_record` of `src/antic/lower_desc.c`, line 2089 | A `provides` line without its interface. | The checker refuses a `provides` line whose interface it cannot resolve, and lowering runs on a module without an error. |
 | `lower_static_descriptor` of `src/antic/lower_desc.c`, line 2111 | A type other than a class and a pointer to one. | The checker refuses `delete`, `destroy` and `dup` of any other type, as `` `delete` needs a class pointer, found `*Point` ``, and the teardown of an owned buffer asks for a class alone. |
 
+## The sides of batch 3av
+
+Batch 3av of the third phase read the check `use-after-free` in
+`src/antic/sema_free.c` and the checks of simd structs in
+`src/antic/sema_simd.c`. It found T413 to T418 and fixed all six, T417
+and T418 in `src/antic/sema_uninit.c`. The rows of `sema_free.c` under its
+own heading above stand as they were. The line numbers are those of the
+coverage run after the batch, at `a75e9eba`. The fixes of T417 and T418
+move the lines of `src/antic/sema_uninit.c`, whose rows under batch 3at
+name the lines of its own run.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `sema_check_simd_binary` of `src/antic/sema_simd.c`, lines 126, 127 and 138 | Lanes of `char` under `==`, `!=` or an order, and lanes that are neither numbers nor `bool`. | `sema_simd_lane_refused` refuses `char` lanes before the `switch`, and a simd struct takes lanes of numbers, of `f16` and of `bool` alone. |
+| `layout_in` of `src/antic/sema_simd.c`, line 258 | A field of a bound function or of a function of two words. | No declaration writes the type of a bound function, the form of two words stands at a parameter alone, and a field of a struct takes no `own`, which antic refuses with ``expected `:` ``. |
+| `layout_in` of `src/antic/sema_simd.c`, line 266 | An array without an element. | The checker refuses a length below 1 with `an array length is at least 1`, and the line before refuses a symbolic length. |
+| `sema_simd_module_call` of `src/antic/sema_simd.c`, line 378 | A module without its library. | `sema_declare_import` of `src/antic/sema_declare.c` gives every module it declares its library, and the hidden modules of an interpolation and of a pattern get theirs where they are made. |
+| `sema_check_simd_value` of `src/antic/sema_simd.c`, line 592 | A constant index of a shuffle that is no integer. | `sema_require` holds the index to `i64`, and a constant of that type is an integer. |
+| `sema_simd_method_declared` of `src/antic/sema_simd.c`, lines 628 and 629 | A function without its type, and a function whose type is no function type. | The checker gives every function its function type where it declares it, before it checks a body, and the reader of a library file gives each the type the file holds. |
+| `own_field` of `src/antic/sema_free.c`, lines 217 and 226 | No type, and a field without its type. | Every caller passes the type of a checked expression, and the checker gives every field its type. |
+| `refuse`, `walk_expr` and `walk_stmt` of `src/antic/sema_free.c`, lines 322, 688 and 1199 | A kind outside the `switch`. | Each `switch` names every kind of its enum. |
+| `bytes_pointer` of `src/antic/sema_free.c`, line 369 | A pointer without its element. | Every pointer type has its element. |
+| `kill_moved` of `src/antic/sema_free.c`, lines 464 and 465 | A move without its note. | `sema_move_local` of `src/antic/sema_value.c` writes a note for every move it marks, and the error a handler binds, which `sema_move_caught` moves without one, is no value the walk follows. |
+| `walk_list` of `src/antic/sema_free.c`, line 473 | No list of operands. | Its one caller passes the operands of a built-in of a simd struct, which `simd_node` of `src/antic/sema_simd.c` writes for each. |
+| `walk_parts` of `src/antic/sema_free.c`, line 519 | A part of a literal without its value. | The parser gives every part and every field of a literal its value. |
+| `walk_parts`, `walk_call` and `walk_assign` of `src/antic/sema_free.c`, lines 531, 605 and 895 | A path that ends inside a literal, among the arguments of a call or inside the two sides of `=`. | The walk ends a path at a statement alone, and the handler of a call joins the path that goes on. |
+| `walk_handler` of `src/antic/sema_free.c`, line 571 | A handler block without its block. | The parser gives every handler block its block. |
+| `walk_call` of `src/antic/sema_free.c`, line 614 | More arguments than parameters for a function with an `own` parameter. | Only a variadic `extern fn` takes more, and antic refuses `own` on one with ``an `extern fn` takes no `own` parameter, since C tears down nothing``. |
+| `walk_call` of `src/antic/sema_free.c`, line 618 | An `own` parameter at the object of a call of a function of a class. | The object stands at `self`, which takes no `own`. |
+| `walk_assign` of `src/antic/sema_free.c`, line 898 | A target that names a function of a class. | The checker refuses it with `cannot assign to this expression`, and the pass runs on a body without an error. |
+| `one_turn` of `src/antic/sema_free.c`, line 1003 | A loop other than `for` with its statement. | `walk_for` alone gives the loop its statement. |
+| `walk_stmt` of `src/antic/sema_free.c`, line 1196 | No statement. | Every caller passes a statement of a block, of an arm or of a pending list, and `walk_arms` passes `else` only where it stands. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
