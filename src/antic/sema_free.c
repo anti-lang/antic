@@ -555,7 +555,9 @@ static void walk_maybe(struct free_walk *w, const struct expr *e)
 }
 
 /* A handler block: the error path from the state now, whose end and
-   every `yield` join the path that goes on without an error. */
+   every `yield` join the path that goes on without an error. A `try`
+   inside a `try` block goes to the handler of the block, as a call
+   without one does there, by R016 of "Rules of 2026-10-13" and T416. */
 static void walk_handler(struct free_walk *w, const struct handler *h)
 {
     struct state *yields = w->yields;
@@ -563,11 +565,12 @@ static void walk_handler(struct free_walk *w, const struct handler *h)
     struct state ok;
     size_t yield_base = w->yield_base;
 
-    if (h->kind == HANDLE_TRY) {
+    if (h->kind == HANDLE_TRY && w->tried == NULL) {
         run_exits(w, 0, true);
     }
     if (h->kind != HANDLE_BLOCK || h->body == NULL) {
-        if (h->kind == HANDLE_ENCLOSING && w->tried != NULL) {
+        if ((h->kind == HANDLE_ENCLOSING || h->kind == HANDLE_TRY) &&
+            w->tried != NULL) {
             run_exits(w, w->try_base, true);
             state_join(w->tried, &w->now);
         }
