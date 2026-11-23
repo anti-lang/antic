@@ -1,6 +1,9 @@
-//! A library whose private items carry `///` comments. The library file stores
-//! none of them, so it equals the file of the same source with plain comments
-//! in their place, under tests/modules/private_plain.
+//! A library whose private functions, and the functions of whose private types,
+//! carry `///` comments. The library file stores none of them, so it equals the
+//! file of the same source with plain comments in their place, under
+//! tests/modules/private_plain. The text of a private field, of a `construct`
+//! and a `destruct` and of a value of an enum stays, since the C header writes
+//! it, and a value of an enum stands for a case of a variant there.
 
 /// A class with private parts.
 pub class Counter

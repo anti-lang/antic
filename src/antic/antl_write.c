@@ -173,6 +173,17 @@ static bool is_public_struct(const struct writer *w, const struct type *t)
     return false;
 }
 
+/* Whether the function m of a body is a private item, whose `///` text
+   the file leaves out. A `construct` and a `destruct` are not: they are
+   the C view of the class whatever their level, and the header of a
+   library file writes the text of `construct`. */
+static bool is_private_function(const struct item *m)
+{
+    return m->vis == VIS_PRIVATE &&
+           !antl_name_equals(&m->name, "construct") &&
+           !antl_name_equals(&m->name, "destruct");
+}
+
 /* Whether t is in the type table of w. If so, index receives its index. */
 static bool find_type(const struct writer *w, const struct type *t,
                       size_t *index)
@@ -621,7 +632,13 @@ static void put_type(struct writer *w, const struct type *t)
                                          (unsigned)m->is_operator << 5 |
                                          (unsigned)m->may_fail << 6));
                 antl_put_u8(w, (uint8_t)m->vis);
-                put_doc(w, m->doc.text, m->doc.length);
+                /* A private function of a generic and every function of
+                   a private type are private items, whose `///` text is
+                   never stored, by T422 of docs/audit/tests-findings.md. */
+                put_doc(w, m->doc.text,
+                        is_public_struct(w, t) && !is_private_function(m)
+                            ? m->doc.length
+                            : 0);
                 /* DESIGN: the public interface keeps the parameter
                    names of every function. A function of a class body is
                    one, and `anti doc` and the generated header print
@@ -656,7 +673,8 @@ static void put_type(struct writer *w, const struct type *t)
                     antl_put_u8(w, m->is_static);
                     antl_put_u8(w, (uint8_t)m->vis);
                     antl_put_type_ref(w, m->symbol->type);
-                    put_doc(w, m->doc.text, m->doc.length);
+                    put_doc(w, m->doc.text,
+                            is_public_struct(w, t) ? m->doc.length : 0);
                 }
             }
             if (t->type_param_count > 0) {

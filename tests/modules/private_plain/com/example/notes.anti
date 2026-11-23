@@ -1,22 +1,25 @@
-//! A library whose private items carry `///` comments. The library file stores
-//! none of them, so it equals the file of the same source with plain comments
-//! in their place, under tests/modules/private_plain.
+//! A library whose private functions, and the functions of whose private types,
+//! carry `///` comments. The library file stores none of them, so it equals the
+//! file of the same source with plain comments in their place, under
+//! tests/modules/private_plain. The text of a private field, of a `construct`
+//! and a `destruct` and of a value of an enum stays, since the C header writes
+//! it, and a value of an enum stands for a case of a variant there.
 
 /// A class with private parts.
 pub class Counter
 {
-	// The count so far, a private field.
+	/// The count so far, a private field.
 	n: int = 0,
 	/// The step, a public field.
 	pub step: int = 1,
 
-	// Starts the count, a private `construct`.
+	/// Starts the count, a private `construct`.
 	fn construct(self)
 	{
 		self.n = 0;
 	}
 
-	// Ends the count, a private `destruct`.
+	/// Ends the count, a private `destruct`.
 	fn destruct(self)
 	{
 		self.n = 0;
@@ -33,7 +36,7 @@ pub class Counter
 /// A generic class with private parts.
 pub class Box<T>
 {
-	// The value, a private field.
+	/// The value, a private field.
 	v: T,
 
 	// Gives the value, a private function.
@@ -65,7 +68,7 @@ class Tally
 /// A private enum that a public struct holds.
 enum Mode
 {
-	// The first, a value of a private enum.
+	/// The first, a value of a private enum.
 	First,
 	Second,
 }

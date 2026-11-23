@@ -3745,10 +3745,10 @@ set_tests_properties(antl_docs_equivalent PROPERTIES
     FIXTURES_REQUIRED "docs_lines;docs_blocks")
 
 # The `///` comments of private items are never stored. The source under
-# private_docs carries them on the private fields and functions of a class
-# and of a generic, and on the parts of a private class and enum. The
-# source under private_plain has `//` in their place on the same lines, so
-# the two files are one. T422 of docs/audit/tests-findings.md.
+# private_docs carries them on a private function of a generic class and on
+# the functions and fields of a private class. The source under
+# private_plain has `//` in their place on the same lines, so the two files
+# are one. T422 of docs/audit/tests-findings.md.
 add_test(NAME antl_private_docs_with
     COMMAND antic -c -I "${MODULES}/private_docs"
             -o "${LIBS}/private_docs.antl"
