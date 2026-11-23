@@ -1,0 +1,20 @@
+//! A function of a class with type parameters of its own is called directly,
+//! and each call names a copy of its own. Named on a value and not called, it
+//! is no bound function.
+
+class Plain
+{
+	pub n: int = 7,
+
+	pub fn map<U>(self, own u: U) -> U
+	{
+		return u;
+	}
+}
+
+fn main() -> int
+{
+	let p = Plain { };
+	let f = p.map;
+	return 0;
+}

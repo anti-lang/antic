@@ -1,0 +1,85 @@
+//! A function of a copy of a generic class, named as a value through
+//! `Wrap<i16>.f`, has the type of the copy: a `self` of `*Wrap<i16>`, and a
+//! parameter and a result of `i16` where the generic writes `T`. So does a body
+//! qualified by an interface, so does a function passed as an argument, and so
+//! do both inside a generic function, where the copy puts its argument in
+//! place.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+abstract class Reader
+{
+	abstract fn get(self) -> int;
+}
+
+class Wrap<T>
+{
+	implements r: Reader,
+	pub n: int = 7,
+
+	concrete fn Reader::get(self) -> int
+	{
+		return self.n + size_of(T) as int;
+	}
+
+	pub fn plain(self) -> int
+	{
+		return self.n;
+	}
+
+	pub fn make(own v: T) -> T
+	{
+		return v;
+	}
+}
+
+fn with_self() -> int
+{
+	let w = Wrap<i16> { };
+	let f = Wrap<i16>.plain;
+	return f(&w);
+}
+
+fn with_a_parameter_of_t() -> int
+{
+	let f = Wrap<i16>.make;
+	let v = f(40);
+	return v as int;
+}
+
+fn qualified_by_an_interface() -> int
+{
+	let w = Wrap<i16> { };
+	let f = Wrap<i16>.get;
+	return f(&w);
+}
+
+fn call_with(f: fn(*Wrap<i16>) -> int, w: *Wrap<i16>) -> int
+{
+	return f(w);
+}
+
+fn passed_as_an_argument() -> int
+{
+	let w = Wrap<i16> { };
+	return call_with(Wrap<i16>.plain, &w);
+}
+
+fn in_a_generic<T>(w: *Wrap<T>) -> int
+{
+	let f = Wrap<T>.plain;
+	let g = Wrap<T>.get;
+	return f(w) * 100 + g(w);
+}
+
+fn main() -> int
+{
+	printf("self %d\n".ptr, with_self() as c_int);
+	printf("parameter of T %d\n".ptr, with_a_parameter_of_t() as c_int);
+	printf("qualified by an interface %d\n".ptr,
+		qualified_by_an_interface() as c_int);
+	printf("passed as an argument %d\n".ptr, passed_as_an_argument() as c_int);
+	let w = Wrap<i64> { };
+	printf("in a generic %d\n".ptr, in_a_generic(&w) as c_int);
+	return 0;
+}

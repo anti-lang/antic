@@ -1,0 +1,19 @@
+//! A function with type parameters of its own of a generic class is called
+//! directly, and each call names a copy of its own. Named through a copy of its
+//! class and not called, it names no function.
+
+class Wrap<T>
+{
+	pub n: int = 7,
+
+	pub fn map<U>(self, own u: U) -> U
+	{
+		return u;
+	}
+}
+
+fn main() -> int
+{
+	let f = Wrap<int>.map;
+	return 0;
+}

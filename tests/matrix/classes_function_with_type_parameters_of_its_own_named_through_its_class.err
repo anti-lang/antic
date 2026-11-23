@@ -1,0 +1,1 @@
+classes_function_with_type_parameters_of_its_own_named_through_its_class.anti:17:10: error: `map` is generic, and names a function where it is called
