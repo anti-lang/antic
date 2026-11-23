@@ -376,20 +376,43 @@ static bool bytes_pointer(const struct type *t)
    which is how a program ends memory that `destroy` left. Both are
    allowed after `destroy`, and refused after `delete` or a move, which
    left no memory of the program's there. */
+static const struct free_walk *outer_of(const struct free_walk *w,
+                                        const struct expr *e,
+                                        struct value *out);
+
 static void use_address(struct free_walk *w, const struct expr *e)
 {
+    const struct free_walk *frame = w;
     struct value v;
     struct death *d;
 
-    if (!value_of(w, e, &v)) {
+    /* A name of a function around a closure follows the same rule, by
+       T415. */
+    if (!value_of(w, e, &v) && (frame = outer_of(w, e, &v)) == NULL) {
         walk_expr(w, e);
         return;
     }
-    d = dead(w, &v);
+    d = dead(frame, &v);
     if (d != NULL && d->kind != DIED_DESTROYED) {
         refuse(w, e->kind == EXPR_FIELD ? e->as.field.base->pos : e->pos,
                &v, d);
     }
+}
+
+/* The walk of the function around the closure of w whose value e names,
+   with the value in out, or NULL. */
+static const struct free_walk *outer_of(const struct free_walk *w,
+                                        const struct expr *e,
+                                        struct value *out)
+{
+    const struct free_walk *o;
+
+    for (o = w->outer; o != NULL; o = o->outer) {
+        if (value_of(o, e, out)) {
+            return o;
+        }
+    }
+    return NULL;
 }
 
 /* A use inside a closure of a value of a function around it, at pos,
@@ -399,15 +422,10 @@ static void use_outer(struct free_walk *w, const struct expr *e,
 {
     const struct free_walk *o;
     struct value v;
+    struct death *d;
 
-    for (o = w->outer; o != NULL; o = o->outer) {
-        if (value_of(o, e, &v)) {
-            struct death *d = dead(o, &v);
-            if (d != NULL) {
-                refuse(w, pos, &v, d);
-            }
-            return;
-        }
+    if ((o = outer_of(w, e, &v)) != NULL && (d = dead(o, &v)) != NULL) {
+        refuse(w, pos, &v, d);
     }
 }
 

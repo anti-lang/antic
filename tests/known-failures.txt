@@ -32,9 +32,6 @@ matrix_checks_uninitialized_read_at_an_index_changed_through_a_pointer_refused T
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_call_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_closure_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 anti_doc_foreign_markdown T412 The page writes a type of another module without the module the source spells.
-matrix_checks_use_after_free_a_closure_frees_what_the_body_destroyed_dev T415 E2 refuses free in a closure of a value the body destroyed.
-matrix_checks_use_after_free_a_closure_frees_what_the_body_destroyed_release T415 E2 refuses free in a closure of a value the body destroyed.
-matrix_checks_use_after_free_a_closure_frees_what_the_body_destroyed_memory_checks T415 E2 refuses free in a closure of a value the body destroyed.
 matrix_checks_use_after_free_a_try_call_in_a_try_block_refused T416 E2 takes a try inside a try block as an exit of the function.
 matrix_checks_use_after_free_an_undo_past_a_try_call_in_a_try_block_dev T416 E2 takes a try inside a try block as an exit of the function.
 matrix_checks_use_after_free_an_undo_past_a_try_call_in_a_try_block_release T416 E2 takes a try inside a try block as an exit of the function.
