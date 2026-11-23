@@ -384,9 +384,13 @@ static void type_signature(struct text *out, const char *lead,
         type_params(out, t);
         break;
     case TYPE_CLASS:
-        text_appendf(out, "%s%s%s%s%sclass %.*s", lead,
+        /* `singleton` stands where the header writes it, as `abstract`
+           and `final` do, by T411 of docs/audit/tests-findings.md. */
+        text_appendf(out, "%s%s%s%s%s%sclass %.*s", lead,
                      t->has_abstract ? "abstract " : "",
-                     t->is_final ? "final " : "", t->traced ? "trace " : "",
+                     t->is_final ? "final " : "",
+                     t->is_singleton ? "singleton " : "",
+                     t->traced ? "trace " : "",
                      t->safety == SAFETY_SYNCHRONIZED ? "synchronized "
                      : t->safety == SAFETY_CONCURRENT ? "concurrent "
                                                       : "",
