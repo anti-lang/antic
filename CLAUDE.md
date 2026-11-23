@@ -1081,6 +1081,20 @@ not re-open a settled decision without asking Eddie.
   sides, up to test 8372. It ran each sanitizer suite in the six parts of
   `asan`, the last up to test 8370: `asan` 251 s, 180 s, 270 s, 165 s,
   113 s and 641 s, `ubsan` 258 s, 183 s, 268 s, 165 s, 126 s and 676 s.
+  The step of the answers of 2026-11-23 measured `host` in the same three
+  parts: 380 s, 284 s and 481 s before the fix of T412, up to test 8373,
+  where `unit_modules` failed on the bytes of a library file it writes by
+  hand, which passed alone once they named version 100, 390 s, 282 s and
+  484 s before the commit of the marks of a field, up to test 8374,
+  392 s, 285 s and 505 s before the fix of T385, up to test 8379, 393 s,
+  286 s and 502 s before that of T387, up to test 8382, 364 s, 282 s and
+  478 s before the commit of the lines of a table, up to test 8383,
+  390 s, 283 s and 440 s before the commit of the Mutex, up to test 8387,
+  393 s, 287 s and 451 s before the fix of T404, up to test 8389, and
+  399 s, 295 s and 469 s before the close of T407, up to test 8395. It
+  ran each sanitizer suite in the six parts of `asan`, the last up to
+  test 8393: `asan` 262 s, 184 s, 277 s, 177 s, 111 s and 743 s, `ubsan`
+  270 s, 187 s, 274 s, 169 s, 119 s and 740 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1691,14 +1705,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8372 ctest tests pass on the development Mac, and two of them, the
+- 8395 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
-  carry `host=windows`, the three lines of T385, which wait for Eddie's
-  choice, the three lines of T387, which wait for his answer, the
-  three lines of T404 and of T407 and the line of T412, which wait for
-  his answers.
-  The ASan and the UBSan builds run 8370 each
+  carry `host=windows`.
+  The ASan and the UBSan builds run 8393 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
