@@ -5,6 +5,8 @@
 #include "antic.h"
 
 #include <inttypes.h>
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -294,6 +296,40 @@ static void fn_signature(struct text *out, const struct fn_shown *f)
     }
 }
 
+/* The digits of the float value, the fewest that give back the value at
+   the width of its type, as an Anti literal writes them: with a `.`,
+   which printf leaves out of a whole value and of `1e+20`. A value that
+   is not finite has no literal and gives false. By T410 of
+   docs/audit/tests-findings.md, `%g` wrote six digits. */
+static bool float_literal(struct text *out, double value, bool narrow)
+{
+    char digits[64];
+    const char *e;
+    int precision;
+
+    if (!isfinite(value)) {
+        return false;
+    }
+    for (precision = 1; precision < 17; precision++) {
+        double back;
+        snprintf(digits, sizeof digits, "%.*g", precision, value);
+        back = strtod(digits, NULL);
+        if (narrow ? (float)back == (float)value : back == value) {
+            break;
+        }
+    }
+    snprintf(digits, sizeof digits, "%.*g", precision, value);
+    e = strchr(digits, 'e');
+    if (strchr(digits, '.') != NULL) {
+        text_append(out, digits);
+    } else if (e != NULL) {
+        text_appendf(out, "%.*s.0%s", (int)(e - digits), digits, e);
+    } else {
+        text_appendf(out, "%s.0", digits);
+    }
+    return true;
+}
+
 /* The value of a constant, for the kinds a page can print in one line.
    An array, a struct, a character and a value computed from size_of
    carry none. */
@@ -313,9 +349,15 @@ static void const_value(struct text *out, const struct const_value *v)
     case CONST_BOOL:
         text_appendf(out, " = %s", v->as.boolean ? "true" : "false");
         break;
-    case CONST_FLOAT:
-        text_appendf(out, " = %g", v->as.floating);
+    case CONST_FLOAT: {
+        struct text digits = {0};
+        if (float_literal(&digits, v->as.floating,
+                          v->type != NULL && v->type->kind == TYPE_F32)) {
+            text_appendf(out, " = %s", text_cstr(&digits));
+        }
+        text_free(&digits);
         break;
+    }
     case CONST_NULL:
         text_append(out, " = none");
         break;
