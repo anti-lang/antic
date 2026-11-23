@@ -168,6 +168,21 @@ static bool refuse_own_member(struct checker *c, const struct expr *e,
                                  sema_member_type(c, m->symbol->type, t));
 }
 
+/* A function of a class with type parameters of its own names a copy
+   where it is called alone, as a generic function does, by T420 of
+   docs/audit/tests-findings.md. Named through its class or on a value
+   and not called, it is refused. Returns whether it reported. */
+static bool refuse_generic_member(struct checker *c, const struct expr *e,
+                                  const struct item *m)
+{
+    if (m->kind != ITEM_FN || m->type_param_count == 0) {
+        return false;
+    }
+    sema_error_at(c, e->pos, "`%.*s` is generic, and names a function "
+                  "where it is called", (int)m->name.length, m->name.text);
+    return true;
+}
+
 /* DESIGN: a use of a function on a class reaches it through a table.
    Two kinds hold no entry of the primary table: a body qualified by an
    interface, and a plain body beside one qualified by a base. Each fills
@@ -2714,6 +2729,9 @@ static struct type *check_type_member(struct checker *c, struct expr *e,
     if (refuse_abstract_call(c, e->pos, t, m)) {
         return sema_builtin(c, TYPE_ERROR);
     }
+    if (c->callee != e && refuse_generic_member(c, e, m)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     if (m->kind == ITEM_FN && c->callee != e &&
         refuse_own_member(c, e, t, m)) {
         return sema_builtin(c, TYPE_ERROR);
@@ -2839,6 +2857,9 @@ static struct type *check_member_name(struct checker *c, struct expr *e,
         m->symbol != NULL && m->symbol->type != NULL &&
         m->symbol->type->kind == TYPE_FN &&
         m->symbol->type->param_count > 0) {
+        if (c->callee != e && refuse_generic_member(c, e, m)) {
+            return sema_builtin(c, TYPE_ERROR);
+        }
         if (c->callee != e && refuse_own_member(c, e, s, m)) {
             return sema_builtin(c, TYPE_ERROR);
         }
