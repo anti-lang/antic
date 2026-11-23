@@ -32,9 +32,5 @@ matrix_checks_uninitialized_read_at_an_index_changed_through_a_pointer_refused T
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_call_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_closure_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 anti_doc_foreign_markdown T412 The page writes a type of another module without the module the source spells.
-matrix_checks_uninitialized_read_a_try_call_in_a_try_block_refused T417 C1 takes a try inside a try block as an exit of the function.
-matrix_checks_uninitialized_read_an_undo_past_a_try_call_in_a_try_block_dev T417 C1 takes a try inside a try block as an exit of the function.
-matrix_checks_uninitialized_read_an_undo_past_a_try_call_in_a_try_block_release T417 C1 takes a try inside a try block as an exit of the function.
-matrix_checks_uninitialized_read_an_undo_past_a_try_call_in_a_try_block_memory_checks T417 C1 takes a try inside a try block as an exit of the function.
 matrix_checks_uninitialized_read_a_defer_inside_a_defer_refused T418 C1 reads a defer inside a deferred statement nowhere.
 matrix_checks_uninitialized_read_a_defer_of_a_closure_inside_a_defer_refused T418 C1 reads a defer inside a deferred statement nowhere.
