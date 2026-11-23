@@ -1,0 +1,1 @@
+modules_export_variant_under_a_union.anti:6:16: error: export variant `Bits` has the C name of export union `Bits` in module `com.example.exports`

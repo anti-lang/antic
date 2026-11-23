@@ -1,0 +1,15 @@
+//! A module exports a variant under the C name of a union that a library it
+//! imports exports already. C has one name space for the tags of both.
+
+import com.example.exports;
+
+export variant Bits
+{
+	Whole { n: c_int },
+	Empty,
+}
+
+fn main() -> int
+{
+	return 0;
+}

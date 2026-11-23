@@ -422,26 +422,42 @@ static const char *c_library_header(const struct name *name)
     return stdint_defines(name) ? "<stdint.h>" : NULL;
 }
 
-/* What an export struct, union or constant is called in a message, as
-   `struct`, `union` or `const`, or NULL for any other export symbol. */
+/* What an export item whose C name is a tag, a macro or the prefix of
+   helpers is called in a message, as `struct`, `union`, `class`, `enum`,
+   `variant`, `type` or `const`, or NULL for any other export symbol. */
 static const char *c_name_kind(const struct symbol *sym)
 {
     if (sym->kind == SYMBOL_CONST) {
         return "const";
     }
-    if (sym->kind == SYMBOL_STRUCT && sym->type != NULL &&
-        sym->type->kind == TYPE_STRUCT) {
-        return sym->type->is_union ? "union" : "struct";
+    if (sym->kind != SYMBOL_STRUCT || sym->type == NULL) {
+        return NULL;
     }
-    return NULL;
+    if (sym->alias) {
+        return "type";
+    }
+    switch (sym->type->kind) {
+    case TYPE_STRUCT:
+        return sym->type->is_union ? "union" : "struct";
+    case TYPE_CLASS:
+        return "class";
+    case TYPE_ENUM:
+        return "enum";
+    case TYPE_VARIANT:
+        return "variant";
+    default:
+        return NULL;
+    }
 }
 
-/* DESIGN: an export struct, union or constant is a name of the C header,
-   a tag or a macro, and one header holds the interfaces of every library
-   a module imports. Another module that exports one of the three under
-   the same name gives the header two definitions of it, or a macro that
-   replaces the tag. The item is refused, as an `export fn` that has the
-   symbol of another is, by item 5 of "Answers of 2026-11-19" in
+/* DESIGN: an export struct, union, class, enum, variant, `type` or
+   constant is a name of the C header: a tag, the prefix of the helpers
+   of a class or a variant, or a macro. One header holds the interfaces
+   of every library a module imports. Another module that exports any of
+   these kinds under the same name gives the header two definitions of a
+   tag or of a helper, or a macro that replaces the tag. The item is
+   refused, as an `export fn` that has the symbol of another is, by item 5
+   of "Answers of 2026-11-19" and 10 of "Answers of 2026-11-23" in
    docs/decisions.md. */
 static void check_c_name_once(struct checker *c, const struct item *it,
                               const char *kind)
@@ -488,7 +504,9 @@ static const struct type *written_result(const struct type *t)
    their names before the item's. An `export fn` named after a keyword of
    C or C++ is refused as well, since its name is its symbol, which the
    header cannot rename as it renames a type, a field or a constant, by
-   item 6 of "Answers of 2026-11-19". */
+   item 6 of "Answers of 2026-11-19". An export item of any other kind
+   has a C name of the header that no export item of an imported library
+   has, by check_c_name_once. */
 void sema_check_export(struct checker *c, struct item *it)
 {
     const struct type *t = it->symbol->type;
@@ -558,6 +576,7 @@ void sema_check_export(struct checker *c, struct item *it)
        `construct` with arguments crosses as `anti_<Class>_construct`
        whatever its level, so its parameters follow the rule as well. */
     case ITEM_CLASS:
+        check_c_name_once(c, it, "class");
         for (i = 0; i < t->field_count; i++) {
             if (t->fields[i].form == FIELD_BASE ||
                 t->fields[i].form == FIELD_TABLE) {
@@ -638,6 +657,7 @@ void sema_check_export(struct checker *c, struct item *it)
     /* A variant crosses as the struct of its tag and the union of its
        cases, so the fields of every case follow the export rule. */
     case ITEM_VARIANT:
+        check_c_name_once(c, it, "variant");
         for (i = 0; i < t->param_count; i++) {
             const struct type *payload = t->params[i];
             for (j = 0; payload != NULL && j < payload->field_count; j++) {
@@ -653,6 +673,9 @@ void sema_check_export(struct checker *c, struct item *it)
                              payload->fields[j].type, true, NULL);
             }
         }
+        return;
+    case ITEM_ENUM:
+        check_c_name_once(c, it, "enum");
         return;
     case ITEM_CONST:
         check_c_name_once(c, it, "const");

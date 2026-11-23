@@ -1,0 +1,14 @@
+//! A module exports a struct under the C name of a copy that a library it
+//! imports names by `export type`. The header would define the tag twice.
+
+import com.example.exports;
+
+export struct IntSpan
+{
+	a: c_int,
+}
+
+fn main() -> int
+{
+	return 0;
+}

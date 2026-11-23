@@ -1,0 +1,1 @@
+modules_export_struct_under_a_type.anti:6:15: error: export struct `IntSpan` has the C name of export type `IntSpan` in module `com.example.exports`
