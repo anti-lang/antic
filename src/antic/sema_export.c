@@ -752,6 +752,28 @@ void sema_interface(const struct module *module, const char *module_name,
         *sym = *it->symbol;
         sym->internal = it->vis == VIS_INTERNAL;
         sym->spelled = types_item_spelled(it);
+        {
+            struct type_spelling *found = NULL;
+            size_t n = types_item_qualifiers(it, &found);
+            struct type_spelling *kept =
+                n > 0 ? types_alloc_array(arena, n, sizeof *kept) : NULL;
+            size_t j;
+            for (j = 0; j < n; j++) {
+                kept[j].module.text = keep_name(arena, found[j].module.text,
+                                                found[j].module.length);
+                kept[j].module.length = found[j].module.length;
+                kept[j].name.text = keep_name(arena, found[j].name.text,
+                                              found[j].name.length);
+                kept[j].name.length = found[j].name.length;
+                kept[j].qualifier.text =
+                    keep_name(arena, found[j].qualifier.text,
+                              found[j].qualifier.length);
+                kept[j].qualifier.length = found[j].qualifier.length;
+            }
+            free(found);
+            sym->quals = kept;
+            sym->qual_count = n;
+        }
         /* DESIGN: an interface keeps the parameter names of a function,
            which the generated header and anti doc print. */
         if (it->kind == ITEM_FN || it->kind == ITEM_EXTERN_FN) {

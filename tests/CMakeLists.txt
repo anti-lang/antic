@@ -8112,9 +8112,10 @@ endforeach()
 # item of a list there, which ends it as well. signs holds an enum with a
 # value below zero, T409 of docs/audit/tests-findings.md. floats holds a
 # constant of more digits than six and huge one that printf writes with
-# an exponent, T410. single holds a singleton class, T411. foreign holds a
-# parameter whose type another module declares, which the source spells
-# with the module, T412. sides holds the forms that no other page holds: a
+# an exponent, T410. single holds a singleton class, T411. foreign holds
+# types that other modules declare, which the source spells with the last
+# segment of an import, with its alias and bare under a direct import,
+# T412, in the user docs and with --private. sides holds the forms that no other page holds: a
 # name of a type that is no copy, a function that may fail and gives
 # nothing, a function of C that takes a function, the float constants of
 # the forms of float_literal, a base of `anti.lang` other than the root,
@@ -8136,6 +8137,7 @@ foreach(pair "prose_html||prose|com.example.prose.html|prose.expected.html"
              "huge_markdown|--markdown|huge|com.example.huge.md|huge.expected.md"
              "single_markdown|--markdown|single|com.example.single.md|single.expected.md"
              "foreign_markdown|--markdown|foreign|com.example.foreign.md|foreign.expected.md"
+             "foreign_private|--markdown\\|--private|foreign|com.example.foreign.md|foreign.private.expected.md"
              "sides_markdown|--markdown|sides|com.example.sides.md|sides.expected.md"
              "sides_private|--markdown\\|--private|sides|com.example.sides.md|sides.private.expected.md")
     string(REPLACE "\\|" "!" pair "${pair}")

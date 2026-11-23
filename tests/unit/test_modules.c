@@ -316,7 +316,7 @@ static const char scale_source[] = "pub const SCALE: uint = 6;\n"
 
 /* The library file of scale_source, byte by byte. */
 static const uint8_t scale_antl[] = {
-    'A', 'N', 'T', 'L', 99, 0, 0, 0,                /* magic, version */
+    'A', 'N', 'T', 'L', 100, 0, 0, 0,               /* magic, version */
     5, 0, 0, 0, 's', 'c', 'a', 'l', 'e',            /* package name */
     5, 0, 0, 0, '0', '.', '0', '.', '0',            /* package version */
     0, 0, 0, 0,                                     /* dependencies */
@@ -334,10 +334,12 @@ static const uint8_t scale_antl[] = {
     2, 0, 0, 0,                                     /* items */
     2, 5, 0, 0, 0, 'S', 'C', 'A', 'L', 'E', 0, 0, 0, 0, 0,
     8, 0, 0, 0,                                     /* spells `uint` */
+    0, 0, 0, 0,                                     /* no module spelled */
     0, 0, 0, 0,
     0, 6, 0, 0, 0, 0, 0, 0, 0,                      /* const SCALE = 6 */
     3, 5, 0, 0, 0, 's', 'c', 'a', 'l', 'e', 1, 0, 0, 0, 0,
     8, 0, 0, 0,                                     /* spells `uint` */
+    0, 0, 0, 0,                                     /* no module spelled */
     0, 0, 0, 0,
     1, 0, 0, 0, 'x',                                /* fn scale(x) */
     0, 0, 0, 0,                                     /* no defaults */
@@ -1772,9 +1774,9 @@ static void damaged_files(void)
     size_t n;
 
     memcpy(copy, scale_antl, sizeof copy);
-    copy[4] = 100;
+    copy[4] = 101;
     refuses_file(copy, sizeof copy,
-                 "has format version 100, and antic reads version 99");
+                 "has format version 101, and antic reads version 100");
     memcpy(copy, scale_antl, sizeof copy);
     copy[3] = 'X';
     refuses_file(copy, sizeof copy, "is not a library file");
@@ -3091,10 +3093,43 @@ static void put_str(struct text *b, const char *s)
     text_append_bytes(b, s, strlen(s));
 }
 
+/* The records of the types the declaration of an item spells with a
+   module, by 1 of "Answers of 2026-11-23" in docs/decisions.md. The
+   count of the first item, `SCALE`, stands at byte 109 after its word of
+   R178. A record of three names reads, and one with an empty name, of the
+   module, of the type or before it, is damage, which the reader finds at
+   the end of the record. */
+static void spelling_records(void)
+{
+    enum { COUNT = 109 };
+    static const char *const records[][3] = {
+        {"m", "T", "q"}, {"", "T", "q"}, {"m", "", "q"}, {"m", "T", ""}};
+    size_t k;
+
+    for (k = 0; k < sizeof records / sizeof records[0]; k++) {
+        struct text bytes = {0};
+        size_t j;
+        text_append_bytes(&bytes, (const char *)scale_antl, COUNT);
+        put_u32(&bytes, 1);
+        for (j = 0; j < 3; j++) {
+            put_str(&bytes, records[k][j]);
+        }
+        text_append_bytes(&bytes, (const char *)scale_antl + COUNT + 4,
+                          sizeof scale_antl - COUNT - 4);
+        if (k == 0) {
+            CHECK(reads_file(&bytes));
+        } else {
+            refuses_file((const uint8_t *)bytes.data, bytes.length,
+                         "is damaged at byte 127");
+        }
+        text_free(&bytes);
+    }
+}
+
 /* Where the tables sit in scale_antl. The count of the type table comes
    first and the items follow the table. Then come the counts of the
    symbolic values and of the aggregates of the IR. */
-enum { SCALE_TYPES = 67, SCALE_ITEMS = 86, SCALE_SYMS = 183, SCALE_AGGS = 187 };
+enum { SCALE_TYPES = 67, SCALE_ITEMS = 86, SCALE_SYMS = 191, SCALE_AGGS = 195 };
 
 /* The index of link k of a chain of n: each link names the next one
    forward, or the one before it backward. The end of the chain is the
@@ -6335,6 +6370,7 @@ void test_modules(void)
     one_struct_descriptor();
     dependencies();
     damaged_files();
+    spelling_records();
     damaged_wait();
     damaged_locks();
     lock_edge_to_itself();

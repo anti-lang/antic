@@ -1,8 +1,31 @@
 //! A function whose parameter has a type of another module.
 
+import anti.collection.list;
 import anti.log;
+import anti.mem as m;
+import anti.time.{Clock};
 
 /// Write nothing to `to`.
 pub fn note(to: *log.Logger)
 {
+}
+
+/// Hold an allocator, a list of loggers and a clock.
+pub struct Held
+{
+	from: ?*m.Allocator,
+	loggers: ?*list.List<*log.Logger>,
+	clock: ?*Clock,
+}
+
+/// Take a logger and give back its allocator.
+pub class Keeper
+{
+	pub n: int = 0,
+
+	/// The allocator of `to`.
+	pub fn with(self, to: *log.Logger, from: *m.Allocator) -> *m.Allocator
+	{
+		return from;
+	}
 }

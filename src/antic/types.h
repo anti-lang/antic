@@ -980,6 +980,29 @@ unsigned types_item_spelled(const struct item *it);
    type whose bit stands in spelled. */
 void types_name_spelled(struct text *out, const struct type *t,
                         unsigned spelled);
+/* DESIGN: by 1 of "Answers of 2026-11-23" in docs/decisions.md, a page
+   of `anti doc` writes a type of another module as the declaration of
+   its item spells it, `*log.Logger`. The item records the module before
+   the name of each such type, as the alias of an import or the last
+   segment of its path, and the library file carries the records beside
+   the bits of enum types_spelling. module and name are the path and the
+   name of the type, of its generic for a copy, and qualifier what the
+   source writes before the name. */
+struct type_spelling {
+    struct name module;
+    struct name name;
+    struct name qualifier;
+};
+/* The records of the types the declaration of it spells with a module
+   before their name, the first spelling of each type, in the order of
+   the declaration. *out is grown with alloc_grow, and the caller frees
+   it. The walk reads what types_item_spelled reads. */
+size_t types_item_qualifiers(const struct item *it,
+                             struct type_spelling **out);
+/* types_name_spelled, where a struct, a class, an enum or a variant that
+   a record of quals names stands with the qualifier of the record. */
+void types_name_doc(struct text *out, const struct type *t, unsigned spelled,
+                    const struct type_spelling *quals, size_t qual_count);
 /* The name of t with the module of every struct in it, as main.Vec2. A
    copy of a generic qualifies its arguments as well. */
 void types_name_qualified(struct text *out, const struct type *t);

@@ -24,6 +24,12 @@
    page of its source. A variable of the file, since every writer of a
    signature reads it, and anti writes one page at a time. */
 static unsigned spelled_now;
+/* The records of the types of other modules that the same declaration
+   spells with their module, by 1 of "Answers of 2026-11-23". tree_quals
+   holds those of an item of the syntax tree, which the page frees. */
+static const struct type_spelling *quals_now;
+static size_t qual_count_now;
+static struct type_spelling *tree_quals;
 
 /* DESIGN: a page writes a declaration as the source writes it, where the
    `own` of an owned function value stands before the name, `own f:` and
@@ -35,10 +41,10 @@ static void doc_type_name(struct text *out, const struct type *t)
     if (t != NULL && t->kind == TYPE_FN && t->owned) {
         struct type bare = *t;
         bare.owned = false;
-        types_name_spelled(out, &bare, spelled_now);
+        types_name_doc(out, &bare, spelled_now, quals_now, qual_count_now);
         return;
     }
-    types_name_spelled(out, t, spelled_now);
+    types_name_doc(out, t, spelled_now, quals_now, qual_count_now);
 }
 
 static struct doc_entry *entry_add(struct doc_entry **list, size_t *count,
@@ -685,6 +691,8 @@ static void interface_item(struct doc_page *p, const struct symbol *sym)
         return;
     }
     spelled_now = sym->spelled;
+    quals_now = sym->quals;
+    qual_count_now = sym->qual_count;
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     text_append_bytes(&one->name, sym->name.text, sym->name.length);
     doc_copy(&one->doc, &sym->doc);
@@ -751,6 +759,9 @@ static void tree_item(struct doc_page *p, const struct item *it, bool notes)
         return;
     }
     spelled_now = types_item_spelled(it);
+    free(tree_quals);
+    qual_count_now = types_item_qualifiers(it, &tree_quals);
+    quals_now = tree_quals;
     one = entry_add(&p->items, &p->item_count, &p->item_capacity);
     /* An `operator fn` that shares its name is headed by the name of its
        symbol, `eq:Point`, as the page of the interface heads it, T173 of
@@ -830,6 +841,10 @@ static void tree_items(struct doc_page *p, const struct module *tree, bool notes
             i++;
         }
     }
+    free(tree_quals);
+    tree_quals = NULL;
+    quals_now = NULL;
+    qual_count_now = 0;
 }
 
 /* The tables a backtick name resolves against, copied from the

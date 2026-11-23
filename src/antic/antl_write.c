@@ -1205,6 +1205,20 @@ bool antl_write(struct text *out, const struct interface *iface,
         /* R178 of "Rules of 2026-10-13": the names the declaration spells
            its types with, which `anti doc` writes. */
         antl_put_u32(&w, sym->spelled);
+        /* 1 of "Answers of 2026-11-23": the module before the name of
+           each type of another module that the declaration spells so. */
+        antl_put_count(&w, sym->qual_count);
+        {
+            size_t j;
+            for (j = 0; j < sym->qual_count; j++) {
+                antl_put_bytes(&w, sym->quals[j].module.text,
+                               sym->quals[j].module.length);
+                antl_put_bytes(&w, sym->quals[j].name.text,
+                               sym->quals[j].name.length);
+                antl_put_bytes(&w, sym->quals[j].qualifier.text,
+                               sym->quals[j].qualifier.length);
+            }
+        }
         put_doc(&w, sym->doc.text, sym->doc.length);
         if (sym->kind == SYMBOL_FN || sym->kind == SYMBOL_EXTERN_FN) {
             size_t j;

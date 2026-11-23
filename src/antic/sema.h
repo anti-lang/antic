@@ -100,6 +100,10 @@ struct symbol {
     /* The bits of enum types_spelling that the declaration of an item of
        an interface spells, which the library file carries. */
     unsigned spelled;
+    /* The types of other modules the same declaration spells with their
+       module, which the library file carries as well. */
+    const struct type_spelling *quals;
+    size_t qual_count;
     /* SYMBOL_FN of a library file written `operator fn`, whose item the
        reader does not make. A symbol with an item reads the item. */
     bool is_operator;

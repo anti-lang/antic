@@ -68,6 +68,16 @@ source. A name of C wins over the other names of its type, and an enum
 without a base reads `c_int`, the base the specification gives it. The
 format version was 85 then.
 
+A type of another module stands as the declaration spells it, by 1 of
+"Answers of 2026-11-23": `*log.Logger` where the item writes `log.Logger`,
+`m.Allocator` under `import anti.mem as m` and `Clock` under a direct
+import. `types_item_qualifiers` of `src/antic/types.c` records the module
+the item writes before the name of each such type, the first spelling of
+each type, and the library file carries the records after the word of the
+names. A copy writes its arguments by the records as well. The base after
+`inherits` keeps the whole path of its module. The format version was 100
+then.
+
 A backtick name such as `forms.Level` links to the item of the page. The last
 segment of the documented module stands there as the last segment of an import
 does. A name after it that is no item stays text.

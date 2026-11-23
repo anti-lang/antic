@@ -1965,6 +1965,134 @@ unsigned types_item_spelled(const struct item *it)
     return spelled;
 }
 
+/* The records types_item_qualifiers fills, with their count and room. */
+struct qualifiers {
+    struct type_spelling *list;
+    size_t count;
+    size_t capacity;
+};
+
+static bool name_same(struct name a, struct name b)
+{
+    return a.length == b.length &&
+           (a.length == 0 || memcmp(a.text, b.text, a.length) == 0);
+}
+
+static void type_expr_qualifiers(struct qualifiers *q,
+                                 const struct type_expr *t)
+{
+    size_t i;
+
+    if (t == NULL) {
+        return;
+    }
+    /* A name with a module before it names a type of that module. A
+       nested type of the item's own module reads `Outer.Inner`, whose
+       first part is the name of a type and stands in its name already,
+       and a `type` of another module may stand for a type of a third,
+       so a record names the type that the name names alone. */
+    if (t->kind == TYPEX_NAMED && t->module.length > 0 && t->type != NULL &&
+        (t->type->kind == TYPE_STRUCT || t->type->kind == TYPE_CLASS ||
+         t->type->kind == TYPE_ENUM || t->type->kind == TYPE_VARIANT)) {
+        const struct type *named =
+            t->type->generic != NULL ? t->type->generic : t->type;
+        bool known = false;
+        size_t j;
+        if (name_same(named->name, t->name)) {
+            for (j = 0; j < q->count; j++) {
+                known = known || (name_same(q->list[j].module, named->module) &&
+                                  name_same(q->list[j].name, named->name));
+            }
+            if (!known) {
+                q->list = alloc_grow(q->list, &q->capacity, q->count + 1,
+                                     sizeof *q->list);
+                q->list[q->count].module = named->module;
+                q->list[q->count].name = named->name;
+                q->list[q->count].qualifier = t->module;
+                q->count++;
+            }
+        }
+    }
+    type_expr_qualifiers(q, t->element);
+    type_expr_qualifiers(q, t->result);
+    for (i = 0; i < t->param_count; i++) {
+        type_expr_qualifiers(q, t->params[i]);
+    }
+    for (i = 0; i < t->arg_count; i++) {
+        type_expr_qualifiers(q, t->args[i]);
+    }
+}
+
+static void item_qualifiers(struct qualifiers *q, const struct item *it)
+{
+    size_t i;
+    size_t j;
+
+    if (it == NULL) {
+        return;
+    }
+    for (i = 0; i < it->param_count; i++) {
+        type_expr_qualifiers(q, it->params[i].type);
+    }
+    type_expr_qualifiers(q, it->result);
+    type_expr_qualifiers(q, it->type);
+    type_expr_qualifiers(q, it->base);
+    for (i = 0; i < it->base_arg_count; i++) {
+        type_expr_qualifiers(q, it->base_args[i]);
+    }
+    for (i = 0; i < it->case_count; i++) {
+        for (j = 0; j < it->cases[i].field_count; j++) {
+            type_expr_qualifiers(q, it->cases[i].fields[j].type);
+        }
+    }
+    for (i = 0; i < it->member_count; i++) {
+        item_qualifiers(q, it->members[i]);
+    }
+}
+
+size_t types_item_qualifiers(const struct item *it, struct type_spelling **out)
+{
+    struct qualifiers q = {NULL, 0, 0};
+
+    item_qualifiers(&q, it);
+    *out = q.list;
+    return q.count;
+}
+
+/* The records print_type follows, set for the length of one call of
+   types_name_doc, as spelled_names is. */
+static const struct type_spelling *spelled_quals;
+static size_t spelled_qual_count;
+
+void types_name_doc(struct text *out, const struct type *t, unsigned spelled,
+                    const struct type_spelling *quals, size_t qual_count)
+{
+    const struct type_spelling *outer_quals = spelled_quals;
+    size_t outer_count = spelled_qual_count;
+
+    spelled_quals = quals;
+    spelled_qual_count = qual_count;
+    types_name_spelled(out, t, spelled);
+    spelled_quals = outer_quals;
+    spelled_qual_count = outer_count;
+}
+
+/* The qualifier a record of spelled_quals gives the named type t, NULL
+   for none. */
+static const struct name *qualifier_of(const struct type *t)
+{
+    const struct type *named = t->generic != NULL ? t->generic : t;
+    size_t i;
+
+    for (i = 0; i < spelled_qual_count; i++) {
+        if (name_same(spelled_quals[i].module, named->module) &&
+            name_same(spelled_quals[i].name, named->name)) {
+            return &spelled_quals[i].qualifier;
+        }
+    }
+    return NULL;
+}
+
 /* The second name of a builtin type of kind under spelled_names, NULL
    for the first. */
 static const char *second_name(enum type_kind kind)
@@ -2123,6 +2251,20 @@ static void print_type(struct text *out, const struct type *t, bool qualified)
             text_appendf(out, "%.*s.", (int)t->module.length, t->module.text);
             types_symbol_name(out, t);
             return;
+        }
+        if (spelled_qual_count > 0) {
+            const struct name *q = qualifier_of(t);
+            if (q != NULL) {
+                text_appendf(out, "%.*s.", (int)q->length, q->text);
+            }
+            /* The arguments of a copy follow the records too, so the
+               name is written again from them. */
+            if (t->generic != NULL) {
+                types_copy_name(out, t->generic, t->args,
+                                (const struct symbolic *const *)t->values,
+                                false);
+                return;
+            }
         }
         text_appendf(out, "%.*s", (int)t->name.length, t->name.text);
         return;

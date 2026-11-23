@@ -1366,6 +1366,26 @@ void antl_read_items(struct reader *r)
         if (sym->spelled >= TYPES_SPELL_C_DOUBLE << 1) {
             antl_damaged(r);
         }
+        /* Each record holds three names of four bytes of length at the
+           least. A record with an empty name or qualifier names no type,
+           so the file is damaged. */
+        sym->qual_count = antl_get_count(r, 12);
+        if (sym->qual_count > 0 && !r->failed) {
+            struct type_spelling *quals =
+                antl_allocate(r, sym->qual_count, sizeof *quals);
+            size_t j;
+            for (j = 0; j < sym->qual_count && !r->failed; j++) {
+                quals[j].module = antl_get_name(r);
+                quals[j].name = antl_get_name(r);
+                quals[j].qualifier = antl_get_name(r);
+                if (!r->failed && (quals[j].module.length == 0 ||
+                                   quals[j].name.length == 0 ||
+                                   quals[j].qualifier.length == 0)) {
+                    antl_damaged(r);
+                }
+            }
+            sym->quals = quals;
+        }
         {
             struct name doc = antl_get_name(r);
             sym->doc.text = doc.text;
