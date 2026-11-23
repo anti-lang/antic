@@ -445,9 +445,19 @@ static void enum_values(struct doc_entry *item, const struct type *t)
                                       &item->field_capacity);
         text_append_bytes(&one->name, t->fields[i].name.text,
                           t->fields[i].name.length);
-        text_appendf(&one->signature, "%.*s = %" PRIu64,
-                     (int)t->fields[i].name.length, t->fields[i].name.text,
-                     t->fields[i].number);
+        /* A value below zero of a signed base is its number, and the
+           pattern of its 64 bits is none, by T409 of
+           docs/audit/tests-findings.md. */
+        if (t->base != NULL && types_is_signed(t->base)) {
+            text_appendf(&one->signature, "%.*s = %" PRId64,
+                         (int)t->fields[i].name.length,
+                         t->fields[i].name.text,
+                         (int64_t)t->fields[i].number);
+        } else {
+            text_appendf(&one->signature, "%.*s = %" PRIu64,
+                         (int)t->fields[i].name.length,
+                         t->fields[i].name.text, t->fields[i].number);
+        }
         doc_copy(&one->doc, &t->fields[i].doc);
     }
 }
