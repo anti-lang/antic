@@ -1,0 +1,17 @@
+//! The default hash of a struct of bitfields with a unit break reads the fields
+//! alone. A call of it whose result nothing takes gets the warning
+//! `unused-result`.
+
+struct Flags
+{
+	low: u8 : 3,
+	_: u8 : 0,
+	high: u8 : 4,
+}
+
+fn main() -> int
+{
+	let f = Flags { low: 1, high: 2 };
+	f.hash();
+	return 0;
+}

@@ -1,0 +1,28 @@
+//! A struct with a field of a struct whose `operator fn hash` gives an `int`.
+//! The declaration of the operator gets the one message, and the default hash
+//! of the struct that holds it gets none of its own.
+
+struct Part
+{
+	n: int,
+}
+
+pub operator fn hash(p: Part) -> int
+{
+	return p.n;
+}
+
+struct Whole
+{
+	part: Part,
+}
+
+fn main() -> int
+{
+	let w = Whole { part: Part { n: 1 } };
+	let h = w.hash();
+	if h == 0 {
+		return 1;
+	}
+	return 0;
+}

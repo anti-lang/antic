@@ -1,0 +1,22 @@
+//! The default hash of a struct with a union field reads the bytes of the
+//! union. A call of it whose result nothing takes gets the warning
+//! `unused-result`.
+
+union Raw
+{
+	i: int,
+	f: f64,
+}
+
+struct Holder
+{
+	raw: Raw,
+	n: int,
+}
+
+fn main() -> int
+{
+	let h = Holder { raw: Raw { i: 1 }, n: 2 };
+	h.hash();
+	return 0;
+}

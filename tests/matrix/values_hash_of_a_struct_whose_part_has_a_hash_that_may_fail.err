@@ -1,0 +1,1 @@
+values_hash_of_a_struct_whose_part_has_a_hash_that_may_fail.anti:12:17: error: `operator fn hash` is written `operator fn hash(p: Part) -> u64`

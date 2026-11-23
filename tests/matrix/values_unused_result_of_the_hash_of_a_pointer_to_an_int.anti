@@ -1,0 +1,10 @@
+//! The default hash of a `*int` hashes the address. A call of it whose result
+//! nothing takes gets the warning `unused-result`.
+
+fn main() -> int
+{
+	let n = 5;
+	let p = &n;
+	p.hash();
+	return 0;
+}

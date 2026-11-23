@@ -1,0 +1,56 @@
+//! The default `==` passes over the unit break of a struct of bitfields, as a
+//! struct, as a field of a class and as a part of a class through a `use`
+//! field. A dropped result of the default hash of a generic struct whose field
+//! is a type parameter gets no warning `unused-result`, since the hash of each
+//! copy is the hook of its argument. The program prints one line per form.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Flags
+{
+	low: u8 : 3,
+	_: u8 : 0,
+	high: u8 : 4,
+}
+
+class Part
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	use extra: Part,
+	pub flags: Flags,
+}
+
+struct Box<T: hash>
+{
+	v: T,
+}
+
+fn dropped<T: hash>(b: Box<T>) -> int
+{
+	b.hash();
+	return 1;
+}
+
+fn main() -> int
+{
+	let a = Flags { low: 1, high: 2 };
+	let b = Flags { low: 1, high: 2 };
+	let c = Flags { low: 1, high: 3 };
+	printf("struct %d %d\n".ptr, (a == b) as c_int, (a == c) as c_int);
+	let x = alloc Holder { extra: Part { n: 1 }, flags: a };
+	let y = alloc Holder { extra: Part { n: 1 }, flags: b };
+	let z = alloc Holder { extra: Part { n: 2 }, flags: b };
+	let w = alloc Holder { extra: Part { n: 1 }, flags: c };
+	printf("class %d %d %d\n".ptr, (*x == *y) as c_int, (*x == *z) as c_int,
+		(*x == *w) as c_int);
+	delete(x);
+	delete(y);
+	delete(z);
+	delete(w);
+	printf("generic %lld\n".ptr, dropped(Box<int> { v: 1 }));
+	return 0;
+}

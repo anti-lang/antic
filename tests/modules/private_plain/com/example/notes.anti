@@ -57,6 +57,8 @@ class Tally
 {
 	// The total, a field of a private class.
 	pub total: int = 0,
+	// The most, a constant of a private class.
+	pub const MOST: int = 9;
 
 	// Gives the total, a function of a private class.
 	pub fn get(self) -> int
