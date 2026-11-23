@@ -1207,6 +1207,16 @@ static void give_enum_descriptors(struct lowerer *l, const struct type *fn)
     }
 }
 
+/* The text of the entry fn: that of a function that may fail, or the
+   plain signature. The text of `reflect.call` and the structural hash
+   read the same one, by T408 of docs/audit/tests-findings.md. */
+static bool entry_code(const struct type *fn, struct text *code)
+{
+    return fn != NULL && fn->kind == TYPE_FN && fn->may_fail
+               ? failing_code(fn, code)
+               : signature_code(fn, code);
+}
+
 /* DESIGN: the table entry of a function that may fail returns the error
    and takes an out pointer for its result. Its text is `!` and the
    signature it declares, as `!i64.i32`, by 5 of "Answers of 2026-11-20"
@@ -1226,9 +1236,7 @@ static const struct ir_global *signature_text(struct lowerer *l,
     if (fn == NULL || takes_owned(sym)) {
         return NULL;
     }
-    coded = fn->kind == TYPE_FN && fn->may_fail
-                ? failing_code(fn, &code)
-                : signature_code(fn, &code);
+    coded = entry_code(fn, &code);
     if (!coded) {
         text_free(&code);
         return NULL;
@@ -1391,7 +1399,7 @@ static struct ir_global *class_chain(struct lowerer *l, const struct type *t,
                        table.entries[i].name.length);
         h = ir_hash_bytes(h, ":", 1);
         if (fn != NULL && fn->symbol != NULL &&
-            signature_code(fn->symbol->type, &code)) {
+            entry_code(fn->symbol->type, &code)) {
             h = ir_hash_bytes(h, text_cstr(&code), code.length);
         } else {
             text_format_name(params, sizeof params, "%zu",

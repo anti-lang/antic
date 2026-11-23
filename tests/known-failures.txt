@@ -31,7 +31,6 @@ error_modules_export_enum_under_a_struct T404 An export class, enum or variant w
 matrix_checks_uninitialized_read_at_an_index_changed_through_a_pointer_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_call_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
 matrix_checks_uninitialized_read_at_an_index_changed_by_a_closure_refused T407 C1 keeps a write at the index a local names after a pointer or a closure changes the local.
-plugin_versions_failing T408 The structural hash of an entry that may fail names no result, so a plugin of another result loads.
 anti_doc_signs_markdown T409 The page of an enum writes a value below zero as the pattern of its 64 bits.
 anti_doc_floats_markdown T410 The page of a float constant writes six digits and no `.` before an exponent.
 anti_doc_huge_markdown T410 The page of a float constant writes six digits and no `.` before an exponent.

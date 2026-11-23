@@ -29,12 +29,15 @@ The root `anti.lang.Object` is the runtime's own literal in
 order: the sixteen of the root first, then the public functions of the
 chain. It rolls an FNV-1a over each entry's name, a colon, its signature
 and a semicolon. An entry whose signature no `reflect.Value` carries
-adds the count of its parameters in place of the text. `signature_code`
-builds that text, and `signature_text` interns it as before. The hash
-spells the text with `SPELL_HASH`, which names `c_long`, `c_ulong` and
-`c_wchar` and an enum by its qualified name, by 7 of "Answers of
-2026-11-20" in `docs/decisions.md`. The text of `reflect.call` names an
-enum by its integer, and the two texts differ there alone.
+adds the count of its parameters in place of the text. `entry_code`
+builds that text, and `signature_text` interns it as before. An entry
+that may fail takes the text of `failing_code`, `!` and the result it
+declares, as `!i64`, so a change of that result changes the chain, by
+T408 of `docs/audit/tests-findings.md`. Every other entry takes the
+text of `signature_code`. The text names `c_long`, `c_ulong` and
+`c_wchar` by those names and an enum by its qualified name, by 7 of
+"Answers of 2026-11-20" in `docs/decisions.md`. The text of
+`reflect.call` is the same text, by 1 of "Answers of 2026-11-21".
 
 The hash after k entries is entry k of the chain, so the array is one
 hash per prefix and holds the empty prefix first. It is an array of
