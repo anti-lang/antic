@@ -1782,6 +1782,40 @@ two files under their own headings above stand as they were.
 | `lower_bound_is_direct` of `src/antic/lower.c` | A bound function without its symbol, and no class. | The checker gives every bound function its symbol, and a bound function is taken of a class. |
 | `known_copy`, `note_generic_copy` and `lower_module` of `src/antic/lower.c` | An item without its symbol or its type, and a copy of a generic whose generic has no symbol or no module. | The checker gives every item that lowering reads its symbol and its type, and a copy is made of a generic it declared. |
 
+## The sides of batch 3at
+
+Batch 3at of the third phase read the C side of the checker in
+`src/antic/sema_export.c` and the check `uninitialized-read` in
+`src/antic/sema_uninit.c`. It found T402 to T407 and fixed T402, T403,
+T405 and T406. The rows of the two files under their own headings above
+stand as they were. The line numbers are those of the coverage run of
+`docs/reports/2026-11-22-coverage-phase-3at.md`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `nested_in` of `src/antic/sema_export.c`, line 34 | A type of a class body without its symbol. | The checker declares every type of a class body with its symbol before it checks what crosses to C. |
+| `c_representable` of `src/antic/sema_export.c`, line 57 | A field, a parameter or a result of the type of `none`. | `none` names no type, so only the literal has that type, and no declaration writes it. |
+| `held_nested` of `src/antic/sema_export.c`, lines 289 and 292 | A field without its type, and an array or a pointer without its element. | The checker gives every field its type, the error type among them, and every array and pointer its element. |
+| `check_nested_fields` and `sema_check_export` of `src/antic/sema_export.c`, lines 317 and 563 | The table pointer among the fields of an export class or of a class nested in one. | `anti.lang.Object` alone holds the table pointer, and every other class reaches it through its base. No class of a program is `Object`. |
+| `c_name_kind` of `src/antic/sema_export.c`, line 432 | A struct symbol without its type. | The checker declares every struct, class, enum and variant with its type, and a library file carries the type of each. |
+| `sema_check_export` of `src/antic/sema_export.c`, line 625 | An export struct or union with `align(N)` and no field. | The parser refuses the empty body with `expected identifier`. |
+| `sema_check_export` of `src/antic/sema_export.c`, lines 581 and 584 | A function of an export class without its symbol or its type. | `declare_members` of `src/antic/sema_declare.c` gives every member of a class its symbol and every function its type, the error type among them. |
+| `sema_check_extern_fn` and `check_c_nullable` of `src/antic/sema_export.c`, lines 174, 248, 251 and 272 | An `extern fn` without its type, a type with fewer parameters than the declaration, a written result of type `void`, and a part of the error type. | The checker gives every `extern fn` its type, with one parameter per parameter of the declaration, since an `extern fn` takes no `self` and `may fail` is refused there. `void` names no type, so antic says `` unknown type `void` ``. A parameter or a result of the error type makes the whole function the error type, and the check returns at line 248 for it. |
+| `before` of `src/antic/sema_export.c`, line 676 | Two items that start on one line, a generic and a kept item. | Every source of a test stands in the canonical form, which `fmt_canonical` checks, and that form starts each item on a line of its own. A source in another form reaches the side. |
+| `sema_interface` of `src/antic/sema_export.c`, lines 724, 726, 741, 742, 748, 760, 761 and 768 | An item without its symbol or of the error type, a generic other than a function, a struct, a class and a variant, and a function without its function type or whose type has fewer parameters than its declaration. | The driver writes an interface after a check without an error, where every item has its symbol and its type. The parser takes type parameters on those four kinds of item alone, and the type of a function holds every parameter of its declaration, with the out pointer after them. |
+| `state_join` and `read_element` of `src/antic/sema_uninit.c`, lines 271 and 434 | A fill whose read was refused. | No statement sets the flag `reported`. A refused read clears the fill at line 451, and the walk stops following the buffer there. |
+| `place_element` of `src/antic/sema_uninit.c`, line 525 | A field with a symbol as the place of `=` or `&`. | A field with a symbol is a static field, a constant, an enum value or a function of a type. The checker refuses `=` and `&` on each, a static field with `` `total` is atomic, so it is read with `load()` and written with `store(v)` ``, and C1 runs on a function without an error. |
+| `one_turn` of `src/antic/sema_uninit.c`, line 1009 | A loop that is not a `for` with a statement to bind its names. | `walk_for` alone sets the statement of the loop. |
+| `walk_loop` of `src/antic/sema_uninit.c`, lines 1070 and 1075 | An exit of a loop that holds a buffer the end of a turn lacks. | The exits join at the head and at the tail of the turn, and the end of the turn lies between them on the same path. A path adds buffers and never removes one, and an expression binds none. |
+| `local_of` and `raw_alloc` of `src/antic/sema_uninit.c`, lines 301 and 334 | No expression, and `alloc` with both a count and a value. | Every caller passes an expression. The parser gives `alloc(T, n)` a count and `alloc T { ... }` a value, and never both. |
+| `key_of` of `src/antic/sema_uninit.c`, line 402 | A constant index that is no integer. | The checker refuses an index of another type with `` expected `int` ``, and C1 runs on a function without an error. |
+| `walk_address` of `src/antic/sema_uninit.c`, line 549 | An element whose buffer and index cannot be read. | `place_element` gives an element of a buffer alone, which `element_of` takes apart. |
+| `walk_handler` and `walk_closure` of `src/antic/sema_uninit.c`, lines 587 and 628 | A handler block without its body, and an anonymous function without its item. | The parser gives every handler block its body and every anonymous function its item. |
+| `none_test` of `src/antic/sema_uninit.c`, line 693 | An expression that is not binary. | Its one caller is the arm of `EXPR_BINARY` of `walk_expr`. |
+| `walk_expr` and `walk_stmt` of `src/antic/sema_uninit.c`, lines 713 and 1171 | A kind outside the switch. | Each switch names every kind of expression and of statement. |
+| `walk_assign` of `src/antic/sema_uninit.c`, line 897 | A value that ends the path. | The walk ends a path at a statement alone, so the path that reached the assignment is live after its value. |
+| `walk_stmt` of `src/antic/sema_uninit.c`, line 1168 | No statement. | Every caller passes a statement of a block, an arm or a branch. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
