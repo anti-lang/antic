@@ -1,0 +1,28 @@
+//! `as` from a simd struct to a struct that holds a bitfield is refused, since
+//! a bitfield has no one layout.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+struct Bits
+{
+	a: u32 : 3,
+	b: u32 : 29,
+	c: u32,
+	d: u32,
+	e: u32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let b = v as Bits;
+	return b.c as int;
+}

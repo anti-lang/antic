@@ -1,0 +1,51 @@
+//! The built-ins of a simd struct beside functions of the module of the same
+//! name that do not take the struct first and beside a constant of the name,
+//! and the constraint `neg` on lanes of `f16`. Each line names its case.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+simd struct Half
+{
+	a: f16,
+	b: f16,
+	c: f16,
+	d: f16,
+}
+
+fn sum() -> int
+{
+	return 7;
+}
+
+fn min(x: int) -> int
+{
+	return x;
+}
+
+const max: int = 4;
+
+fn negate<T: neg>(x: T) -> T
+{
+	return -x;
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.5);
+	printf("sum without a parameter: %.1f %d\n".ptr, v.sum() as f64, sum());
+	printf("min of another first type: %.1f %d\n".ptr, v.min() as f64, min(3));
+	let u = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 0.5 };
+	printf("max beside a constant: %.1f %d\n".ptr, u.max() as f64, max);
+	let h = Half.splat(2.0 as f16);
+	let n = negate(h);
+	printf("neg of f16 lanes: %.1f\n".ptr, n.a as f64);
+	return 0;
+}

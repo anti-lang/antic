@@ -1,0 +1,47 @@
+//! E2 passes where a value stays alive: one `own` field of `self` read after
+//! `delete` of another, a closure called with an argument, and an `own` field
+//! of `self` that each turn of a loop deletes and gives a new node. Each line
+//! names its case.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Pair
+{
+	pub own a: *Node,
+	pub own b: *Node,
+
+	pub fn drop_a(self) -> int
+	{
+		delete(self.a);
+		let n = self.b.n;
+		self.a = alloc Node { n: 5 };
+		return n;
+	}
+
+	pub fn renew(self) -> int
+	{
+		for i in 0..3 {
+			delete(self.b);
+			self.b = alloc Node { n: i };
+		}
+		return self.b.n;
+	}
+}
+
+fn main() -> int
+{
+	let p = alloc Pair { a: alloc Node { n: 1 }, b: alloc Node { n: 2 } };
+	printf("the other field: %d\n".ptr, p.drop_a());
+	let add = fn(x: int) -> int {
+		return x + 1;
+	};
+	printf("a closure with an argument: %d\n".ptr, add(p.a.n));
+	printf("a field renewed in a loop: %d\n".ptr, p.renew());
+	delete(p);
+	return 0;
+}

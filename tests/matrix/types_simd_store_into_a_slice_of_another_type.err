@@ -1,0 +1,1 @@
+types_simd_store_into_a_slice_of_another_type.anti:17:10: error: expected `[]f32`, found `[]int`

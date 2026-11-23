@@ -1,0 +1,1 @@
+types_simd_dot_of_another_type.anti:16:16: error: expected `Vec4`, found a float literal

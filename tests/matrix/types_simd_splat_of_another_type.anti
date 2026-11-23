@@ -1,0 +1,17 @@
+//! `splat` takes a value of the lane type.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(true);
+	return v.x as int;
+}

@@ -1,0 +1,26 @@
+//! `as` between a simd struct and a plain struct needs one size of the two on
+//! every target, and a struct whose field of 8 bytes starts past 2^64 less its
+//! alignment has none.
+
+simd struct Two
+{
+	a: i64,
+	b: i64,
+}
+
+struct Vast
+{
+	a: [9223372036854775807]u8,
+	b: [9223372036854775807]u8,
+	c: u64,
+}
+
+fn pass(v: Two, out: *Vast)
+{
+	*out = v as Vast;
+}
+
+fn main() -> int
+{
+	return 0;
+}

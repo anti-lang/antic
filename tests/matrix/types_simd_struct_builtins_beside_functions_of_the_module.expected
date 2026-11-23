@@ -1,0 +1,5 @@
+exit 0
+sum without a parameter: 6.0 7
+min of another first type: 1.5 3
+max beside a constant: 3.0 4
+neg of f16 lanes: -2.0

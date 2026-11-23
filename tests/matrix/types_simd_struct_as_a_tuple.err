@@ -1,0 +1,1 @@
+types_simd_struct_as_a_tuple.anti:17:10: error: cannot convert `Vec4` to `(f32, f32, f32, f32)`, a `simd struct` converts to an array or a plain struct of the same bytes

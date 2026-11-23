@@ -1,0 +1,21 @@
+//! An `extern fn` of the module that takes the simd struct first wins over the
+//! built-in of its name, so `v.sum()` gives the `int` of the function.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+extern fn sum(v: Vec4) -> int;
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let s: f32 = v.sum();
+	return s as int;
+}

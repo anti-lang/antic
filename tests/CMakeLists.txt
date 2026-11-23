@@ -4529,6 +4529,7 @@ foreach(case
         "modules_type_called|items|"
         "modules_type_nested_in_a_generic_class|generic_limits|"
         "modules_type_nested_in_a_generic_class_passed_on|generic_limits|"
+        "modules_use_after_free_of_a_field_moved_into_a_library_function|items|"
         "modules_variadic_function_as_a_value|items|")
     string(REPLACE "|" ";" parts "${case}")
     list(GET parts 0 name)

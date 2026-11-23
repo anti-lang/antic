@@ -1,0 +1,27 @@
+//! E2 and an `own` field of `self` passed to an `own` parameter of a function
+//! of a library: the field moves into it, and naming it after is refused.
+
+import com.example.items;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Pair
+{
+	pub own a: *Node,
+	pub own b: *Node,
+
+	pub fn first(self) -> *Node
+	{
+		let n = items.pick(self.a, self.b, true);
+		let m = self.a.n;
+		return n;
+	}
+}
+
+fn main() -> int
+{
+	return 0;
+}

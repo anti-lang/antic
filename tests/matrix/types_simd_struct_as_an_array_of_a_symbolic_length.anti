@@ -1,0 +1,19 @@
+//! `as` from a simd struct to an array whose length `size_of` gives is refused,
+//! since the length is not one on every target.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let b = v as [size_of(Vec4)]u8;
+	return b[0] as int;
+}

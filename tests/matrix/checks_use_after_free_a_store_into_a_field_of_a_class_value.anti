@@ -1,0 +1,23 @@
+//! E2 and `=` into an `own` field of a class value that a local holds: the
+//! pointer moves into the field, and naming it after is refused.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own n: *Node,
+}
+
+fn main() -> int
+{
+	let h = Holder { n: alloc Node { n: 1 } };
+	let q = alloc Node { n: 2 };
+	h.n = q;
+	printf("%d\n".ptr, q.n);
+	return 0;
+}

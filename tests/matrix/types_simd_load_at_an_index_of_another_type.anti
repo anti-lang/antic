@@ -1,0 +1,18 @@
+//! `load` takes its index as an `i64`.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let xs: [4]f32 = [1.0, 2.0, 3.0, 4.0];
+	let v = Vec4.load(xs[0..4], true);
+	return v.x as int;
+}

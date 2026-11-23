@@ -1,0 +1,19 @@
+//! `as` from a simd struct to an array of `c_long` is refused, since the width
+//! of `c_long` is not one on every target.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let b = v as [2]c_long;
+	return b[0] as int;
+}

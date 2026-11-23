@@ -1,0 +1,18 @@
+//! `dot` takes a value of the same simd struct.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let d = v.dot(2.0);
+	return d as int;
+}

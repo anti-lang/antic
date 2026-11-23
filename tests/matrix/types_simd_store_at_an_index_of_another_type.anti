@@ -1,0 +1,19 @@
+//! `store` takes its index as an `i64`.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let xs: [4]f32 = [0.0, 0.0, 0.0, 0.0];
+	let v = Vec4.splat(1.0);
+	v.store(xs[0..4], 1.5);
+	return xs[0] as int;
+}

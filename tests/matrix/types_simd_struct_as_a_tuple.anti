@@ -1,0 +1,19 @@
+//! `as` from a simd struct to a tuple of its lanes is refused, since a tuple is
+//! no plain struct.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let b = v as (f32, f32, f32, f32);
+	return b.0 as int;
+}

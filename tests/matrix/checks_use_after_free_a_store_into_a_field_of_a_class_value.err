@@ -1,0 +1,1 @@
+checks_use_after_free_a_store_into_a_field_of_a_class_value.anti:21:21: error: `q` was moved into the `own` field `n` on line 20 [use-after-free]

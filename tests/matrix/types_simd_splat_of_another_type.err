@@ -1,0 +1,1 @@
+types_simd_splat_of_another_type.anti:15:21: error: expected `f32`, found `bool`

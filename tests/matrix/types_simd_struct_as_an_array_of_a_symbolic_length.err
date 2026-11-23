@@ -1,0 +1,1 @@
+types_simd_struct_as_an_array_of_a_symbolic_length.anti:17:10: error: cannot convert `Vec4` to `[size_of(Vec4)]u8`, a `simd struct` converts to an array or a plain struct of the same bytes

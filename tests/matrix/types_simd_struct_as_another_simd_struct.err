@@ -1,0 +1,1 @@
+types_simd_struct_as_another_simd_struct.anti:22:10: error: cannot convert `Vec4` to `Two`, a `simd struct` converts to an array or a plain struct of the same bytes

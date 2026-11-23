@@ -1,0 +1,28 @@
+//! E2 and `=` of an `own` parameter of a type parameter into an `own` field of
+//! a generic class: the parameter moves, and naming it after is refused.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Box<T>
+{
+	pub own p: *T,
+
+	pub fn set(self, own v: *T)
+	{
+		self.p = v;
+		printf("%p\n".ptr, v);
+	}
+}
+
+fn main() -> int
+{
+	let b = alloc Box<Node> { p: alloc Node { n: 1 } };
+	b.set(alloc Node { n: 2 });
+	delete(b);
+	return 0;
+}

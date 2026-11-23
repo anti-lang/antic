@@ -1,0 +1,19 @@
+//! A call of `anti.simd` that names no function of the module is refused.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let m = v == v;
+	let b = simd.nothing(m);
+	return 0;
+}

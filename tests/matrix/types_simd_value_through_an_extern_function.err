@@ -1,0 +1,1 @@
+types_simd_value_through_an_extern_function.anti:19:15: error: expected `f32`, found `int`

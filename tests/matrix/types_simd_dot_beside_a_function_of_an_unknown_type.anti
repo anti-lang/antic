@@ -1,0 +1,22 @@
+//! A function of the module named `dot` whose result names an unknown type has
+//! the one message of that type, and `v.dot(v)` takes the built-in.
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+fn dot(v: Vec4, w: Vec4) -> Missing
+{
+	return none;
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let d: f32 = v.dot(v);
+	return d as int;
+}

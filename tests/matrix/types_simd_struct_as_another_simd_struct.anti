@@ -1,0 +1,24 @@
+//! `as` between two simd structs of the same bytes is refused.
+
+import anti.simd;
+
+simd struct Vec4
+{
+	x: f32,
+	y: f32,
+	z: f32,
+	w: f32,
+}
+
+simd struct Two
+{
+	a: f64,
+	b: f64,
+}
+
+fn main() -> int
+{
+	let v = Vec4.splat(1.0);
+	let b = v as Two;
+	return b.a as int;
+}

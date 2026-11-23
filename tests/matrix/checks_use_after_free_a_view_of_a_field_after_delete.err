@@ -1,0 +1,1 @@
+checks_use_after_free_a_view_of_a_field_after_delete.anti:18:10: error: `self.n` was deleted on line 17 [use-after-free]
