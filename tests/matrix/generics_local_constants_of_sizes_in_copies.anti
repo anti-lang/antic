@@ -1,0 +1,33 @@
+//! A local constant of a copy of a generic, and one of a function of a copy of
+//! a generic class, whose value names `size_of(T)`. The copy puts its argument
+//! in place. The value of `i16` folds to an integer, and that of `c_long`,
+//! whose size differs between the targets, stays a size that the back end lays
+//! out per target.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn twice_size<T>() -> int
+{
+	const n: int = size_of(T) as int * 2;
+	return n;
+}
+
+class Holder<T>
+{
+	pub n: int = 0,
+	const width: int = size_of(T) as int * 3;
+
+	pub fn widths(self) -> int
+	{
+		const w: int = size_of(T) as int + 1;
+		return w + Holder<T>.width;
+	}
+}
+
+fn main() -> int
+{
+	printf("%d %d\n".ptr, twice_size<i16>() as c_int, twice_size<c_long>() as c_int);
+	let h = Holder<c_long> { };
+	printf("%d\n".ptr, h.widths() as c_int);
+	return 0;
+}

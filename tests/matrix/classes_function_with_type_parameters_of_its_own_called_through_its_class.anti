@@ -1,0 +1,33 @@
+//! A function of a class with type parameters of its own, called through its
+//! class and through a copy of a generic class. Each call names a copy of its
+//! own, whose argument the call gives.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Plain
+{
+	pub n: int = 7,
+
+	pub fn map<U>(self, own u: U) -> U
+	{
+		return u;
+	}
+}
+
+class Wrap<T>
+{
+	pub n: int = 7,
+
+	pub fn map<U>(self, own u: U) -> U
+	{
+		return u;
+	}
+}
+
+fn main() -> int
+{
+	let p = Plain { };
+	let w = Wrap<i16> { };
+	printf("%d %d\n".ptr, Plain.map(&p, 3) as c_int, Wrap<i16>.map(&w, 4) as c_int);
+	return 0;
+}

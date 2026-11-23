@@ -350,6 +350,18 @@ void test_lexer(void)
          "module_doc:Guide.\nmodule_note:Notes.\nnote:Keep.\n");
     /* Four slashes, an empty block and three stars stay ordinary. */
     docs("//// rule\n/**/\n/*** banner */\nfn f() {}", "");
+    /* A block of more than one line whose lines end with CR and LF holds
+       no CR, and a star in a block of one line is text. */
+    docs("/" "**\r\n    Dot product.\r\n*" "/\r\nfn f() {}",
+         "doc:Dot product.\n");
+    docs("/" "** Gives a * b. *" "/\nfn f() {}", "doc:Gives a * b.\n");
+    /* A block of one line that the source ends inside never ends. */
+    error("fn f() {}\n/" "** Last.", 2, 1, "unterminated block comment");
+    /* The category that `--dump-tokens` prints for the kinds of literal
+       and of note that its tests of a whole source do not hold. */
+    CHECK_STR(lexer_token_category(TOKEN_BYTES), "string_lit");
+    CHECK_STR(lexer_token_category(TOKEN_FORMAT), "string_lit");
+    CHECK_STR(lexer_token_category(TOKEN_MODULE_NOTE), "doc");
     {
         static const enum token_kind k[] = {
             TOKEN_FN, TOKEN_IDENT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_ARROW,
@@ -495,6 +507,8 @@ void test_lexer(void)
     string("\"line\r\nnext\"", TOKEN_STRING, "line\nnext", 9);
     string("\"line\nnext\"", TOKEN_STRING, "line\nnext", 9);
     string("r\"line\r\nnext\"", TOKEN_STRING, "line\nnext", 9);
+    /* A CR that no LF follows stays as it is. */
+    string("\"a\rb\"", TOKEN_STRING, "a\rb", 3);
     string("r\"a\\nb\"", TOKEN_STRING, "a\\nb", 4);
     string("#\"say \"hi\"\"#", TOKEN_STRING, "say \"hi\"", 8);
     string("#\"tab\\t\"#", TOKEN_STRING, "tab\t", 4);
@@ -633,6 +647,24 @@ void test_lexer(void)
     error_n("\"a\0b\"", 5, 1, 3, "NUL is not allowed here");
     error("\"open", 1, 1, "unterminated string literal");
     error("r#\"open\"", 1, 1, "unterminated string literal");
+    error("rf#\"open\"", 1, 1, "unterminated string literal");
+    /* The digits of `\u{}` stop at the seventh, which is one too many. */
+    error("\"\\u{12345678}\"", 1, 2,
+          "`\\u{}` needs 1 to 6 hexadecimal digits");
+    /* A number refused for its `_` keeps a `.` that no digit follows for
+       the next token. */
+    {
+        struct lexed l;
+        lex_s(&l, "3_.len");
+        CHECK(l.diags.count == 1);
+        CHECK(l.tokens.count == 4);
+        if (l.tokens.count == 4) {
+            CHECK(l.tokens.items[0].kind == TOKEN_ERROR);
+            CHECK(l.tokens.items[1].kind == TOKEN_DOT);
+            CHECK(l.tokens.items[2].kind == TOKEN_IDENT);
+        }
+        done(&l);
+    }
 
     /* An `x"..."` error names the unpaired digit or the first character
        that is no hex digit. */
@@ -644,6 +676,8 @@ void test_lexer(void)
           "non-hex character `\\` in `x\"...\"` at column 3");
     error("x\"00 \xC3\xA9\"", 1, 6,
           "non-hex character in `x\"...\"` at column 6");
+    /* A control character other than a blank is no hex digit either. */
+    error("x\"4\v1\"", 1, 4, "non-hex character in `x\"...\"` at column 4");
     error("x#\"00\"#", 1, 1, "`x\"...\"` takes no hash delimiters");
     error("x\"00", 1, 1, "unterminated string literal");
     /* `fr` is refused with the prefix it means, and the literal is read
