@@ -1,0 +1,1 @@
+checks_escaping_local_of_an_element_at_a_computed_index.anti:14:7: error: a reference to `x` is stored into `q` of an outer block, and `x` ends at line 15 [escaping-local]

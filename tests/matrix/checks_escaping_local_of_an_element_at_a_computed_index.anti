@@ -1,0 +1,20 @@
+//! E1 and an element of an array local read at an index known at run time
+//! alone. The element may be either part, so it holds the deepest reference of
+//! the array, the one to `x` of the inner block, and its store into `q` of the
+//! outer block is refused.
+
+fn main() -> int
+{
+	let y = 4;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let a = [&x, &y];
+		let i = y - 3;
+		q = a[i];
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}

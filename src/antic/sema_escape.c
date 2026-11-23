@@ -14,7 +14,13 @@
    one of those by a field access, an index, a slice or an `as` view. The
    pass records each local and parameter with the depth of its block and
    the line of the brace that ends it, and the local whose reference it
-   holds. A local holds the reference the last `=` of the text gave it,
+   holds. A tuple, a struct or an array local holds the reference of each
+   part as well, by 3 of "Answers of 2026-11-23" in docs/decisions.md. A
+   part that a fixed position or name reads, `t.1`, a field, an element
+   at a constant index or a part a destructuring takes, holds the
+   reference its own value holds. An element read at an index known only
+   at run time holds the deepest reference of the local. A local holds
+   the reference the last `=` of the text gave it,
    on whatever path that `=` stands, so a later `=` of another value
    clears it. A local holds no reference of a block deeper than its own,
    since that `=` is refused, so a reference it holds is alive wherever
@@ -28,6 +34,27 @@ struct escape_local {
     int ends;                       /* the line of the closing brace */
     size_t refers;                  /* the index of that local plus 1, or 0 */
     size_t reaches;                 /* the index of the parameter plus 1 */
+    /* The parts of the value that hold a reference, valid when parted
+       is true. A part the list does not name holds none then. refers
+       stays the deepest of them, for the local as a whole. */
+    struct escape_part *parts;
+    size_t part_count;
+    size_t part_capacity;
+    bool parted;
+};
+
+/* A part of a local's value read by a fixed name or position: a field
+   of a struct or a class by its name, an element of a tuple or of an
+   array by its number. */
+struct part_key {
+    struct name field;
+    uint64_t number;
+    bool numbered;
+};
+
+struct escape_part {
+    struct part_key key;
+    size_t refers;                  /* as in struct escape_local */
 };
 
 struct escape_walk {
@@ -89,6 +116,10 @@ static size_t declare(struct escape_walk *w, const struct symbol *sym,
     w->locals[w->count].ends = ends;
     w->locals[w->count].refers = 0;
     w->locals[w->count].reaches = 0;
+    w->locals[w->count].parts = NULL;
+    w->locals[w->count].part_count = 0;
+    w->locals[w->count].part_capacity = 0;
+    w->locals[w->count].parted = false;
     return w->count++;
 }
 
@@ -116,6 +147,108 @@ static const struct escape_local *deeper(const struct escape_local *a,
         return a;
     }
     return b->depth > a->depth ? b : a;
+}
+
+static bool same_key(const struct part_key *a, const struct part_key *b)
+{
+    if (a->numbered || b->numbered) {
+        return a->numbered && b->numbered && a->number == b->number;
+    }
+    return a->field.length == b->field.length &&
+           memcmp(a->field.text, b->field.text, a->field.length) == 0;
+}
+
+/* The part of r that key names, or NULL. */
+static struct escape_part *find_part(struct escape_local *r,
+                                     const struct part_key *key)
+{
+    size_t i;
+
+    for (i = 0; i < r->part_count; i++) {
+        if (same_key(&r->parts[i].key, key)) {
+            return &r->parts[i];
+        }
+    }
+    return NULL;
+}
+
+/* Give the part key of r the reference refers, 0 for none. */
+static void set_part(struct escape_local *r, const struct part_key *key,
+                     size_t refers)
+{
+    struct escape_part *at = find_part(r, key);
+
+    if (at == NULL) {
+        if (refers == 0) {
+            return;
+        }
+        r->parts = alloc_grow(r->parts, &r->part_capacity, r->part_count + 1,
+                              sizeof *r->parts);
+        at = &r->parts[r->part_count++];
+        at->key = *key;
+    }
+    at->refers = refers;
+}
+
+static void forget_parts(struct escape_local *r)
+{
+    r->part_count = 0;
+    r->parted = false;
+}
+
+/* The key of the part that e reads of its base, a field or an element
+   at a constant index. False for an index known at run time alone, and
+   for every other expression. */
+static bool part_key_of(const struct escape_walk *w, const struct expr *e,
+                        struct part_key *key)
+{
+    struct const_value v;
+    struct context saved;
+    bool constant;
+
+    memset(key, 0, sizeof *key);
+    if (e->kind == EXPR_FIELD) {
+        if (e->as.field.element && e->as.field.name.length > 1) {
+            size_t i;
+            key->numbered = true;
+            for (i = 1; i < e->as.field.name.length; i++) {
+                key->number = key->number * 10 +
+                              (uint64_t)(e->as.field.name.text[i] - '0');
+            }
+            return true;
+        }
+        key->field = e->as.field.name;
+        return true;
+    }
+    if (e->kind != EXPR_INDEX) {
+        return false;
+    }
+    sema_enter_quiet(w->c, &saved);
+    constant = sema_eval_const(w->c, e->as.index.index, &v);
+    sema_leave(w->c, &saved);
+    if (!constant || v.kind != CONST_INT) {
+        return false;
+    }
+    key->numbered = true;
+    key->number = v.as.integer;
+    return true;
+}
+
+/* The record of the local that e names, a part of which a field or an
+   index of e reads in place, or NULL. */
+static struct escape_local *parted_base(const struct escape_walk *w,
+                                        const struct expr *e)
+{
+    const struct expr *base = e->kind == EXPR_FIELD ? e->as.field.base
+                              : e->kind == EXPR_INDEX ? e->as.index.base
+                                                      : NULL;
+
+    if (base == NULL || base->kind != EXPR_NAME || base->type == NULL ||
+        (base->type->kind != TYPE_TUPLE && base->type->kind != TYPE_STRUCT &&
+         base->type->kind != TYPE_CLASS && base->type->kind != TYPE_ARRAY)) {
+        return NULL;
+    }
+    return find(w, base->symbol);
 }
 
 /* Whether a value of type t can hold a reference: a pointer, a slice, or
@@ -189,6 +322,25 @@ static const struct escape_local *place_root(const struct escape_walk *w,
     }
 }
 
+/* The local whose reference the part that the field or the index e reads
+   of a local holds. A part the record follows holds its own, and any
+   other part the reference of the whole value. */
+static const struct escape_local *part_root(const struct escape_walk *w,
+                                            const struct expr *e)
+{
+    struct escape_local *r = parted_base(w, e);
+    const struct expr *base =
+        e->kind == EXPR_FIELD ? e->as.field.base : e->as.index.base;
+    struct part_key key;
+
+    if (r != NULL && r->parted && part_key_of(w, e, &key)) {
+        const struct escape_part *part = find_part(r, &key);
+        return part != NULL && part->refers > 0 ? &w->locals[part->refers - 1]
+                                                : NULL;
+    }
+    return root_of(w, base);
+}
+
 /* The local whose reference the value e is, or NULL. Of two, the one
    declared deeper, whose block ends first. */
 static const struct escape_local *root_of(const struct escape_walk *w,
@@ -227,13 +379,13 @@ static const struct escape_local *root_of(const struct escape_walk *w,
         if (base == NULL || base->kind == TYPE_POINTER || !carries(e->type)) {
             return NULL;
         }
-        return root_of(w, e->as.field.base);
+        return part_root(w, e);
     case EXPR_INDEX:
         base = e->as.index.base->type;
         if (base == NULL || base->kind != TYPE_ARRAY || !carries(e->type)) {
             return NULL;
         }
-        return root_of(w, e->as.index.base);
+        return part_root(w, e);
     case EXPR_BINARY:
         /* `q ?? &x` is the value of either side. */
         if (e->as.binary.op != TOKEN_QUESTION_QUESTION) {
@@ -295,6 +447,62 @@ static const struct escape_local *reached_param(const struct escape_walk *w,
         return r;
     }
     return r->reaches > 0 ? &w->locals[r->reaches - 1] : NULL;
+}
+
+/* Give the record at index at the parts of value: the parts a tuple, a
+   struct or an array literal holds, or those of the local value names.
+   Any other value leaves the record with no parts it follows. */
+static void take_parts(struct escape_walk *w, size_t at,
+                       const struct expr *value)
+{
+    struct escape_local *from;
+    struct part_key key;
+    size_t i;
+
+    forget_parts(&w->locals[at]);
+    if (value == NULL) {
+        return;
+    }
+    memset(&key, 0, sizeof key);
+    switch (value->kind) {
+    case EXPR_TUPLE:
+    case EXPR_ARRAY_LIT: {
+        size_t count = value->kind == EXPR_TUPLE ? value->as.tuple.count
+                                                 : value->as.array_lit.count;
+        for (i = 0; i < count; i++) {
+            const struct expr *part = value->kind == EXPR_TUPLE
+                                          ? value->as.tuple.elements[i]
+                                          : value->as.array_lit.elements[i];
+            key.numbered = true;
+            key.number = i;
+            set_part(&w->locals[at], &key, index_of(w, root_of(w, part)));
+        }
+        w->locals[at].parted = true;
+        return;
+    }
+    case EXPR_STRUCT_LIT:
+        for (i = 0; i < value->as.struct_lit.field_count; i++) {
+            key.field = value->as.struct_lit.fields[i].name;
+            set_part(&w->locals[at], &key,
+                     index_of(w, root_of(w,
+                                         value->as.struct_lit.fields[i].value)));
+        }
+        w->locals[at].parted = true;
+        return;
+    case EXPR_NAME:
+        from = find(w, value->symbol);
+        if (from == NULL || !from->parted || from == &w->locals[at]) {
+            return;
+        }
+        for (i = 0; i < from->part_count; i++) {
+            set_part(&w->locals[at], &from->parts[i].key,
+                     from->parts[i].refers);
+        }
+        w->locals[at].parted = true;
+        return;
+    default:
+        return;
+    }
 }
 
 /* The name a message gives the place e: the variable, or the field, that
@@ -495,6 +703,64 @@ static void refuse_store(struct escape_walk *w, const struct expr *target,
     }
 }
 
+/* The record of the local whose part the place target lies in, without
+   a pointer between them, with the key of that part in *key. *exact is
+   true where target is the part itself and false where it lies inside
+   it. NULL for a part read at an index known at run time alone, and for
+   every other place. */
+static struct escape_local *store_part(const struct escape_walk *w,
+                                       const struct expr *target,
+                                       struct part_key *key, bool *exact)
+{
+    const struct expr *e = target;
+
+    *exact = true;
+    while (e != NULL && (e->kind == EXPR_FIELD || e->kind == EXPR_INDEX)) {
+        const struct expr *base =
+            e->kind == EXPR_FIELD ? e->as.field.base : e->as.index.base;
+        if (base->type == NULL || base->type->kind == TYPE_POINTER ||
+            base->type->kind == TYPE_SLICE) {
+            return NULL;
+        }
+        if (base->kind == EXPR_NAME) {
+            struct escape_local *r = parted_base(w, e);
+            return r != NULL && part_key_of(w, e, key) ? r : NULL;
+        }
+        *exact = false;
+        e = base;
+    }
+    return NULL;
+}
+
+/* The parts of held after a store of a value whose reference is root
+   into target, a place inside held. A store into a part the record
+   follows gives that part the reference, or the deeper of the two for a
+   place inside the part. Any other store leaves the record with no parts
+   it follows. */
+static void store_into_part(struct escape_walk *w, struct escape_local *held,
+                            const struct expr *target,
+                            const struct escape_local *root)
+{
+    struct part_key key;
+    bool exact;
+    struct escape_local *r;
+    const struct escape_part *part;
+    const struct escape_local *was;
+
+    if (!held->parted) {
+        return;
+    }
+    r = store_part(w, target, &key, &exact);
+    if (r != held) {
+        forget_parts(held);
+        return;
+    }
+    part = find_part(held, &key);
+    was = part != NULL && part->refers > 0 ? &w->locals[part->refers - 1]
+                                           : NULL;
+    set_part(held, &key, index_of(w, exact ? root : deeper(was, root)));
+}
+
 /* A `=` of value to target, or an atomic store of value into it. */
 static void check_store(struct escape_walk *w, const struct expr *target,
                         const struct expr *value)
@@ -505,6 +771,9 @@ static void check_store(struct escape_walk *w, const struct expr *target,
 
     if (target->kind == EXPR_NAME && a.kind == ANCHOR_LOCAL) {
         w->locals[a.local].reaches = index_of(w, reached_param(w, value));
+        take_parts(w, a.local, value);
+    } else if (a.kind == ANCHOR_LOCAL) {
+        store_into_part(w, &w->locals[a.local], target, root);
     }
     if (root == NULL) {
         /* A new value that holds no reference clears a local. */
@@ -1004,6 +1273,29 @@ static void walk_expr(struct escape_walk *w, const struct expr *e)
     ast_walk_expr(&v, e);
 }
 
+/* The local whose reference part i of the tuple value holds, for a name
+   that a destructuring takes. A local the record follows the parts of
+   gives the reference of the part, and any other value its own. */
+static const struct escape_local *taken_part(const struct escape_walk *w,
+                                             const struct expr *value,
+                                             size_t i)
+{
+    struct escape_local *r =
+        value->kind == EXPR_NAME ? find(w, value->symbol) : NULL;
+    struct part_key key;
+    const struct escape_part *part;
+
+    if (r == NULL || !r->parted) {
+        return root_of(w, value);
+    }
+    memset(&key, 0, sizeof key);
+    key.numbered = true;
+    key.number = i;
+    part = find_part(r, &key);
+    return part != NULL && part->refers > 0 ? &w->locals[part->refers - 1]
+                                            : NULL;
+}
+
 /* Declare the names a `let` binds, each holding the reference its part
    of the value holds. */
 static void walk_let(struct escape_walk *w, const struct stmt *s)
@@ -1022,6 +1314,7 @@ static void walk_let(struct escape_walk *w, const struct stmt *s)
             at = declare(w, s->as.let.symbol, w->depth, w->ends);
             w->locals[at].refers = index_of(w, root_of(w, value));
             w->locals[at].reaches = index_of(w, reached_param(w, value));
+            take_parts(w, at, value);
         }
         return;
     }
@@ -1039,8 +1332,14 @@ static void walk_let(struct escape_walk *w, const struct stmt *s)
         /* A name whose type holds no reference holds none of the
            value, by T384 of docs/audit/tests-findings.md. */
         if (carries(s->as.let.names[i].symbol->type)) {
-            w->locals[at].refers = index_of(w, root_of(w, part));
+            w->locals[at].refers =
+                index_of(w, part != value || value == NULL
+                                ? root_of(w, part)
+                                : taken_part(w, value, i));
             w->locals[at].reaches = index_of(w, reached_param(w, part));
+            if (part != value) {
+                take_parts(w, at, part);
+            }
         }
     }
 }
@@ -1257,5 +1556,8 @@ void sema_check_escapes(struct checker *c, const struct item *it,
     w.c = c;
     w.handler = -1;
     walk_function(&w, it);
+    for (i = 0; i < w.count; i++) {
+        free(w.locals[i].parts);
+    }
     free(w.locals);
 }

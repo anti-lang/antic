@@ -1,0 +1,5 @@
+exit 0
+read as a field: 4
+read at a constant index: 5
+given by an assignment: 6
+read from a copy: 7

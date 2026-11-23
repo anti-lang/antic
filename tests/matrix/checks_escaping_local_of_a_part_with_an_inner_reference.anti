@@ -1,0 +1,18 @@
+//! E1 and a part of a tuple local that holds the reference of a local of the
+//! inner block. `t.0` holds the reference to `x`, which ends before `q`, so its
+//! store into `q` of the outer block is refused, as it is for the whole tuple.
+
+fn main() -> int
+{
+	let y = 4;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let t = (&x, &y);
+		q = t.0;
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}

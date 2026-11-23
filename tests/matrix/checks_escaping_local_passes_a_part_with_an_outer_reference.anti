@@ -1,0 +1,90 @@
+//! E1 gives a part of a struct or an array local the reference that part holds.
+//! The local holds a reference to `x` of the inner block and one to `y` of the
+//! outer block. The part that holds the one to `y`, read by its field name or
+//! at a constant index, may be stored into `q`, which ends with `y`. A part
+//! that a `=` gives a new reference holds that one, and a copy of the local
+//! holds the parts it holds. Each form is a function of its own and prints one
+//! line.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Two
+{
+	near: *int,
+	far: *int,
+}
+
+fn read_as_a_field() -> int
+{
+	let y = 4;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let t = Two { near: &x, far: &y };
+		*t.near += 1;
+		q = t.far;
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}
+
+fn read_at_a_constant_index() -> int
+{
+	let y = 5;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let a = [&x, &y];
+		*a[0] += 1;
+		q = a[1];
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}
+
+fn given_by_an_assignment() -> int
+{
+	let y = 6;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let t = (&x, &x);
+		t.1 = &y;
+		*t.0 += 1;
+		q = t.1;
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}
+
+fn read_from_a_copy() -> int
+{
+	let y = 7;
+	let q: ?*int = none;
+	if y > 0 {
+		let x = 2;
+		let t = (&x, &y);
+		let u = t;
+		*u.0 += 1;
+		q = u.1;
+	}
+	let r = q else {
+		return 0;
+	};
+	return *r;
+}
+
+fn main() -> int
+{
+	printf("read as a field: %d\n".ptr, read_as_a_field());
+	printf("read at a constant index: %d\n".ptr, read_at_a_constant_index());
+	printf("given by an assignment: %d\n".ptr, given_by_an_assignment());
+	printf("read from a copy: %d\n".ptr, read_from_a_copy());
+	return 0;
+}
