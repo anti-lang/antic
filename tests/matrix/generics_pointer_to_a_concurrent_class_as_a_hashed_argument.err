@@ -1,0 +1,1 @@
+generics_pointer_to_a_concurrent_class_as_a_hashed_argument.anti:17:10: error: `*Tally` has no `hash`, which `key` needs for `T`

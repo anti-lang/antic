@@ -3744,6 +3744,29 @@ add_test(NAME antl_docs_equivalent
 set_tests_properties(antl_docs_equivalent PROPERTIES
     FIXTURES_REQUIRED "docs_lines;docs_blocks")
 
+# The `///` comments of private items are never stored. The source under
+# private_docs carries them on the private fields and functions of a class
+# and of a generic, and on the parts of a private class and enum. The
+# source under private_plain has `//` in their place on the same lines, so
+# the two files are one. T422 of docs/audit/tests-findings.md.
+add_test(NAME antl_private_docs_with
+    COMMAND antic -c -I "${MODULES}/private_docs"
+            -o "${LIBS}/private_docs.antl"
+            "${MODULES}/private_docs/com/example/notes.anti")
+set_tests_properties(antl_private_docs_with PROPERTIES
+    FIXTURES_SETUP private_docs_with)
+add_test(NAME antl_private_docs_without
+    COMMAND antic -c -I "${MODULES}/private_plain"
+            -o "${LIBS}/private_plain.antl"
+            "${MODULES}/private_plain/com/example/notes.anti")
+set_tests_properties(antl_private_docs_without PROPERTIES
+    FIXTURES_SETUP private_docs_without)
+add_test(NAME antl_private_docs_left_out
+    COMMAND "${CMAKE_COMMAND}" -E compare_files "${LIBS}/private_docs.antl"
+            "${LIBS}/private_plain.antl")
+set_tests_properties(antl_private_docs_left_out PROPERTIES
+    FIXTURES_REQUIRED "private_docs_with;private_docs_without")
+
 # A library with a generic carries the checked tree of its body, which
 # every host writes byte for byte the same. pick.antl.hex lists them.
 add_test(NAME antl_generic

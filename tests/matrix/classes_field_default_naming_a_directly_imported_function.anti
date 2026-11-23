@@ -1,0 +1,21 @@
+//! A field default that names a function of another module is no constant
+//! expression, through a direct import as through the name of its module. A
+//! library file could carry no such default.
+
+import anti.text.{equal};
+
+class Matcher
+{
+	pub same: fn(str, str) -> bool = equal,
+}
+
+fn main() -> int
+{
+	let m = alloc Matcher { };
+	let r = m.same("a", "a");
+	delete(m);
+	if r {
+		return 0;
+	}
+	return 1;
+}

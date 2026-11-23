@@ -1,0 +1,33 @@
+//! A struct with a field of a `?T` of a slice has the default `==`, which
+//! compares the field by its flag and then the view it holds, its address and
+//! its length, as a slice field compares. Two values equal by `==` hash alike.
+//! The program prints one line per pair.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Window
+{
+	view: ?[]int,
+	n: int,
+}
+
+fn line(name: str, same: bool, hashed: bool)
+{
+	printf("%.*s %d %d\n".ptr, name.len as c_int, name.ptr, same as c_int,
+		hashed as c_int);
+}
+
+fn main() -> int
+{
+	let a = [1, 2, 3];
+	let x = Window { view: a[0..2], n: 1 };
+	let y = Window { view: a[0..2], n: 1 };
+	let shorter = Window { view: a[0..1], n: 1 };
+	let empty = Window { view: none, n: 1 };
+	let blank = Window { view: none, n: 1 };
+	line("same view", x == y, x.hash() == y.hash());
+	line("shorter view", x == shorter, true);
+	line("none and none", empty == blank, empty.hash() == blank.hash());
+	line("view and none", x == empty, true);
+	return 0;
+}

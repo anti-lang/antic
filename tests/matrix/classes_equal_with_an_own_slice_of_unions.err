@@ -1,0 +1,1 @@
+classes_equal_with_an_own_slice_of_unions.anti:18:9: error: `==` is not defined on `Holder`, whose field `parts` has no `eq`

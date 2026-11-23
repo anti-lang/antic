@@ -1,0 +1,26 @@
+//! A slice element of a tuple hashes as its view, its address and its length,
+//! so the default hash of the tuple reaches no `operator fn hash` of the
+//! elements of the slice. A call of it whose result nothing takes gets the
+//! warning `unused-result`.
+
+struct Part
+{
+	n: int,
+}
+
+pub operator fn hash(p: Part) -> u64
+{
+	return p.n as u64;
+}
+
+fn count(t: ([]Part, int)) -> int
+{
+	t.hash();
+	return t.0.len;
+}
+
+fn main() -> int
+{
+	let a = [Part { n: 1 }, Part { n: 2 }];
+	return count((a[0..2], 1)) - 2;
+}

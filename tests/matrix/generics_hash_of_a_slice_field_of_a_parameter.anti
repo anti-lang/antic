@@ -1,0 +1,33 @@
+//! A slice field hashes as its view, its address and its length, so the default
+//! hash of a generic struct with a field of `[]T` needs no `hash` of `T`. A
+//! generic function without constraints hashes it, as `==` compares it. The
+//! program prints the two answers of each.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Box<T>
+{
+	xs: []T,
+}
+
+fn key<T>(b: Box<T>) -> u64
+{
+	return b.hash();
+}
+
+fn same<T>(a: Box<T>, b: Box<T>) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	let a = [1, 2, 3];
+	let x = Box<int> { xs: a[0..2] };
+	let y = Box<int> { xs: a[0..2] };
+	let z = Box<int> { xs: a[0..1] };
+	printf("hash %d %d\n".ptr, (key(x) == key(y)) as c_int,
+		(key(x) == key(x)) as c_int);
+	printf("equal %d %d\n".ptr, same(x, y) as c_int, same(x, z) as c_int);
+	return 0;
+}

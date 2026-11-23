@@ -1,0 +1,1 @@
+classes_equal_with_an_own_slice_of_structs_that_hold_a_union.anti:25:9: error: `==` is not defined on `Holder`, whose field `parts` has no `eq`

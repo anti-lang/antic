@@ -1,0 +1,24 @@
+//! A class with an `own` slice of unions has no default `==`, since it compares
+//! the elements of the slice one by one and no default can read a union.
+
+union Bits
+{
+	a: int,
+	b: f32,
+}
+
+class Holder
+{
+	pub n: int = 0,
+	pub own parts: []Bits,
+}
+
+fn same(a: Holder, b: Holder) -> bool
+{
+	return a == b;
+}
+
+fn main() -> int
+{
+	return 0;
+}

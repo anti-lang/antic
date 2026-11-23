@@ -1,0 +1,30 @@
+//! A slice field hashes as its view, its address and its length, so the default
+//! hash of the struct reaches no `operator fn hash` of its elements. A call of
+//! it whose result nothing takes gets the warning `unused-result`.
+
+struct Part
+{
+	n: int,
+}
+
+pub operator fn hash(p: Part) -> u64
+{
+	return p.n as u64;
+}
+
+struct Parts
+{
+	xs: []Part,
+}
+
+fn count(p: Parts) -> int
+{
+	p.hash();
+	return p.xs.len;
+}
+
+fn main() -> int
+{
+	let a = [Part { n: 1 }, Part { n: 2 }];
+	return count(Parts { xs: a[0..2] }) - 2;
+}

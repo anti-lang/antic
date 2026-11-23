@@ -1,0 +1,79 @@
+//! A library whose private items carry `///` comments. The library file stores
+//! none of them, so it equals the file of the same source with plain comments
+//! in their place, under tests/modules/private_plain.
+
+/// A class with private parts.
+pub class Counter
+{
+	// The count so far, a private field.
+	n: int = 0,
+	/// The step, a public field.
+	pub step: int = 1,
+
+	// Starts the count, a private `construct`.
+	fn construct(self)
+	{
+		self.n = 0;
+	}
+
+	// Ends the count, a private `destruct`.
+	fn destruct(self)
+	{
+		self.n = 0;
+	}
+
+	/// Adds the step, a public function.
+	pub fn add(self) -> int
+	{
+		self.n += self.step;
+		return self.n;
+	}
+}
+
+/// A generic class with private parts.
+pub class Box<T>
+{
+	// The value, a private field.
+	v: T,
+
+	// Gives the value, a private function.
+	fn inner(self) -> T
+	{
+		return self.v;
+	}
+
+	/// Gives the value, a public function.
+	pub fn get(self) -> T
+	{
+		return self.inner();
+	}
+}
+
+/// A private class that a public struct holds.
+class Tally
+{
+	// The total, a field of a private class.
+	pub total: int = 0,
+
+	// Gives the total, a function of a private class.
+	pub fn get(self) -> int
+	{
+		return self.total;
+	}
+}
+
+/// A private enum that a public struct holds.
+enum Mode
+{
+	// The first, a value of a private enum.
+	First,
+	Second,
+}
+
+/// A public struct that holds the private types.
+pub struct Holder
+{
+	/// The tally, a field of a public struct.
+	t: Tally,
+	m: Mode,
+}
