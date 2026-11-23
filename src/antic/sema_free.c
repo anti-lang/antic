@@ -105,7 +105,7 @@ struct free_walk {
     struct state *yields;           /* the handler a `yield` leaves */
     struct state *tried;            /* the handler of the `try` block */
     struct state *fall;             /* the arm a `fallthrough` enters */
-    struct exits *exits;            /* NULL inside a deferred statement */
+    struct exits *exits;            /* the pending statements of the walk */
     size_t yield_base;              /* the pending statements of the handler */
     size_t try_base;                /* those of the body of the `try` block */
     size_t fall_base;               /* those of the arm */
@@ -650,7 +650,7 @@ static void walk_closure(struct free_walk *w, const struct item *fn)
     inner.yields = NULL;
     inner.tried = NULL;
     inner.fall = NULL;
-    inner.exits = w->exits != NULL ? &exits : NULL;
+    inner.exits = &exits;
     walk_block(&inner, fn->body);
     state_free(&inner.now);
     free(exits.items);
@@ -1112,39 +1112,25 @@ static void walk_try(struct free_walk *w, const struct stmt *s)
     state_free(&given);
 }
 
-/* A `defer` or an `undo` inside a deferred statement runs where that
-   one is left, from a copy of the state where it stands, which the path
-   goes on without. */
-static void walk_deferred(struct free_walk *w, const struct stmt *s)
-{
-    struct free_walk inner = *w;
-
-    inner.now = state_copy(&w->now);
-    inner.deferred = true;
-    inner.loop = NULL;
-    inner.yields = NULL;
-    inner.tried = NULL;
-    inner.fall = NULL;
-    walk_stmt(&inner, s);
-    state_free(&inner.now);
-}
-
 /* Run the pending statements above base at an exit, from a copy of the
-   state now. failing marks an error exit. */
+   state now. failing marks an error exit. A deferred statement keeps the
+   `defer` statements inside it in a list of its own, so each runs where
+   its block in the deferred statement is left, by T413. */
 static void run_exits(struct free_walk *w, size_t base, bool failing)
 {
     struct free_walk inner;
+    struct exits own = {NULL, 0, 0, 0};
     const struct exits *x = w->exits;
     size_t end;
     size_t start;
     size_t i;
 
-    if (x == NULL || !w->now.live || x->count <= base) {
+    if (!w->now.live || x->count <= base) {
         return;
     }
     inner = *w;
     inner.now = state_copy(&w->now);
-    inner.exits = NULL;
+    inner.exits = &own;
     inner.deferred = true;
     inner.loop = NULL;
     inner.yields = NULL;
@@ -1167,12 +1153,13 @@ static void run_exits(struct free_walk *w, size_t base, bool failing)
         }
     }
     state_free(&inner.now);
+    free(own.items);
 }
 
 /* The count of the pending statements, the base of an exit. */
 static size_t pending_count(const struct free_walk *w)
 {
-    return w->exits != NULL ? w->exits->count : 0;
+    return w->exits->count;
 }
 
 /* The path ends here, and into, when given, takes it. */
@@ -1214,19 +1201,16 @@ static void walk_stmt(struct free_walk *w, const struct stmt *s)
         walk_for(w, s);
         return;
     case STMT_DEFER:
-    case STMT_UNDO:
-        if (w->exits != NULL) {
-            struct exits *x = w->exits;
-            x->items = alloc_grow(x->items, &x->capacity, x->count,
-                                  sizeof *x->items);
-            x->items[x->count].s = s->as.deferred;
-            x->items[x->count].undo = s->kind == STMT_UNDO;
-            x->items[x->count].block = x->depth;
-            x->count++;
-        } else {
-            walk_deferred(w, s->as.deferred);
-        }
+    case STMT_UNDO: {
+        struct exits *x = w->exits;
+        x->items = alloc_grow(x->items, &x->capacity, x->count,
+                              sizeof *x->items);
+        x->items[x->count].s = s->as.deferred;
+        x->items[x->count].undo = s->kind == STMT_UNDO;
+        x->items[x->count].block = x->depth;
+        x->count++;
         return;
+    }
     case STMT_FAIL:
         walk_expr(w, s->as.fail.value);
         run_exits(w, 0, true);
@@ -1286,17 +1270,13 @@ static void walk_block(struct free_walk *w, const struct block *b)
     size_t base = pending_count(w);
     size_t i;
 
-    if (w->exits != NULL) {
-        w->exits->depth++;
-    }
+    w->exits->depth++;
     for (i = 0; b != NULL && i < b->count; i++) {
         walk_stmt(w, b->stmts[i]);
     }
-    if (w->exits != NULL) {
-        run_exits(w, base, false);
-        w->exits->count = base;
-        w->exits->depth--;
-    }
+    run_exits(w, base, false);
+    w->exits->count = base;
+    w->exits->depth--;
 }
 
 void sema_check_frees(struct checker *c, const struct item *it, size_t first)
