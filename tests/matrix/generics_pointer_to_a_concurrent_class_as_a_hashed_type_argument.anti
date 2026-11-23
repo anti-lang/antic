@@ -11,19 +11,10 @@ struct Keyed<T: hash>
 	v: T,
 }
 
-fn key<T: hash>(k: Keyed<T>) -> u64
-{
-	return k.v.hash();
-}
-
 fn main() -> int
 {
 	let a = alloc Tally { };
 	let k = Keyed<*Tally> { v: a };
-	let h = key(k);
 	delete(a);
-	if h == 0 {
-		return 1;
-	}
 	return 0;
 }

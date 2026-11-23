@@ -715,8 +715,15 @@ static bool meets_hook(struct checker *c, struct type *t, const char *hook)
     if (t->kind == TYPE_ARRAY && strcmp(hook, LANG_HOOK_EQ) == 0) {
         return sema_default_eq(c, t);
     }
+    /* `x.hash()` on a `*C` that cannot be `none` calls the hash of the
+       class, as sema_hash_call takes it, so the pointer meets `hash` where
+       the class does, by T421 of docs/audit/tests-findings.md. */
     if (strcmp(hook, LANG_HOOK_HASH) == 0 &&
-        sema_concurrent_lacks(c, t, hook)) {
+        sema_concurrent_lacks(c,
+                              t->kind == TYPE_POINTER && !t->nullable
+                                  ? t->element
+                                  : t,
+                              hook)) {
         return false;
     }
     if (types_is_simd(t) && strcmp(hook, LANG_HOOK_HASH) != 0) {
