@@ -74,9 +74,10 @@ A type of another module stands as the declaration spells it, by 1 of
 import. `types_item_qualifiers` of `src/antic/types.c` records the module
 the item writes before the name of each such type, the first spelling of
 each type, and the library file carries the records after the word of the
-names. A copy writes its arguments by the records as well. The base after
-`inherits` keeps the whole path of its module. The format version was 100
-then.
+names. A copy writes its arguments by the records as well. The format
+version was 100 then. The base after `inherits` follows the records too,
+by "Answers of 2026-11-23, second set": `log.Logger`, `m.Allocator` or
+`Clock` as the header writes it, and a base of the module bare.
 
 A field stands with its marks, by 2 of "Answers of 2026-11-23": `inject` or
 `inject final`, then `own`, `mutable` and `atomic`, in the order the parser
