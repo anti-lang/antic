@@ -116,9 +116,12 @@ static void add_call(struct checker *c, struct expr *e, struct type *t)
    Give e the call of every function of a struct or a variant inside it.
    A class value calls the `hash` of its chain, which lowering finds in
    its members. A pointer is hashed by its address and reaches
-   nothing. A value of a type parameter needs the hook. walked holds the
-   structs, the tuples and the variants walked for e, whose calls e
-   holds already. */
+   nothing. A slice part hashes as its view, its address and its length,
+   and reaches nothing either, by T423 of docs/audit/tests-findings.md:
+   the slice that is the value hashed, and an `own` slice of a class, are
+   walked through their elements by the callers. A value of a type
+   parameter needs the hook. walked holds the structs, the tuples and the
+   variants walked for e, whose calls e holds already. */
 static void walk(struct checker *c, struct expr *e, struct type *t,
                  struct ptr_set *walked)
 {
@@ -129,7 +132,6 @@ static void walk(struct checker *c, struct expr *e, struct type *t,
         sema_param_hash(c, e, t);
         return;
     case TYPE_ARRAY:
-    case TYPE_SLICE:
         walk(c, e, t->element, walked);
         return;
     case TYPE_OPTIONAL:
@@ -214,9 +216,12 @@ bool sema_hash_call(struct checker *c, struct expr *e, struct type *t,
     e->as.call.hash_calls = NULL;
     e->as.call.hash_count = 0;
     if (hashed->kind != TYPE_POINTER) {
+        /* A slice that is the value hashed takes its elements. */
+        struct type *parts =
+            hashed->kind == TYPE_SLICE ? hashed->element : hashed;
         struct ptr_set walked;
         memset(&walked, 0, sizeof walked);
-        walk(c, e, hashed, &walked);
+        walk(c, e, parts, &walked);
         ptr_set_free(&walked);
     }
     e->type = sema_builtin(c, TYPE_U64);
@@ -715,7 +720,8 @@ void sema_class_defaults(struct checker *c, struct item *it)
                 const struct struct_field *f = &up->fields[i];
                 if (f->form == FIELD_PLAIN || f->form == FIELD_USE) {
                     walk(c, e,
-                         f->owned && f->type->kind == TYPE_POINTER
+                         f->owned && (f->type->kind == TYPE_SLICE ||
+                                      f->type->kind == TYPE_POINTER)
                              ? f->type->element
                              : f->type,
                          &walked);
