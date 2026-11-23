@@ -176,7 +176,18 @@ static struct ir_operand pack_context(struct lowerer *l,
    returned, when drop is true, and the worker copies what it keeps. A
    fresh argument of an `own` parameter is the worker's, which tears it
    down. Every chunk of a `parallel` reads one context while its caller
-   waits, so no chunk tears it down and none takes a copy. */
+   waits, so no chunk tears it down and none takes a copy.
+
+   DESIGN: a `dispatch` that finds its object in flight gives the handle
+   `none`, and no thunk runs for it. The caller then tears down the
+   context in its frame, as the thunk would have, through drop_values,
+   which the thunk runs as well, by 4 of "Answers of 2026-11-23" in
+   docs/decisions.md. The runtime copied the context into no job, and the
+   frame still holds its bytes. */
+static void drop_values(struct lowerer *l, const struct expr *call,
+                        const struct ir_operand *values, size_t extra,
+                        bool copies);
+
 static void call_worker(struct lowerer *l, const struct expr *call,
                         uint32_t context, struct ir_operand first,
                         size_t out, bool drop)
@@ -223,19 +234,48 @@ static void call_worker(struct lowerer *l, const struct expr *call,
                  at_out);
     }
     if (drop && extra > 0) {
-        lower_drop_arguments(l, callee->symbol, callee->symbol->type,
-                             (const struct expr *const *)call->as.call.args,
-                             values, extra, 1);
-        for (i = extra; i > 0 && l->b != NULL; i--) {
-            const struct type *copy = job_copy(call, i - 1);
-            if (copy != NULL) {
-                lower_destroy_owned(l, copy, values[i - 1],
-                                    ir_int_op(IR_PTR, 0), false);
-            }
-        }
+        drop_values(l, call, values, extra, true);
     }
     free(values);
     ir_ret(f, l->b, IR_VOID, lower_none());
+}
+
+/* Tear down the fresh arguments among the extra values of the context
+   of call that the parameters which are not `own` took, and with copies
+   the `dup` the job holds of each value that lives somewhere else. */
+static void drop_values(struct lowerer *l, const struct expr *call,
+                        const struct ir_operand *values, size_t extra,
+                        bool copies)
+{
+    size_t i;
+
+    lower_drop_arguments(l, call->as.call.callee->symbol,
+                         call->as.call.callee->symbol->type,
+                         (const struct expr *const *)call->as.call.args,
+                         values, extra, 1);
+    for (i = extra; copies && i > 0 && l->b != NULL; i--) {
+        const struct type *copy = job_copy(call, i - 1);
+        if (copy != NULL) {
+            lower_destroy_owned(l, copy, values[i - 1], ir_int_op(IR_PTR, 0),
+                                false);
+        }
+    }
+}
+
+/* Whether drop_values tears down any value of the context of call. */
+static bool drops_any(const struct expr *call)
+{
+    const struct symbol *sym = call->as.call.callee->symbol;
+    size_t i;
+
+    for (i = 0; i < call->as.call.arg_count; i++) {
+        if (lower_drops_argument(sym, sym->type, i + 1,
+                                 call->as.call.args[i]) ||
+            job_copy(call, i) != NULL) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /* DESIGN: the worker pool calls one C signature, and a worker has the
@@ -309,6 +349,9 @@ static struct ir_function *dispatch_thunk(struct lowerer *l,
    a return ends, so the runtime copies it into the job: by decision 23
    of "Decisions of 2026-10-11" each job keeps the arguments of its own
    `dispatch`. */
+static void drop_context(struct lowerer *l, const struct expr *call,
+                         struct ir_operand context, uint32_t agg, bool copies);
+
 struct ir_operand lower_dispatch(struct lowerer *l,
                                  const struct expr *e)
 {
@@ -340,6 +383,18 @@ struct ir_operand lower_dispatch(struct lowerer *l,
                                                         ir_aggregate(agg)));
     handle = lower_rt_call(l, RT_FN_DISPATCH, args);
     lower_hook_object(l, HOOK_DISPATCHED, args[0]);
+    if (extra > 0 && drops_any(call)) {
+        struct ir_block *drop = lower_new_block(l);
+        struct ir_block *done = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, handle,
+                                          ir_int_op(IR_PTR, 0))),
+                  drop, done);
+        l->b = drop;
+        drop_context(l, call, context, agg, true);
+        ir_jump(l->f, l->b, done);
+        l->b = done;
+    }
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
     ir_store(l->f, l->b, IR_PTR, handle, lower_temp(l, out));
     return lower_temp(l, out);
@@ -481,9 +536,11 @@ static struct ir_operand chunk_count(struct lowerer *l, const struct expr *e)
 
 /* The caller of a `parallel` tears down the fresh arguments of the
    parameters that are not `own` in context, of aggregate agg, once every
-   chunk has run, as it tears down the arguments of a call. */
+   chunk has run, as it tears down the arguments of a call. The caller of
+   a `dispatch` whose object is in flight does so as well, and with
+   copies it tears down the copies of the job, as the thunk would have. */
 static void drop_context(struct lowerer *l, const struct expr *call,
-                         struct ir_operand context, uint32_t agg)
+                         struct ir_operand context, uint32_t agg, bool copies)
 {
     size_t extra = call->kind == EXPR_CALL ? call->as.call.arg_count : 0;
     struct ir_operand *values;
@@ -503,10 +560,7 @@ static void drop_context(struct lowerer *l, const struct expr *call,
                         : lower_temp(l, ir_load(l->f, l->b,
                                                 lower_ir_type_of(t), at));
     }
-    lower_drop_arguments(l, call->as.call.callee->symbol,
-                         call->as.call.callee->symbol->type,
-                         (const struct expr *const *)call->as.call.args,
-                         values, extra, 1);
+    drop_values(l, call, values, extra, copies);
     free(values);
 }
 
@@ -556,7 +610,7 @@ struct ir_operand lower_parallel(struct lowerer *l,
     args[7] = lower_temp(l, results);
     args[8] = lower_temp(l, count);
     lower_rt_call(l, RT_FN_PARALLEL, args);
-    drop_context(l, call, context, agg);
+    drop_context(l, call, context, agg, false);
     out = ir_slot(l->f, l->b, lower_vtype_of(l, e->type));
     ir_store(l->f, l->b, IR_PTR, lower_temp(l, ir_load(l->f, l->b, IR_PTR,
                                                        lower_temp(l, results))),

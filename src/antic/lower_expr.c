@@ -1719,6 +1719,12 @@ static void keep_address_argument(struct lowerer *l, const struct type *fn,
     }
 }
 
+bool lower_drops_argument(const struct symbol *sym, const struct type *fn,
+                          size_t index, const struct expr *arg)
+{
+    return fresh_argument(sym, fn, index, arg) != NULL;
+}
+
 void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
                           const struct type *fn, const struct expr *const *args,
                           const struct ir_operand *values, size_t count,

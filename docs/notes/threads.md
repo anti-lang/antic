@@ -50,5 +50,7 @@ tools can observe.
   has returned. The caller keeps its value. The bytes alone reached what the caller
   tears down at the end of its block, T382. A
   second dispatch of an object in flight gives a null job, so two workers never hold
-  one object. `anti_rt_join` waits for the job, writes its result and frees it, and
+  one object. Its caller then tears down the fresh arguments and the copies of the
+  context in its frame, as the thunk would have, by 4 of "Answers of 2026-11-23".
+  `anti_rt_join` waits for the job, writes its result and frees it, and
   `join` of a null job writes zero bytes of the size of the result.

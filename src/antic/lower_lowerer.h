@@ -664,6 +664,10 @@ void lower_drop_arguments(struct lowerer *l, const struct symbol *sym,
                           const struct type *fn, const struct expr *const *args,
                           const struct ir_operand *values, size_t count,
                           size_t first);
+/* Whether lower_drop_arguments tears down the argument arg at the
+   parameter index of the call of sym with type fn. */
+bool lower_drops_argument(const struct symbol *sym, const struct type *fn,
+                          size_t index, const struct expr *arg);
 
 /* The class pointer v of e moved to the interface sub-object that
    e->to_iface names. Where may_be_none holds, `none` stays `none`. */

@@ -1,0 +1,61 @@
+//! A `dispatch` of an object that is in flight gives a job whose handle is
+//! `none`, and no worker runs for it. The `dup` that it took of a local at a
+//! parameter that is not `own` has no owner but that job all the same, so the
+//! caller tears it down, as the thunk would have, by 4 of "Answers of
+//! 2026-11-23". The local stays the caller's. The program runs with
+//! --anti.threads=1, so the first job is in flight until it is joined. A copy
+//! runs no `construct`, so a cell counts the times its `destruct` ran. The line
+//! prints what the two jobs give and that count after both joins, two copies,
+//! and after the locals end, two more.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Cell
+{
+	pub v: int = 0,
+
+	pub static atomic gone: int = 0;
+
+	fn destruct(self)
+	{
+		Cell.gone.add(1);
+	}
+}
+
+class Box
+{
+	pub own p: *Cell,
+}
+
+class Runner
+{
+	pub n: int = 0,
+}
+
+worker fn read(r: *Runner, b: Box) -> int
+{
+	return b.p.v + r.n;
+}
+
+fn copied(r: *Runner)
+{
+	let one = Box { p: alloc Cell { v: 1 } };
+	let two = Box { p: alloc Cell { v: 2 } };
+	let first = dispatch r -> read(one);
+	let second = dispatch r -> read(two);
+	let a = join(first);
+	let b = join(second);
+	printf("the copy of a value: %d %d, torn down %d\n".ptr, a as c_int,
+		b as c_int, Cell.gone.load() as c_int);
+}
+
+fn main() -> int
+{
+	let r = alloc Runner { n: 1 };
+	copied(r);
+	free(r);
+	printf("at the end: torn down %d\n".ptr, Cell.gone.load() as c_int);
+	return 0;
+}
