@@ -1,0 +1,1 @@
+values_equal_on_optional_slice_fields_as_views.anti:14:9: error: `==` is not defined on `Window`, whose field `view` has no `eq`
