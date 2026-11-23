@@ -1,0 +1,1 @@
+checks_use_after_free_a_try_call_in_a_try_block.anti:30:22: error: `p` was deleted on line 26 [use-after-free]

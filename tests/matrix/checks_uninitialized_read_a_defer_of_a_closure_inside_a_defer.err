@@ -1,0 +1,1 @@
+checks_uninitialized_read_a_defer_of_a_closure_inside_a_defer.anti:14:24: error: element 0 of `p` is read before every path from `alloc` on line 10 wrote it [uninitialized-read]

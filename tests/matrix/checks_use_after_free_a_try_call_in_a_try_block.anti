@@ -1,0 +1,32 @@
+//! E2 and a `try` before a call inside a `try` block: the error goes to the
+//! handler of the block, which reads the node that the body deleted.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn fails(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "no";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	try {
+		delete(p);
+		let r = try fails(1);
+		printf("%d\n".ptr, r);
+	} catch e {
+		printf("%d\n".ptr, p.n);
+	}
+	return 0;
+}

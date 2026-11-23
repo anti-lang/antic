@@ -1,0 +1,33 @@
+//! E2 and an `own` field of `self` that a `defer` deletes and then gives a new
+//! node: the field is dead at the `=`, so it tears nothing down, as it does in
+//! the body of the function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+class Holder
+{
+	pub own n: *Node,
+
+	pub fn reset(self)
+	{
+		defer {
+			delete(self.n);
+			self.n = alloc Node { n: 2 };
+		}
+		printf("%d\n".ptr, self.n.n);
+	}
+}
+
+fn main() -> int
+{
+	let h = alloc Holder { n: alloc Node { n: 1 } };
+	h.reset();
+	printf("%d\n".ptr, h.n.n);
+	delete(h);
+	return 0;
+}

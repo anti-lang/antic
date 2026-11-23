@@ -1,0 +1,22 @@
+//! C1 and a `defer` of a closure that a `defer` holds: it runs where the body
+//! of the closure is left, and reads an element that no path wrote.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	defer {
+		let f = fn() {
+			let p = alloc(int, 2) else {
+				return;
+			};
+			defer {
+				printf("%d\n".ptr, p[0]);
+				free(p);
+			}
+			p[1] = 1;
+		};
+		f();
+	}
+	return 0;
+}

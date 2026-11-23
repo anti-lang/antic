@@ -1,0 +1,19 @@
+//! C1 and a `defer` inside a `defer`: the inner one runs where the block of the
+//! outer one is left, and reads an element that no path wrote.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let p = alloc(int, 2) else {
+		return 0;
+	};
+	defer {
+		defer {
+			printf("%d\n".ptr, p[0]);
+			free(p);
+		}
+		p[1] = 1;
+	}
+	return 0;
+}

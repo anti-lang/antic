@@ -1,0 +1,47 @@
+//! E2 and a `try` before a call inside a `try` block: the error goes to the
+//! handler of the block and leaves no block of the function, so the `undo` of
+//! the function does not run there and reads no node that the body deleted.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn fails(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "no";
+	}
+	return n;
+}
+
+fn work(n: int) -> int may fail
+{
+	let p = alloc Node { n: 1 };
+	undo {
+		printf("undo %d\n".ptr, p.n);
+	}
+	try {
+		delete(p);
+		let r = try fails(1);
+		p = alloc Node { n: r };
+	} catch e {
+		p = alloc Node { n: 2 };
+	}
+	let s = try fails(n);
+	printf("%d %d\n".ptr, p.n, s);
+	delete(p);
+	return 0;
+}
+
+fn main() -> int
+{
+	let r = work(0) catch {
+		return 1;
+	};
+	return r;
+}

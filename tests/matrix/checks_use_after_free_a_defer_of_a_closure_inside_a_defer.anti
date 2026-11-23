@@ -1,0 +1,24 @@
+//! E2 and a `defer` of a closure that a `defer` holds: it runs where the body
+//! of the closure is left, after the body deleted the node, on every call.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	defer {
+		let f = fn() {
+			let q = alloc Node { n: 2 };
+			defer {
+				printf("%d\n".ptr, q.n);
+			}
+			delete(q);
+		};
+		f();
+	}
+	return 0;
+}

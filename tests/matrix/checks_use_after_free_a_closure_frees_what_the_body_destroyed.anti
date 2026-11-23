@@ -1,0 +1,21 @@
+//! E2 and the address of a value that the body destroyed, in a closure: `free`
+//! passes there, as it passes in the body of the function.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Node
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let p = alloc Node { n: 1 };
+	destroy(p);
+	let f = fn() {
+		free(p);
+	};
+	f();
+	printf("done\n".ptr);
+	return 0;
+}

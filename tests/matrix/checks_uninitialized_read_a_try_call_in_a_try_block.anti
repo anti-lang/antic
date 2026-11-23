@@ -1,0 +1,29 @@
+//! C1 and a `try` before a call inside a `try` block: the error goes to the
+//! handler of the block, which reads the element before any path wrote it.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn fails(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "no";
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let p = alloc(int, 2) else {
+		return 0;
+	};
+	try {
+		let r = try fails(1);
+		p[0] = r;
+	} catch e {
+		printf("%d\n".ptr, p[0]);
+	}
+	free(p);
+	return 0;
+}

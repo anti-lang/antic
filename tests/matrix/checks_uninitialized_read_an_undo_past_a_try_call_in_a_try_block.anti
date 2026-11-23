@@ -1,0 +1,44 @@
+//! C1 and a `try` before a call inside a `try` block: the error goes to the
+//! handler of the block and leaves no block of the function, so the `undo` of
+//! the function does not run there and reads no element before its write.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn fails(n: int) -> int may fail
+{
+	if n > 0 {
+		fail "no";
+	}
+	return n;
+}
+
+fn work(n: int) -> int may fail
+{
+	let p = alloc(int, 2) else {
+		return 0;
+	};
+	undo {
+		printf("undo %d\n".ptr, p[0]);
+		free(p);
+	}
+	try {
+		let r = try fails(1);
+		p[0] = r;
+	} catch e {
+		p[0] = 2;
+	}
+	let s = try fails(n);
+	printf("%d %d\n".ptr, p[0], s);
+	free(p);
+	return 0;
+}
+
+fn main() -> int
+{
+	let r = work(0) catch {
+		return 1;
+	};
+	return r;
+}
