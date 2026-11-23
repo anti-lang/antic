@@ -1816,6 +1816,59 @@ stand as they were. The line numbers are those of the coverage run of
 | `walk_assign` of `src/antic/sema_uninit.c`, line 897 | A value that ends the path. | The walk ends a path at a statement alone, so the path that reached the assignment is live after its value. |
 | `walk_stmt` of `src/antic/sema_uninit.c`, line 1168 | No statement. | Every caller passes a statement of a block, an arm or a branch. |
 
+## The sides of batch 3au
+
+Batch 3au of the third phase read the descriptors, the tables and the
+chains of lowering in `src/antic/lower_desc.c` and the pages of
+`anti doc` in `src/antic/docpage.c`. It found T408 to T412 and fixed
+T408 to T411. The rows of the two files under their own headings above
+stand as they were. The line numbers are those of the coverage run after
+the batch, at `0ff649a3`.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `doc_type_name` of `src/antic/docpage.c`, line 35 | No type. | Every caller passes the type of a field, a parameter, a result, a constant or a base, which the checker gives each. |
+| `declared_result` and `declared_params` of `src/antic/docpage.c`, lines 130 and 144 | A function with the out pointer and no parameter. | The out pointer is itself a parameter of the type. |
+| `declared_result` of `src/antic/docpage.c`, line 134 | A function type without a result. | Every function type carries one, `void` where the declaration writes none. |
+| `declared_params` of `src/antic/docpage.c`, line 147 | A count without `self`. | Every caller passes `false`, and `body_entries` reads `self` from the count the declaration wrote. |
+| `type_params` of `src/antic/docpage.c`, line 214 | A type parameter without its record. | The checker gives every type parameter of a struct, a class and a variant its record, and the library file carries it. |
+| `fn_signature` of `src/antic/docpage.c`, line 256 | More names than the type has parameters. | The count the declaration wrote never exceeds the parameters of its type, which hold `self` and the out pointer besides. |
+| `fn_signature` of `src/antic/docpage.c`, line 261 | A parameter of a bound function. | No declaration writes the type of a bound function. `let f = c.area;` gives it to a local alone. |
+| `fn_signature` of `src/antic/docpage.c`, lines 268, 269 and 277 | No list of names, and a parameter without its name. | Every caller passes one name per parameter. The parser gives each parameter its name, and the library file carries them. |
+| `fn_signature` of `src/antic/docpage.c`, line 284 | A variadic function without a parameter before `...`. | The parser refuses `extern fn only(...)` with `expected identifier`, and `body_entries`, which alone passes `self`, passes no `...`. |
+| `const_value` of `src/antic/docpage.c`, lines 343 and 355 | A constant value without its type. | The checker gives every constant value its type, and the reader of a library file reads it with the value. |
+| `type_signature` and `enum_values` of `src/antic/docpage.c`, lines 376 and 497 | An enum without its base. | The checker gives every enum a base, `c_int` where it names none, and the library file carries it. |
+| `type_signature` of `src/antic/docpage.c`, line 402 | A class without a base. | `anti.lang.Object` alone has none, which the compiler declares and which stands on no page. |
+| `field_signature` of `src/antic/docpage.c`, line 429 | The table pointer among the fields of a class. | `anti.lang.Object` alone holds the table pointer, and every other class reaches it through its base. |
+| `variant_cases` of `src/antic/docpage.c`, lines 461 and 470 | A tag with more values than the variant has cases, and a payload without fields. | The checker gives a variant one case per value of its tag enum, and a case without fields no payload. |
+| `body_values` and `body_entries` of `src/antic/docpage.c`, lines 528, 529, 594 and 595 | A member without its symbol or its type. | `declare_members` of `src/antic/sema_declare.c` gives every member of a class its symbol and every function its type, the error type among them. |
+| `constraint_signature` of `src/antic/docpage.c`, lines 648 and 652 | A constraint without its set, and a set without its declaration. | The checker gives every constraint its set, which names the item that declares it, and the reader of a library file does the same. |
+| `interface_item` of `src/antic/docpage.c`, line 684 | An item of the interface without its type. | The interface of a module is written after a check without an error, where every item has its type. |
+| `tree_items` of `src/antic/docpage.c`, line 825 | Two items that start on one line. | Every source of a test stands in the canonical form, which `fmt_canonical` checks, and that form starts each item on a line of its own. |
+| `build_page` of `src/antic/docpage.c`, line 877 | An interface without its doc text. | `sema_interface` of `src/antic/sema_export.c` writes an empty text for a module without `//!`, and the reader reads the text the file carries. |
+| `lower_table_index` of `src/antic/lower_desc.c`, line 42 | A function the table of the class lacks. | Every caller asks for a function the checker found in the chain of the class. |
+| `lower_note_table_read` and `foreign_class` of `src/antic/lower_desc.c`, lines 75 and 101 | A class with a base that the compiler declares. | `anti.lang.Object` is the one class the compiler declares, and it has no base. |
+| `lower_note_table_read` of `src/antic/lower_desc.c`, line 80 | A slot outside the table. | Every caller passes the slot that `lower_table_index` found. |
+| `foreign_class`, `note_table_write`, `lower_class_depth` and `lower_declared_copy` of `src/antic/lower_desc.c`, lines 100, 134, 236 and 1849 | No type, and a type that is no class. | Each walks the chain of a class up to the root, whose base ends it. |
+| `note_table_write` of `src/antic/lower_desc.c`, line 147 | A copy whose table holds more entries than the table of its generic. | A copy takes the functions of its generic, and no others. |
+| `lower_class_global` of `src/antic/lower_desc.c`, lines 286 and 291 | An export item that is no class. | Every caller passes a class. |
+| `type_id_of` and `lower_struct_descriptor` of `src/antic/lower_desc.c`, lines 418, 1682 and 1684 | A field of a `Job` and of the lock of an object. | No declaration names either type. A `Job` stands in a local that `dispatch` gives, and the lock of a synchronized class is a `transient` field, which no field list holds. |
+| `type_id_of` of `src/antic/lower_desc.c`, line 449 | A kind past the table of the built-in types. | Every kind that the switch above it leaves to the table is a built-in scalar of it. |
+| `variant_descriptor` of `src/antic/lower_desc.c`, line 739 | A field list of a variant without its descriptor. | The module writes the descriptor and its list together, and it finds the descriptor first. |
+| `append_type_name` of `src/antic/lower_desc.c`, line 1110 | A parameter of a bound function. | No declaration writes the type of a bound function. |
+| `signature_code` and `failing_code` of `src/antic/lower_desc.c`, lines 1139 and 1179 | A parameter of type `void`. | `void` names no type, so antic says `` unknown type `void` ``. |
+| `failing_code` and `give_enum_descriptors` of `src/antic/lower_desc.c`, lines 1173 and 1201 | An out pointer that is no pointer. | The type of a function that may fail takes a pointer to its result. |
+| `entry_code` of `src/antic/lower_desc.c`, line 1215 | No type, and a type that is no function type. | Both callers pass the type of a function, which the checker gives every function of a table. |
+| `class_functions`, `class_chain` and `lower_class_table` of `src/antic/lower_desc.c`, lines 1294, 1311, 1312, 1401, 1887 and 1902 | An entry of a table without its item, its symbol or its function type. | `table_of` gives every entry the item of its function, the root's among them, and the checker gives each its symbol and its type. |
+| `lower_class_descriptor` of `src/antic/lower_desc.c`, line 1594 | A `destruct` without a body or a symbol. | A class declares `destruct` with a body, and a descriptor is written by the module that declares the class or the copy. |
+| `lower_class_descriptor` of `src/antic/lower_desc.c`, lines 1645 and 1646 | A copy of a generic without its arguments or its parameters. | The checker makes a copy from one argument per parameter of a generic. |
+| `lower_struct_descriptor` of `src/antic/lower_desc.c`, line 1717 | A struct without a field. | The parser refuses an empty body with `expected identifier`, and `transient` stands in a class body alone. |
+| `lower_interface_table` of `src/antic/lower_desc.c`, lines 1955 and 1960 | A function of the class or of the interface without a symbol or a body. | The checker gives every member its symbol and refuses a class that leaves an abstract function of its interface without a body. |
+| `constructs_with_arguments` of `src/antic/lower_desc.c`, line 1985 | A `construct` without its symbol or its function type. | `declare_members` of `src/antic/sema_declare.c` gives every member of a class its symbol and every function its type. |
+| `requires_class_field` and `lower_class_record` of `src/antic/lower_desc.c`, lines 1999 and 2047 | A base that is no class. | The base of a class is a class, and the root ends the walk. |
+| `lower_class_record` of `src/antic/lower_desc.c`, line 2089 | A `provides` line without its interface. | The checker refuses a `provides` line whose interface it cannot resolve, and lowering runs on a module without an error. |
+| `lower_static_descriptor` of `src/antic/lower_desc.c`, line 2111 | A type other than a class and a pointer to one. | The checker refuses `delete`, `destroy` and `dup` of any other type, as `` `delete` needs a class pointer, found `*Point` ``, and the teardown of an owned buffer asks for a class alone. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

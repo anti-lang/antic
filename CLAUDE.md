@@ -1060,6 +1060,16 @@ not re-open a settled decision without asking Eddie.
   8319. It ran each sanitizer suite in the six parts of `asan`, the last
   up to test 8317: `asan` 251 s, 181 s, 271 s, 165 s, 114 s and 629 s,
   `ubsan` 253 s, 163 s, 169 s, 106 s, 85 s and 668 s.
+  Batch 3au of the third phase of coverage measured `host` in the same
+  three parts, up to test 8327: 386 s, 281 s and 393 s before the commit
+  of T408 to T412, 280 s, 272 s and 401 s before the fix of T408, where
+  `emit_identity` failed on the moved chains, which ran again alone once
+  the manifest stood written, 377 s, 280 s and 379 s before that of
+  T409, 312 s, 250 s and 423 s before that of T410, and 377 s, 279 s and
+  471 s before that of T411 and the commit of the tests of the sides. It
+  ran each sanitizer suite in the six parts of `asan`, the last up to
+  test 8325: `asan` 249 s, 182 s, 267 s, 163 s, 114 s and 635 s, `ubsan`
+  249 s, 182 s, 261 s, 106 s, 85 s and 660 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1670,13 +1680,14 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8319 ctest tests pass on the development Mac, and two of them, the
+- 8327 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
   carry `host=windows`, the three lines of T385, which wait for Eddie's
-  choice, the three lines of T387, which wait for his answer, and the
-  three lines of T404 and of T407, which wait for his answers.
-  The ASan and the UBSan builds run 8317 each
+  choice, the three lines of T387, which wait for his answer, the
+  three lines of T404 and of T407 and the line of T412, which wait for
+  his answers.
+  The ASan and the UBSan builds run 8325 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
