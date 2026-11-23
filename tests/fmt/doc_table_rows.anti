@@ -1,0 +1,26 @@
+//! The lines of a table in a doc comment, each of which starts with `|` and
+//! keeps a line of its own, and a `|` word at the width of a line, which a line
+//! does not start with.
+
+/// The kinds of a value:
+/// | name | width |
+/// |---|---|
+/// | `int` | 64 |
+/// The text after the table opens a paragraph of its own, which the fill joins
+/// as before.
+pub fn one() -> int
+{
+	return 1;
+}
+
+/// The value is aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mm |
+/// not a row of a table.
+pub fn two() -> int
+{
+	return 2;
+}
+
+fn main() -> int
+{
+	return one() + two() - 3;
+}

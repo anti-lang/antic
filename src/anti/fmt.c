@@ -1242,7 +1242,9 @@ static size_t columns_of(const char *s, size_t n)
    which `anti doc` renders: a `-` that makes a `- ` item, or three
    backticks of a fence. The doc warnings read a word of `#` alone as a
    heading and a word of digits and `.` or `)` as an item of a numbered
-   list, so those open markup as well, by I of "Answers of 2026-11-19" in docs/decisions.md. */
+   list, so those open markup as well, by I of "Answers of 2026-11-19" in docs/decisions.md.
+   A word that starts with `|` opens a row of a table, which keeps a line
+   of its own, by 6 of "Answers of 2026-11-23". */
 static bool opens_markup(const char *word, size_t length)
 {
     size_t digits = 0;
@@ -1254,7 +1256,7 @@ static bool opens_markup(const char *word, size_t length)
     while (digits < length && word[digits] >= '0' && word[digits] <= '9') {
         digits++;
     }
-    return (length == 1 && word[0] == '-') ||
+    return (length == 1 && word[0] == '-') || (length > 0 && word[0] == '|') ||
            (length >= 3 && memcmp(word, "```", 3) == 0) ||
            (hashes > 0 && hashes == length) ||
            (digits > 0 && digits + 1 == length &&
@@ -1377,7 +1379,9 @@ static bool starts_with(const char *s, size_t length, const char *prefix)
 /* Re-wrap the text of a doc comment to the width, with used columns
    already taken by the indent and the marker. A fenced block is written
    as it stands, a blank line separates two paragraphs, and a `- ` item
-   carries its continuation two columns in. */
+   carries its continuation two columns in. A line that starts with `|`
+   is written as it stands on a line of its own, as the row of a table,
+   by 6 of "Answers of 2026-11-23" in docs/decisions.md. */
 static void wrap_doc(const char *text, size_t length, size_t used,
                      struct text *out)
 {
@@ -1409,7 +1413,8 @@ static void wrap_doc(const char *text, size_t length, size_t used,
             i = end + 1;
             continue;
         }
-        if (fenced || indent == end - i) {
+        if (fenced || indent == end - i ||
+            starts_with(text + i + indent, end - i - indent, "|")) {
             text_append_bytes(out, text + i, end - i);
             i = end + 1;
             continue;
@@ -1444,6 +1449,8 @@ static void wrap_doc(const char *text, size_t length, size_t used,
             if (lead_in == tail - next || is_fence(text + next, tail - next) ||
                 starts_with(text + next + lead_in, tail - next - lead_in,
                             "- ") ||
+                starts_with(text + next + lead_in, tail - next - lead_in,
+                            "|") ||
                 lead_in != columns_of(rest, strlen(rest))) {
                 break;
             }

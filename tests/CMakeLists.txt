@@ -7966,6 +7966,15 @@ add_expect_test(fmt_doc_heading_and_number_at_the_width STATUS 0
     COMMAND "$<TARGET_FILE:anti>" fmt --check
             "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_heading_and_number_at_the_width.anti")
 
+# A line of a doc comment that starts with `|` keeps a line of its own,
+# as an item of a list does, and a `|` word at the width stays at the end
+# of its line, by 6 of "Answers of 2026-11-23". The source is in the
+# canonical form.
+add_expect_test(fmt_doc_table_rows STATUS 0
+    PATTERN "^$"
+    COMMAND "$<TARGET_FILE:anti>" fmt --check
+            "${CMAKE_CURRENT_SOURCE_DIR}/fmt/doc_table_rows.anti")
+
 # A fence of a doc comment whose line starts with a tab, which anti doc
 # and anti check read as a fence. The source is in the canonical form, and
 # fmt_canonical passes over it until `anti fmt` agrees.
