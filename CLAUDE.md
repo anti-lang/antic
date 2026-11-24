@@ -1124,6 +1124,12 @@ not re-open a settled decision without asking Eddie.
   in the six parts of `asan`, the last up to test 8434: `asan` 258 s,
   186 s, 281 s, 171 s, 113 s and 707 s, `ubsan` 261 s, 182 s, 278 s,
   169 s, 121 s and 723 s.
+  The step of the second set of answers of 2026-11-23 measured `host` in
+  the same three parts, up to test 8436: 393 s, 293 s and 422 s before
+  the commit of the base after `inherits`. It ran each sanitizer suite in
+  the six parts of `asan`, the last up to test 8434: `asan` 261 s, 183 s,
+  276 s, 171 s, 111 s and 715 s, `ubsan` 267 s, 186 s, 276 s, 167 s,
+  117 s and 692 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
