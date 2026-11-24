@@ -1973,6 +1973,29 @@ number is that of the source at the commit that builds it.
 |---|---|---|
 | `carried_member` of `src/antic/antl_write.c`, line 67 | A private `construct` or `destruct` without a body. | A function of a body without a body is abstract, and an abstract function is `pub`, so the test of the level decides first. An abstract `construct` or `destruct` is refused as well, `` `construct` cannot be abstract ``, so no library file holds one. |
 
+## The sides of batch 3ay
+
+Batch 3ay of the third phase read the pattern methods, the match as a
+condition and `if let` on a value that may be `none` in
+`src/antic/sema_pattern.c`, and the driver of antic in
+`src/antic/driver.c`. It found T429 and fixed it. The rows of `driver.c`
+under its own heading above stand as they were. The line numbers are
+those of the coverage run after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `is_byte_slice` of `src/antic/sema_pattern.c`, line 62 | A type that is NULL, and a slice without its element. | Every caller passes a checked type, and every slice type has its element. |
+| `method_call` of `src/antic/sema_pattern.c`, line 247 | A method with one count of arguments other than 1. | Of `str_methods`, `matches` alone takes one count, and it is 1. |
+| `method_call` of `src/antic/sema_pattern.c`, line 303 | A template after an argument that failed its check. | The template is the second argument of `replace`, the first that the loop reads. |
+| `sema_match_field` of `src/antic/sema_pattern.c`, line 742 | A group number past `u64`. | The lexer refuses such a number, and a library file holds the name of a field that a checked tree held. |
+| `test_of` of `src/antic/sema_pattern.c`, line 786 | A type that cannot be `none`. | `sema_check_test` passes a `?Match`, and `sema_if_let_none` a type that `check_switch` of `src/antic/sema_stmt.c` found may be `none`. |
+| `names_it` of `src/antic/sema_pattern.c`, line 840 | An expression that is NULL. | The parser writes the target of every assignment and the operand of every `&`. |
+| `visit_write_expr` of `src/antic/sema_pattern.c`, line 866 | An anonymous function without its function. | The parser gives every anonymous function its function. |
+| `sema_if_let_none` of `src/antic/sema_pattern.c`, line 926 | A binding that its scope holds already. | The binding is the first name of a scope of its own. |
+| `pattern_position` of `src/antic/sema_pattern.c`, lines 977, 983 and 984 | A spelling that ends before its closing quote. | The lexer writes a pattern literal with its quotes, and PCRE2 names an offset inside the pattern. |
+| `read_file` of `src/antic/driver.c`, line 119 | A source too large, read without its message. | `read_source` reads every source and names its failure, and the quiet read takes a library file, which has no limit. |
+| `back_end` of `src/antic/driver.c`, lines 1204 and 1206 | A library file, and a library of `--lib` in dev mode. | `write_library` writes a library file before the back end, and `--lib static` and `--lib shared` build in release mode alone, so `--dev` beside them is refused. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

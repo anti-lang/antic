@@ -1143,6 +1143,15 @@ not re-open a settled decision without asking Eddie.
   It ran each sanitizer suite in the six parts of `asan`, the last up to
   test 8448: `asan` 249 s, 180 s, 271 s, 168 s, 107 s and 642 s, `ubsan`
   249 s, 179 s, 271 s, 167 s, 116 s and 682 s.
+  Batch 3ay of the third phase of coverage measured `host` in the same
+  three parts: 382 s, 286 s and 394 s before the commit of T429, up to
+  test 8456, 339 s, 213 s and 378 s before its fix, 378 s, 283 s and
+  373 s before the commit of the tests of the sides, up to test 8472,
+  and 380 s, 282 s and 412 s before the commit of the test of a match of
+  a function, up to test 8475. It ran each sanitizer suite in the six
+  parts of `asan`, the last up to test 8473: `asan` 243 s, 179 s, 272 s,
+  168 s, 108 s and 640 s, `ubsan` 254 s, 181 s, 270 s, 169 s, 117 s and
+  773 s.
   A suite past 9 minutes gets
   faster tests, never fewer: see
   "Repository layout" in `docs/decisions.md`.
@@ -1753,11 +1762,11 @@ reports what it finished.
   `trace.start` installs the one the runtime key `trace` names. See "Hooks
   and tracing" in `docs/decisions.md`, `docs/notes/hooks.md` and
   `docs/notes/trace-handlers.md`.
-- 8450 ctest tests pass on the development Mac, and two of them, the
+- 8475 ctest tests pass on the development Mac, and two of them, the
   `mimalloc_environment` tests, skip there, since they need a Linux host.
   `tests/known-failures.txt` holds the two lines of T136 and T138, which
   carry `host=windows`.
-  The ASan and the UBSan builds run 8448 each
+  The ASan and the UBSan builds run 8473 each
   with the same skips, without
   the `no_paths` test, which needs a build that no sanitizer wrote paths
   into, and without `antic_message_license_text_with_a_nul_byte`, which
