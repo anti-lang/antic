@@ -2077,6 +2077,35 @@ numbers are those of the sources after the batch.
 | `enum_named` and `settable` of `src/anti/bindwrite.c`, lines 601 and 708 | An enum of a field that the module does not hold. | Both readers record every enum that a field names, and a field names an enum of the module alone. |
 | `cut` of `src/anti/bindwrite.c`, line 613 | A path without its memory. | The walk appends to a path before it cuts it. |
 
+## The sides of batch 3bc
+
+Batch 3bc of the third phase read the functions lowering writes for a
+class in `src/antic/lower_class.c` and the error channel in lowering in
+`src/antic/lower_error.c`. It found T440 and T441 and fixed both. The
+line numbers are those of the sources after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `singleton_instance` of `src/antic/lower_class.c`, line 178 | A second request for the instance of one class in one module. | `lower_singleton_get` is its one caller. It writes the `get` of a class once per module, and it returns before for a `get` that a library file holds, which brings its instance with it. |
+| `lower_class_construct` of `src/antic/lower_class.c`, line 304 | A `construct` without a symbol or without a body. | The function runs for the export classes of the module, whose functions the checker gave symbols, and item 3 of "Answers of 2026-11-24" refuses `abstract fn construct`. |
+| `lower_find_member_fn` of `src/antic/lower_class.c`, line 386 | A name that no public function of the chain declares, and a chain that holds no class. | `call_fatal` asks for `fatal` of `anti.lang.Error`, and the table of an interface asks for an entry, which a public function of the interface or of a class above it declares. The base of a class is a class. |
+| `lower_interface_thunk` of `src/antic/lower_class.c`, line 425 | A thunk of one class, sub-object and function asked for twice. | Its one caller writes the table of a class and a sub-object once, and returns the table it wrote before. |
+| `lower_run_construct_bodies` of `src/antic/lower_class.c`, line 565 | A `construct` of the chain without a symbol or without a body. | The checker gives every function of a class body a symbol, a library file carries the body of a `construct` its class needs, and item 3 of "Answers of 2026-11-24" refuses `abstract fn construct`. |
+| `lower_run_construct` of `src/antic/lower_class.c`, line 581 | No type. | Each caller passes the type of the object it built. |
+| `lower_store_interface_tables` of `src/antic/lower_class.c`, line 594 | A chain that holds no class. | The base of a class is a class. |
+| `lower_construct` of `src/antic/lower_class.c`, line 634 | A class without a base. | Every class but `anti.lang.Object` has a base, `Object` when it names none, and no program can name `Object` to build it. |
+| `lower_construct` of `src/antic/lower_class.c`, line 643 | `T(args)` of a class without a `construct`. | The checker refuses it with `` `T` has no `construct` with arguments, so a literal builds it ``. |
+| `lower_construct` of `src/antic/lower_class.c`, line 659 | An argument past the parameters of `construct`. | The checker refuses a call with more arguments than parameters. |
+| `lower_construct` of `src/antic/lower_class.c`, line 680 | A block that ended at the call of a `construct` that may fail. | A `construct` gives nothing or `?*Error`, so its call ends no block. |
+| `lower_handler` of `src/antic/lower_error.c`, lines 57 and 65 | A handler without the handling of a result. | Its three callers pass the handling of the call, of the guard or of the `try` block. |
+| `lower_convert_in_place` of `src/antic/lower_error.c`, line 116 | No value, and a block that ended. | A `let` holds a value, and `lower_handle_converted` passes one it checked. `lower_let_value` of `src/antic/lower_stmt.c` calls it after a `construct` that cannot fail, on the block of the `let`, and `lower_handle_converted` on the success path of the call. |
+| `lower_converts_in_place` of `src/antic/lower_error.c`, lines 128 and 131 | A handled call without an out pointer, and `alloc` of a call that builds no class. | A call that may fail and gives a pointer writes it through its out pointer. `alloc` of a call takes a class with arguments alone, and the checker refuses the rest with `` `alloc` of one object takes a literal or a class with arguments ``. |
+| `lower_handle_converted` of `src/antic/lower_error.c`, line 169 | A conversion to an interface without an out pointer. | A value that converts to an interface is a pointer, which the out pointer of the call carries. |
+| `lower_handle_converted` of `src/antic/lower_error.c`, lines 181, 182 and 185 | A call without a handler, and a call that the `try` block around it handles without that block. | The checker refuses a call that may fail without a handler, and a call in a `try` block takes the handler of the block, whose scope lowering opens around it. |
+| `lower_pointer_guard` of `src/antic/lower_error.c`, line 262 | A guard without its name, and a block that ended. | The checker gives every `let` a symbol, `let _` among them, and lowering drops a statement after the end of its path. |
+| `lower_guard_missing` of `src/antic/lower_error.c`, line 310 | A handler of a guard that reaches its end. | The checker refuses it with `` the handler of a value can reach its end without `yield` ``. |
+| `lower_fail` of `src/antic/lower_error.c`, line 392 | A `fail` without the class of the error or without `capture`. | `sema_resolve_origin` refuses a `fail` where `anti.lang` lacks either, and a refused program is not lowered. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
