@@ -776,6 +776,13 @@ static void test_of(struct checker *c, struct expr *e, struct type *t)
     struct pos pos = e->pos;
 
     *value = *e;
+    /* A failing call writes its result into its own node, which is value
+       from here on. Left on e, the place named the comparison, which
+       holds the call, and the copy of a tree walked the two without end.
+       T429 of docs/audit/tests-findings.md. */
+    if (value->kind == EXPR_CALL && value->as.call.out == e) {
+        value->as.call.out = value;
+    }
     none->type = types_is_nullable(t) ? t : types_with_none(c->types, t);
     memset(e, 0, sizeof *e);
     e->kind = EXPR_BINARY;
