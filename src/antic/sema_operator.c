@@ -99,6 +99,17 @@ static bool binary_operands(struct checker *c, struct expr *e,
                     : types_with_none(c->types, *value_type));
             return !sema_is_error(*left) && !sema_is_error(*right);
         }
+        /* `none == none` gives neither side a type. That is one mistake,
+           so the left side gets the message and the right side is checked
+           quietly, T437 of docs/audit/tests-findings.md. */
+        {
+            struct context quiet;
+            *left = sema_check_expr(c, l, outer);
+            sema_enter_quiet(c, &quiet);
+            *right = sema_check_expr(c, r, outer);
+            sema_leave(c, &quiet);
+            return !sema_is_error(*left) && !sema_is_error(*right);
+        }
     }
     /* A literal beside an f16 takes no type from it, so the refusal of
        the f16 is the one message. A literal before a carry takes the type
