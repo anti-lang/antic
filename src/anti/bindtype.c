@@ -436,13 +436,20 @@ static const struct bind_type *suffixes(struct parser *p,
         next(p);
         if (p->kind == T_NUMBER) {
             char digits[32];
+            const char *start = digits;
+            int radix = 0;
             if (p->word_length >= sizeof digits) {
                 return NULL;
             }
             memcpy(digits, p->word, p->word_length);
             digits[p->word_length] = '\0';
+            /* strtoll takes no `0b`, the prefix of a binary constant. */
+            if (digits[0] == '0' && (digits[1] == 'b' || digits[1] == 'B')) {
+                start = digits + 2;
+                radix = 2;
+            }
             errno = 0;
-            t->length = strtoll(digits, NULL, 0);
+            t->length = strtoll(start, NULL, radix);
             /* A length past INT64_MAX is refused, not saturated. */
             if (errno == ERANGE) {
                 return NULL;
