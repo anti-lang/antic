@@ -274,6 +274,9 @@ void lower_class_init(struct lowerer *l, const struct item *it)
     ir_ret(l->f, l->b, IR_VOID, lower_none());
 }
 
+static void lower_run_construct_bodies(struct lowerer *l, const struct type *t,
+                                       struct ir_operand dest);
+
 /* DESIGN: an export class whose `construct` takes arguments gives C
    `anti_<Class>_construct(self, args...)`, the counterpart of
    `Class(args)`. It prepares self as the init of the class does, then
@@ -290,6 +293,7 @@ void lower_class_construct(struct lowerer *l, const struct item *it)
     struct ir_function *f;
     struct ir_operand *args;
     struct ir_operand self;
+    struct ir_operand error;
     uint32_t value;
     struct text name = {0};
     size_t i;
@@ -317,8 +321,13 @@ void lower_class_construct(struct lowerer *l, const struct item *it)
     l->f = f;
     l->b = ir_block_add(f);
     self = lower_temp(l, f->params[0].temp);
-    ir_call(l->f, l->b, IR_VOID, ir_func_op(lower_init_function(l, t)), &self,
-            1);
+    /* The steps of the init stand here apart from its `created` hook,
+       which runs once `construct` succeeded, as `Class(args)` runs it, by
+       T441 of docs/audit/tests-findings.md. The runtime counts the
+       object as the init counts it. */
+    lower_prepare_object(l, t, NULL, self);
+    lower_build_on_heap(l, self);
+    lower_run_construct_bodies(l, t, self);
     args = alloc_zeroed(f->param_count, sizeof *args);
     for (i = 0; i < f->param_count; i++) {
         args[i] = lower_temp(l, f->params[i].temp);
@@ -328,10 +337,26 @@ void lower_class_construct(struct lowerer *l, const struct item *it)
                     args, f->param_count);
     free(args);
     if (sig->result->kind == TYPE_VOID) {
+        lower_hook_object(l, HOOK_CREATED, self);
+        lower_build_on_heap(l, lower_none());
         ir_ret(l->f, l->b, IR_VOID, lower_none());
-    } else {
-        ir_ret(l->f, l->b, IR_PTR, lower_temp(l, value));
+        return;
     }
+    error = lower_temp(l, value);
+    if (l->hooks) {
+        struct ir_block *made = lower_new_block(l);
+        struct ir_block *after = lower_new_block(l);
+        ir_branch(l->f, l->b,
+                  lower_temp(l, ir_binary(l->f, l->b, IR_EQ, IR_I8, error,
+                                          ir_int_op(IR_PTR, 0))),
+                  made, after);
+        l->b = made;
+        lower_hook_object(l, HOOK_CREATED, self);
+        ir_jump(l->f, l->b, after);
+        l->b = after;
+    }
+    lower_build_on_heap(l, lower_none());
+    ir_ret(l->f, l->b, IR_PTR, error);
 }
 
 /* Branch to a new block when the class value at p has a table, and give
