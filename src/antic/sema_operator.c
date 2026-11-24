@@ -39,9 +39,14 @@ static struct type *right_literal_type(struct checker *c, enum token_kind op,
     if (fn != NULL && sema_is_error(fn->type)) {
         return NULL;
     }
-    if (fn == NULL || fn->type == NULL || fn->type->kind != TYPE_FN ||
-        fn->type->param_count < 2) {
+    if (fn == NULL || fn->type == NULL || fn->type->kind != TYPE_FN) {
         return left;
+    }
+    /* An operator without a second parameter gives the literal no type,
+       so the use names the operand that the operator lacks, T436 of
+       docs/audit/tests-findings.md. */
+    if (fn->type->param_count < 2) {
+        return NULL;
     }
     /* DESIGN: a parameter that names a type parameter takes what the
        left operand gives it, so `a + 5` against `b: T` with a Key<int> on
