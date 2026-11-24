@@ -1760,7 +1760,9 @@ bool sema_names_function(struct checker *c, const struct expr *e)
    declared at module level, by T115 of docs/audit/tests-findings.md. An
    `extern fn` and a function of the body of a type have no such form, so
    a default that names one is refused, by item 1 of "Answers of
-   2026-11-24" in docs/decisions.md. */
+   2026-11-24" in docs/decisions.md. Nor has a function inside an array, a
+   tuple or a struct literal, which the refusal names at the first one,
+   by T428. */
 bool sema_refuse_uncarried_function(struct checker *c, const struct expr *e)
 {
     const struct symbol *sym;
@@ -1770,8 +1772,15 @@ bool sema_refuse_uncarried_function(struct checker *c, const struct expr *e)
         if (sym == NULL || sym->kind != SYMBOL_EXTERN_FN) {
             return false;
         }
-    } else if (e->kind != EXPR_FIELD || !names_function(c, e)) {
-        return false;
+    } else if (e->kind == EXPR_FIELD) {
+        if (!names_function(c, e)) {
+            return false;
+        }
+    } else {
+        e = function_in(c, e);
+        if (e == NULL) {
+            return false;
+        }
     }
     fail_const(c, e, "a function");
     return true;
