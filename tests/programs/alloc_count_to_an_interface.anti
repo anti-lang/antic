@@ -1,0 +1,39 @@
+//! `alloc(Square, 2)` converted to a pointer to an interface of the class where
+//! it stands, beside a `?*Square` of `none`. The raw form gives `?*T`, and the
+//! conversion moves a pointer that is not `none` to its sub-object and keeps
+//! `none`. The elements have zero tables and are never used, so the program
+//! frees nothing and runs in release mode alone.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	pub tag: int = 0,
+
+	implements sh: Shape,
+
+	pub side: int = 1,
+
+	concrete fn area(self) -> int
+	{
+		return self.side;
+	}
+}
+
+fn nothing() -> ?*Square
+{
+	return none;
+}
+
+fn main() -> int
+{
+	let s: ?*Shape = alloc(Square, 2);
+	let n: ?*Shape = nothing();
+	printf("%d %d\n".ptr, (s != none) as c_int, (n == none) as c_int);
+	return 0;
+}
