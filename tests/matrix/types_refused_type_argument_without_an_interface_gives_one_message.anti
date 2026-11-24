@@ -1,0 +1,45 @@
+//! A type argument that lacks the interface of its constraint is one mistake,
+//! so the later uses of the copy get no message.
+
+abstract class Named
+{
+	abstract fn name(self) -> str;
+}
+
+class Tag inherits Named
+{
+	pub n: int = 0,
+
+	concrete fn name(self) -> str
+	{
+		return "tag";
+	}
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+struct Box<T: Named>
+{
+	item: *T,
+}
+
+fn open<T: Named>(b: Box<T>) -> *T
+{
+	return b.item;
+}
+
+fn main() -> int
+{
+	let p = alloc Plain { };
+	let b = Box<Plain> { item: p };
+	let q = open(b);
+	let r = open(b);
+	delete(p);
+	if q == r {
+		return 0;
+	}
+	return 1;
+}

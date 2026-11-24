@@ -237,6 +237,13 @@ struct checker {
     size_t pending_count;
     size_t pending_capacity;
     bool pending_done;
+    /* The type arguments refused so far. A later use of the same copy,
+       and a call that takes a value of it, gives no second message, by
+       item 4 of "Answers of 2026-11-24" in docs/decisions.md. */
+    struct refused_arg *refused_args;
+    /* The call of a generic function whose arguments are checked against
+       its constraints now, or NULL. */
+    const struct expr *meets_call;
     /* The copies being filled, one inside another, and whether a chain
        too deep was refused. */
     int copy_depth;
@@ -292,6 +299,16 @@ struct pending_check {
     struct name generic;
     struct pos pos;
     struct generic_map map;         /* the arguments of the use */
+};
+
+/* A type argument that lacked a part of a constraint of the generic
+   named generic and had its message. The part is a hook, `Float` or an
+   interface. */
+struct refused_arg {
+    const struct type *type;
+    const void *part;
+    struct name generic;
+    struct refused_arg *next;
 };
 
 /* What a call gives the inference of a generic. It holds the type

@@ -1,0 +1,1 @@
+types_refused_type_argument_without_an_interface_gives_one_message.anti:37:13: error: `Plain` has no `Named`, which `Box` needs for `T`

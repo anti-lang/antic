@@ -1,0 +1,32 @@
+//! A type argument that lacks `lt` is one mistake. The first use of the copy
+//! gets the message, and the later uses get none: a field of the copy, a call
+//! that takes it and the copy named again.
+
+struct P
+{
+	n: int,
+}
+
+struct Keyed<T: lt>
+{
+	key: T,
+}
+
+struct Holder
+{
+	k: Keyed<P>,
+}
+
+fn first<T: lt>(k: Keyed<T>) -> T
+{
+	return k.key;
+}
+
+fn main() -> int
+{
+	let k = Keyed<P> { key: P { n: 1 } };
+	let x = first(k);
+	let y = first(k);
+	let z: Keyed<P> = k;
+	return x.n + y.n + z.key.n;
+}

@@ -1,0 +1,1 @@
+types_refused_type_argument_without_hash_gives_one_message.anti:17:10: error: `*Counter` has no `hash`, which `key` needs for `T`

@@ -1,0 +1,17 @@
+//! A type argument that is no `Float` is one mistake, so the second use of the
+//! copy gets no message.
+
+fn small<T: Float>(x: T) -> bool
+{
+	return x < x;
+}
+
+fn main() -> int
+{
+	let a = small(3);
+	let b = small(4);
+	if a || b {
+		return 1;
+	}
+	return 0;
+}

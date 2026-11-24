@@ -828,6 +828,80 @@ static struct type *constraint_iface(struct checker *c, const struct type *p,
     return map != NULL ? subst(c, p->ifaces[i], map) : p->ifaces[i];
 }
 
+static const struct name *generic_name(const struct type *g);
+
+/* The part of a constraint that `Float` is, for refused_before. */
+static const char float_part = 0;
+
+/* Whether the argument t of the generic named generic lacked part
+   before and had its message there. */
+static bool refused_for(const struct checker *c, const struct type *t,
+                        const void *part, const struct name *generic)
+{
+    const struct refused_arg *r;
+
+    for (r = c->refused_args; r != NULL; r = r->next) {
+        if (r->type == t && r->part == part &&
+            types_same_name(&r->generic, generic)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* Whether an argument of the call checked now is a value of a copy, or
+   a pointer to one, that holds t among its arguments and refused it for
+   part. Such a call is a use of that copy. */
+static bool takes_refused_copy(const struct checker *c, const struct type *t,
+                               const void *part)
+{
+    const struct expr *call = c->meets_call;
+    size_t i;
+    size_t k;
+
+    for (i = 0; call != NULL && i < call->as.call.arg_count; i++) {
+        const struct type *a = call->as.call.args[i]->type;
+        while (a != NULL &&
+               (a->kind == TYPE_POINTER || a->kind == TYPE_OPTIONAL)) {
+            a = a->element;
+        }
+        for (k = 0; a != NULL && a->generic != NULL &&
+                    k < a->generic->type_param_count;
+             k++) {
+            if (a->args[k] == t &&
+                refused_for(c, t, part, generic_name(a->generic))) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/* Whether the argument t of the generic named generic lacks part at a
+   use whose message was given before. A refused type argument is one
+   mistake, by item 4 of "Answers of 2026-11-24" in docs/decisions.md.
+   The first use of a copy gets the message, and a later use of the same
+   copy gets none, nor does a call that takes a value of it. The call
+   records the argument, the part and the generic. */
+static bool refused_before(struct checker *c, const struct type *t,
+                           const void *part, const struct name *generic)
+{
+    struct refused_arg *r;
+    bool before;
+
+    if (refused_for(c, t, part, generic)) {
+        return true;
+    }
+    before = takes_refused_copy(c, t, part);
+    r = arena_alloc(c->arena, sizeof *r);
+    r->type = t;
+    r->part = part;
+    r->generic = *generic;
+    r->next = c->refused_args;
+    c->refused_args = r;
+    return before;
+}
+
 /* Check the argument t of the parameter p of the generic named by
    generic at pos, and report the first hook or interface it lacks. map
    holds the arguments of the use, as constraint_iface reads it. */
@@ -847,6 +921,9 @@ static void check_meets(struct checker *c, struct type *t,
         return;
     }
     if (!meets_float(t, p)) {
+        if (refused_before(c, t, &float_part, generic)) {
+            return;
+        }
         sema_error_at(c, pos, "`%s` is no `%s`, which `%.*s` needs for "
                       "`%.*s`: `%s` takes `f32` and `f64` alone", sema_tn(t),
                       LANG_FLOAT, (int)generic->length, generic->text,
@@ -855,6 +932,9 @@ static void check_meets(struct checker *c, struct type *t,
     }
     for (i = 0; i < HOOK_COUNT; i++) {
         if ((p->hooks & (1u << i)) != 0 && !meets_hook(c, t, hook_names[i])) {
+            if (refused_before(c, t, hook_names[i], generic)) {
+                return;
+            }
             sema_error_at(c, pos, "`%s` has no `%s`, which `%.*s` needs for "
                           "`%.*s`%s", sema_tn(t), hook_names[i],
                           (int)generic->length, generic->text,
@@ -866,6 +946,9 @@ static void check_meets(struct checker *c, struct type *t,
     for (i = 0; i < p->iface_count; i++) {
         struct type *iface = constraint_iface(c, p, i, map);
         if (!meets_iface(c, t, iface)) {
+            if (refused_before(c, t, iface, generic)) {
+                return;
+            }
             sema_error_at(c, pos, "`%s` has no `%s`, which `%.*s` needs for "
                           "`%.*s`", sema_tn(t), sema_tn(iface),
                           (int)generic->length, generic->text,
@@ -2492,6 +2575,7 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
     struct type *failed;
     struct generic_map map;
     const struct name *name;
+    const struct expr *was;
     size_t i;
 
     if (own == 0 && g->count > 0) {
@@ -2540,8 +2624,11 @@ struct type *sema_generic_call(struct checker *c, struct expr *e,
             return sema_builtin(c, TYPE_ERROR);
         }
     }
+    was = c->meets_call;
+    c->meets_call = e;
     meets_all(c, &map, outer_count, outer != NULL ? &outer->name : NULL, name,
               e->pos);
+    c->meets_call = was;
     if (outer != NULL && map.to == NULL && copy != outer) {
         complete_class(c, &map, outer, outer_count, e->pos);
     }
@@ -2555,6 +2642,7 @@ static struct type *finish_copy(struct checker *c, struct expr *call,
                                 struct type *fn, const struct item *it,
                                 struct generic_map *map)
 {
+    const struct expr *was;
     size_t i;
 
     for (i = 0; i < map->count; i++) {
@@ -2566,7 +2654,10 @@ static struct type *finish_copy(struct checker *c, struct expr *call,
             return NULL;
         }
     }
+    was = c->meets_call;
+    c->meets_call = call;
     meets_all(c, map, 0, NULL, &it->name, call->pos);
+    c->meets_call = was;
     return record_copy(c, call, fn, map);
 }
 

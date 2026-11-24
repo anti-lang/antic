@@ -1,0 +1,1 @@
+types_refused_type_argument_without_float_gives_one_message.anti:11:10: error: `int` is no `Float`, which `small` needs for `T`: `Float` takes `f32` and `f64` alone
