@@ -19,3 +19,9 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
+matrix_values_matches_of_a_compiled_pattern_caught_as_none_as_a_condition_dev T429 antic overflows its stack on a match of a compiled pattern caught as none and tested as a condition.
+matrix_values_matches_of_a_compiled_pattern_caught_as_none_as_a_condition_release T429 antic overflows its stack on a match of a compiled pattern caught as none and tested as a condition.
+matrix_values_matches_of_a_compiled_pattern_caught_as_none_as_a_condition_memory_checks T429 antic overflows its stack on a match of a compiled pattern caught as none and tested as a condition.
+matrix_values_match_of_a_failing_function_caught_as_none_as_a_condition_dev T429 antic overflows its stack on a match of a failing function caught as none and tested as a condition.
+matrix_values_match_of_a_failing_function_caught_as_none_as_a_condition_release T429 antic overflows its stack on a match of a failing function caught as none and tested as a condition.
+matrix_values_match_of_a_failing_function_caught_as_none_as_a_condition_memory_checks T429 antic overflows its stack on a match of a failing function caught as none and tested as a condition.

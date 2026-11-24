@@ -1,0 +1,52 @@
+//! A match that a function that may fail gives, whose failure `catch none`
+//! counts as `none`, stands as a condition, in `if`, after `!`, `&&` and `||`.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn first(line: str, r: Regex) -> ?Match may fail
+{
+	return try line.matches(r);
+}
+
+fn in_if(r: Regex)
+{
+	if first("baaa", r) catch none {
+		printf("if: matched\n".ptr);
+	}
+}
+
+fn after_not(r: Regex)
+{
+	if !(first("b", r) catch none) {
+		printf("not: no match\n".ptr);
+	}
+}
+
+fn after_and(r: Regex)
+{
+	if true && (first("aa", r) catch none) {
+		printf("and: matched\n".ptr);
+	}
+}
+
+fn after_or(r: Regex)
+{
+	if false || (first("a", r) catch none) {
+		printf("or: matched\n".ptr);
+	}
+}
+
+fn main() -> int
+{
+	let r = Regex.compile("a+") catch {
+		return 1;
+	};
+	in_if(r);
+	after_not(r);
+	after_and(r);
+	after_or(r);
+	return 0;
+}
