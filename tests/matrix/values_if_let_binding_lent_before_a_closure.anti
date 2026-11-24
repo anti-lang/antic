@@ -1,0 +1,26 @@
+//! A binding of `if let` whose address a call takes, before an anonymous
+//! function in the same call, is read again in the block.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn touch<T>(p: *T, f: fn() -> int) -> int
+{
+	return f();
+}
+
+fn main() -> int
+{
+	if let m = "ab".matches(re"a") {
+		let n = touch(&m, fn() -> int {
+			return 7;
+		});
+		printf("%d\n".ptr, n as c_int);
+		if m {
+			printf("matched\n".ptr);
+		}
+	}
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! `to_bytes` stands on a `str`, and a `[]byte` has `to_text`.
+
+import anti.lang;
+
+fn main() -> int
+{
+	let room: [3]byte = [1, 2, 3];
+	let data = room[0..3];
+	let b = data.to_bytes();
+	return 0;
+}

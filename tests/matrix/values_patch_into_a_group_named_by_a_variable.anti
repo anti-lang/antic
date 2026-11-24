@@ -1,0 +1,21 @@
+//! `patch` writes into a group of a pattern literal that a variable names,
+//! which the program reads at run time.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main() -> int
+{
+	let room: [4]byte = [0x31, 0x32, 0x33, 0x34];
+	let data = room[0..4];
+	let name = "two";
+	let n = data.patch(re"(?<one>\d)(?<two>\d)", b"x", name) catch {
+		printf("failed\n".ptr);
+		return 1;
+	};
+	printf("%d places: %d %d %d %d\n".ptr, n as c_int, room[0] as c_int,
+		room[1] as c_int, room[2] as c_int, room[3] as c_int);
+	return 0;
+}

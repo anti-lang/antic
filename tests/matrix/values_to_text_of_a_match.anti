@@ -1,0 +1,13 @@
+//! A match has `group` and `took_part`, and no conversion of a `[]byte`.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let m = "ab".matches(re"a");
+	if m {
+		let t = m.to_text();
+	}
+	return 0;
+}

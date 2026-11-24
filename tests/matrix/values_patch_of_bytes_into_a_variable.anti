@@ -1,0 +1,14 @@
+//! `into` of a byte sequence is the literal 0, since a byte sequence has no
+//! groups.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [3]byte = [1, 2, 3];
+	let data = room[0..3];
+	let g = 0;
+	let n = data.patch(b"\x01", b"\x09", g);
+	return 0;
+}

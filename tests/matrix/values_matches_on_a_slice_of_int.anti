@@ -1,0 +1,12 @@
+//! The methods of a pattern stand on a `str` and a `[]byte` alone.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [2]int = [1, 2];
+	let part = room[0..2];
+	let m = part.matches(re"a");
+	return 0;
+}

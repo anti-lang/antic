@@ -1,0 +1,1 @@
+values_malformed_pattern_after_a_carriage_return.anti:9:30: error: malformed pattern: missing closing parenthesis

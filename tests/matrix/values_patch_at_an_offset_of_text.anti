@@ -1,0 +1,12 @@
+//! `patch` takes its offset as an `int`.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [3]byte = [1, 2, 3];
+	let data = room[0..3];
+	let n = data.patch(b"\x01", b"\x09", 0, "at");
+	return 0;
+}

@@ -1,0 +1,11 @@
+//! A lone carriage return in a pattern literal is one byte of its line, so the
+//! position of a malformed pattern after it counts it as one column.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let m = "ab".matches(re"ab(");
+	return 0;
+}

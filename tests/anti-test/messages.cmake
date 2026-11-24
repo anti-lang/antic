@@ -220,6 +220,14 @@ anti_message(project_cached_library_imports_unread STATUS 0
     OUT "ok com.example.twice.doubles"
         "anti test: 1 tests in 1 modules, 0 modules failed"
     ARGS test --runtime "${RUNTIME}")
+# A read of the walk of the imports of the cached file, the thirty-third,
+# which read_file of driver.c makes without a message, fails the same way.
+anti_message(project_cached_library_walk_unread STATUS 0
+    SETUP write_project_and_run
+    FAULT read:33:EIO
+    OUT "ok com.example.twice.doubles"
+        "anti test: 1 tests in 1 modules, 0 modules failed"
+    ARGS test --runtime "${RUNTIME}")
 # The library directory of a second run, which files_remove_tree of
 # files.c empties first: the removal of a library file of the first run,
 # and the directory, which then still holds the others.
