@@ -1,0 +1,52 @@
+//! `alloc` of a class that implements an interface, converted to a pointer to
+//! the interface where it stands: `alloc Square(n)` of a `construct` that
+//! cannot fail and `alloc Square { }` of a literal, each as the value of a
+//! `let` of the interface and as an argument, and `alloc Square(n)` as the
+//! result of a function.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Shape
+{
+	abstract fn area(self) -> int;
+}
+
+class Square
+{
+	implements sh: Shape,
+
+	pub side: int = 1,
+
+	fn construct(self, side: int)
+	{
+		self.side = side;
+	}
+
+	concrete fn area(self) -> int
+	{
+		return self.side * self.side;
+	}
+}
+
+fn show(own s: *Shape)
+{
+	printf("%d\n".ptr, s.area() as c_int);
+	delete(s);
+}
+
+fn made(n: int) -> *Shape
+{
+	return alloc Square(n);
+}
+
+fn main() -> int
+{
+	let a: *Shape = alloc Square(2);
+	show(a);
+	show(alloc Square(3));
+	show(alloc Square { side: 4 });
+	show(made(5));
+	let b: *Shape = alloc Square { side: 6 };
+	show(b);
+	return 0;
+}

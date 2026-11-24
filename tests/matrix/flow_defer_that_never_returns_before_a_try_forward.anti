@@ -1,0 +1,38 @@
+//! A `defer` whose call never returns runs when `try` forwards the error of a
+//! call to the caller, and ends the program there.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+extern fn fflush(stream: ?*byte) -> c_int;
+
+extern fn exit(status: c_int) -> never;
+
+fn stop(n: int) -> never
+{
+	printf("stop %d\n".ptr, n as c_int);
+	fflush(none);
+	exit(n as c_int);
+}
+
+fn bad(n: int) -> int may fail
+{
+	fail "bad";
+}
+
+fn forwards(n: int) -> int may fail
+{
+	defer stop(n);
+	let v = try bad(n);
+	return v;
+}
+
+fn main() -> int
+{
+	let v = forwards(6) catch e {
+		yield 0;
+	};
+	printf("after %d\n".ptr, v as c_int);
+	return 0;
+}

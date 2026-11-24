@@ -1,0 +1,55 @@
+//! A body qualified by its one interface, `concrete fn Placed::spot`, that
+//! gives a struct, named as `Hand.spot` and called through that function value
+//! and directly. The function that `Hand.spot` names reads the entry of the
+//! table, so a class below that replaces the body is honoured, and the struct
+//! comes back through it.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+struct Point
+{
+	x: int,
+	y: int,
+	z: int,
+}
+
+abstract class Placed
+{
+	abstract fn spot(self, n: int) -> Point;
+}
+
+class Hand
+{
+	implements pl: Placed,
+
+	pub size: int = 5,
+
+	concrete fn Placed::spot(self, n: int) -> Point
+	{
+		return Point { x: self.size, y: n, z: self.size + n };
+	}
+}
+
+class Palm inherits Hand
+{
+	concrete fn Placed::spot(self, n: int) -> Point
+	{
+		return Point { x: self.size * 10, y: n, z: 1 };
+	}
+}
+
+fn main() -> int
+{
+	let h = alloc Hand { };
+	let p = alloc Palm { size: 7 };
+	let named = Hand.spot;
+	let a = named(h, 2);
+	let b = named(p, 3);
+	let c = Hand.spot(p, 4);
+	printf("%d %d %d\n".ptr, a.x as c_int, a.y as c_int, a.z as c_int);
+	printf("%d %d %d\n".ptr, b.x as c_int, b.y as c_int, b.z as c_int);
+	printf("%d %d %d\n".ptr, c.x as c_int, c.y as c_int, c.z as c_int);
+	delete(h);
+	delete(p);
+	return 0;
+}

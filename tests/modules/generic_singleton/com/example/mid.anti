@@ -1,0 +1,11 @@
+//! A second library that makes the copy of `u8` of the generic singleton of
+//! registry and counts in the copy of `int` that the library file of registry
+//! holds.
+import com.example.registry;
+
+/// Add one hundred to the counter of `u8` and a thousand to that of `int`.
+pub fn tick()
+{
+	registry.Reg<u8>.get().count.add(100);
+	registry.Reg<int>.get().count.add(1000);
+}

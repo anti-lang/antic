@@ -13,7 +13,7 @@
 #             never, never_cpp, ctypes, ctypes_shared, ctypes_bundle,
 #             tight, tight_aligned, wide, callbacks, forged_notice,
 #             doc_close, constant_names, tuple_names, keyword_names,
-#             levels, copy_header or created
+#             levels, copy_header, created or created_no_hooks
 #   CC        the C compiler of the build, with its options
 #   HOST_LINK the options of a link of a program of this host
 #   CXX       the same compiler for C++, which checks the headers
@@ -268,17 +268,22 @@ elseif(CASE STREQUAL "failing")
             SOURCES "${SOURCES}/failing.c"
             INPUTS "${library_file}" "${runtime_library}")
     expect_output("${dir}/failing${EXE}" "${SOURCES}/failing.expected")
-elseif(CASE STREQUAL "created")
+elseif(CASE STREQUAL "created" OR CASE STREQUAL "created_no_hooks")
     # anti_Meter_construct runs the `created` hook that the class replaces
     # once `construct` succeeded, as `Meter(limit)` does, and not when it
-    # fails. T441 of docs/audit/tests-findings.md.
-    library(created static "${dir}")
+    # fails. T441 of docs/audit/tests-findings.md. created_no_hooks builds
+    # the library with --no-hooks, and neither runs the hook.
+    if(CASE STREQUAL "created")
+        library(created static "${dir}")
+    else()
+        library(created static "${dir}" --no-hooks)
+    endif()
     string(STRIP "${tool_stdout}" line)
     string(REGEX MATCH "[^ ]*${RUNTIME_LIBRARY}" runtime_library "${line}")
     program("${dir}/created${EXE}" OPTIONS -std=c11 -I "${dir}"
             SOURCES "${SOURCES}/created.c"
             INPUTS "${library_file}" "${runtime_library}")
-    expect_output("${dir}/created${EXE}" "${SOURCES}/created.expected")
+    expect_output("${dir}/created${EXE}" "${SOURCES}/${CASE}.expected")
 elseif(CASE STREQUAL "generics")
     # The copy of a generic that `export type` names crosses to C as the
     # export class of that name, with its table, its init and one symbol

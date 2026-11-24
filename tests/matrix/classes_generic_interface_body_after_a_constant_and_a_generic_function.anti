@@ -1,0 +1,46 @@
+//! A generic interface whose public body the class leaves to it, `hello`,
+//! declared after a constant and a generic function of the interface. The table
+//! of the class takes the body of the copy of the interface, which the lookup
+//! finds past the two.
+
+extern fn printf(fmt: ?*byte, ...) -> c_int;
+
+abstract class Greeter<T>
+{
+	pub const BASE: int = 40;
+
+	abstract fn n(self, x: T) -> int;
+
+	pub fn pick<U>(self, own x: U) -> U
+	{
+		return x;
+	}
+
+	pub fn hello(self, x: T) -> int
+	{
+		return Greeter<T>.BASE + self.n(x);
+	}
+}
+
+class G
+{
+	implements g: Greeter<u8>,
+
+	concrete fn n(self, x: u8) -> int
+	{
+		return x as int;
+	}
+}
+
+fn greet(r: *Greeter<u8>) -> int
+{
+	return r.hello(2) + r.pick(100);
+}
+
+fn main() -> int
+{
+	let x = alloc G { };
+	printf("%d\n".ptr, greet(x) as c_int);
+	delete(x);
+	return 0;
+}
