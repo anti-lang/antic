@@ -363,8 +363,9 @@ static int64_t patch_group(struct checker *c, const struct expr *literal,
 
 /* The arguments of a `patch` call after their check. offset and limit
    hold the default 0 when the call leaves them out. A text into stands in
-   name, and into is then absent. fixed says that with, find and offset
-   are all literals. */
+   name, and into is then absent. named says that the call gave a name,
+   an empty one included. fixed says that with, find and offset are all
+   literals. */
 struct patch_args {
     struct expr *find;
     struct expr *with;
@@ -373,6 +374,7 @@ struct patch_args {
     struct expr *offset;
     struct expr *limit;
     bool pattern;
+    bool named;
     bool fixed;
 };
 
@@ -411,6 +413,7 @@ static bool check_patch_args(struct checker *c, struct expr *e,
     }
     ok = check_arg(c, a->with, bytes);
     a->name = text_literal(c, e->pos, "", 0);
+    a->named = false;
     if (a->into != NULL) {
         t = sema_check_expr(c, a->into, word);
         if (sema_is_error(t)) {
@@ -418,6 +421,7 @@ static bool check_patch_args(struct checker *c, struct expr *e,
         } else if (a->pattern && t->kind == TYPE_STR) {
             a->name = a->into;
             a->into = NULL;
+            a->named = true;
         } else if (!sema_require(c, a->into, t, word)) {
             ok = false;
         } else if (!a->pattern && (a->into->kind != EXPR_INT ||
@@ -482,9 +486,9 @@ static bool patch_literal_group(struct checker *c, struct expr *e,
 
     a->fixed = a->fixed && known;
     if (known) {
-        group = patch_group(c, a->find, a->name->as.text.length > 0
-                                            ? a->name
-                                            : a->into,
+        /* An empty name names no group, as in `m.group("")`, by T431 of
+           docs/audit/tests-findings.md. */
+        group = patch_group(c, a->find, a->named ? a->name : a->into,
                             e->pos);
         if (group < 0) {
             return false;
