@@ -2022,6 +2022,28 @@ T430 and T431. The line numbers are those of the sources after the batch.
 | `fits_span` of `src/rt/patterns.c`, line 716 | A length below zero. | Each length is that of a slice. |
 | `anti_rt_regex_patch` of `src/rt/patterns.c`, line 769 | A walk that fails before its first search. | `walk_begin` with a limit of 0 and no check counts nothing and gives `DONE`. |
 
+## The sides of batch 3ba
+
+Batch 3ba of the third phase read the sites of the hooks in
+`src/antic/lower_hook.c` and the dump of the tree in
+`src/antic/ast_dump.c`. It found T433 and fixed it. The line numbers are
+those of the sources after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `lower_hook_object` of `src/antic/lower_hook.c`, line 24 | A block that ended before the site, and no object. | Each site follows an instruction of the block it stands in, the call of a `construct`, of `dispatch` or of a teardown, and lowering drops a statement after the end of its path. Each caller passes the temporary of the object. |
+| `lower_hook_object` of `src/antic/lower_hook.c`, lines 27 and 28 | A `created` hook of an object that is no temporary, and an object on the heap that another function records. | Each site of `created` passes the temporary of the address of the object. `lower_build_on_heap` records the function beside the temporary, each caller puts back what it replaced before its function ends, and an anonymous function is queued and lowered after the function that holds it. |
+| `lower_traced_class` of `src/antic/lower_hook.c`, line 76 | No type. | `lower_hook_changed` passes the owner of a place of a field, which `place_address` sets for every field, and `traced_function` passes a class. |
+| `lower_hook_call` and `lower_hook_failed` of `src/antic/lower_hook.c`, lines 101, 116 and 117 | A function that is not instrumented, a block that ended, and an exit that fails without an error. | Both callers call them for an instrumented function alone, after `take_trace_name`. The `enter` stands at the start of the body, the action of `leave` runs at an exit of an open block, and the action of an exit that fails carries the error of that exit. |
+| `lower_hook_copied` of `src/antic/lower_hook.c`, line 134 | A block that ended before the site, and no copy. | The site follows the copy of the object in the same block, and the copy has its temporary. |
+| `record_of_field` of `src/antic/lower_hook.c`, line 153 | A struct in the chain. | `lower_hook_changed` asks for a class that `lower_traced_class` answered for, and the base of a class is a class. |
+| `lower_hook_changed` of `src/antic/lower_hook.c`, lines 183 and 184 | A block that ended before the write, and a field without an object. | Lowering drops a statement after the end of its path. A field without an object is a static field, which is `atomic`, and its writes are lowered as atomic operations, never through `lower_assign`. |
+| `name_in` of `src/antic/ast_dump.c`, line 113 | An index outside its table, and a value the table names no name for. | antic dumps the tree of a source alone, which the parser and the checker built, and each table names every value of its enum, which a `_Static_assert` holds. |
+| `dump_type`, `dump_expr`, `dump_handler`, `dump_stmt` and `dump_module` of `src/antic/ast_dump.c`, lines 147, 279, 602, 668 and 1057 | A kind outside the `switch`. | Each `switch` names every kind. |
+| `dump_params` of `src/antic/ast_dump.c`, line 857 | A field past the fields of its struct. | The type of a struct holds one field per field of its item. |
+| `dump_module` of `src/antic/ast_dump.c`, lines 1060, 1062 and 1065 | A function at module level that is `abstract` or `concrete`, or takes `self`. | The parser takes the three in a class body alone. At module level it refuses them with `expected an item` and `expected identifier`. |
+| `dump_module` of `src/antic/ast_dump.c`, line 1114 | A case past the cases of the type of a variant. | The type of a variant holds one case per case of its item. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
