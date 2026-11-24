@@ -2044,6 +2044,39 @@ those of the sources after the batch.
 | `dump_module` of `src/antic/ast_dump.c`, lines 1060, 1062 and 1065 | A function at module level that is `abstract` or `concrete`, or takes `self`. | The parser takes the three in a class body alone. At module level it refuses them with `expected an item` and `expected identifier`. |
 | `dump_module` of `src/antic/ast_dump.c`, line 1114 | A case past the cases of the type of a variant. | The type of a variant holds one case per case of its item. |
 
+## The sides of batch 3bb
+
+Batch 3bb of the third phase read the checks of the operators in
+`src/antic/sema_operator.c` and the writer of `anti bind` in
+`src/anti/bindwrite.c`. It found T434 to T439 and fixed each. The line
+numbers are those of the sources after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `right_literal_type` of `src/antic/sema_operator.c`, line 42 | An operator without a type, or with a type that is no function type. | `sema_operator_symbol` gives a function of a class body or of the module, whose type is a function type or the type of a refused signature, and the check above it returns for the second. |
+| `binary_operands` of `src/antic/sema_operator.c`, line 100 | A comparison with `none` whose sides fail after both were checked. | The value side returns before when it fails or holds no `none`, and the `none` side is checked against a type that may be `none`, which it takes. |
+| `binary_operands` of `src/antic/sema_operator.c`, line 111 | `none == none` whose right side fails where the left side took the type of the context. | Both sides are checked against the one type of the context. |
+| `takes_first` of `src/antic/sema_operator.c`, line 204 | A symbol without a type. | Every function symbol has a type once its signature is checked, the type of a refusal among them. |
+| `refused_takes_first` of `src/antic/sema_operator.c`, lines 231 to 233 | A symbol without a type, a refused signature without its item, without parameters or with a first parameter of no type. | A refused signature is one of the source, which has its item, and the parser gives every parameter a type. A refused operator without parameters reaches it beside a loop over a struct that the operator does not take, a second mistake with a message of its own. |
+| `sema_operator_symbol` and `sema_hook` of `src/antic/sema_operator.c`, lines 262, 309 and 312 | No type. | Each caller passes the type of a checked operand. |
+| `sema_operator_symbol` of `src/antic/sema_operator.c`, line 273 | A member of the name that is no `operator fn` beside an operator of the module. | `sema_method_symbol` gives the member of the class first, which is no operator, so the condition ends before it. |
+| `sema_hook_well_formed` of `src/antic/sema_operator.c`, lines 345, 350, 353 and 365 | No hook, and a hook other than `next`, `value` and `iter`. | Each caller asks for a hook it found, by one of the three names. |
+| `operator_receiver` of `src/antic/sema_operator.c`, line 378 | An operand that is a pointer of the type of the parameter already. | An operator is looked up on the type of a struct or a class, never on a pointer, so its operand is a value. |
+| `class_operator` of `src/antic/sema_operator.c`, lines 505 and 506 | A refused signature, a signature without a result and one whose result has another kind. | `takes_first` turns away a refused signature before, and `check_hook` refuses an `operator fn hash` and an `operator fn eq` with another result at their declaration, after which the checker writes no default `==` or hash. |
+| `class_operator` of `src/antic/sema_operator.c`, lines 509 and 510 | An operator of a library file, without its item, and a copy whose arguments are fewer than the parameters of its generic. | The module that declares a class writes its `equals` and its hash, and its operators are of its source. Every copy names an argument per parameter. |
+| `class_operator` of `src/antic/sema_operator.c`, line 530 | An operator that takes a class with a Mutex by value. | R100 refuses it at its declaration. |
+| `same_signature` of `src/antic/sema_operator.c`, line 590 | Two forms of one signature where the form counts. | Both callers pass `false`, by C of "Answers of 2026-11-19". |
+| `unrelated_pointers` of `src/antic/sema_operator.c`, lines 626 and 627 | A pointer beside no pointer, and a class pointer beside a pointer to no class. | It runs after `comparable_pointers` or for two types that are one, which pairs a pointer with a pointer of one element or two class pointers alone. |
+| `check_comparison` of `src/antic/sema_operator.c`, line 811 | A `?T` on the right alone beside `none`. | The `none` side takes the type of the value side, so the two sides are one `?T`. |
+| `check_coalesce` of `src/antic/sema_operator.c`, line 1051 | A right side whose type is that of `none`. | `none` is checked against the type of the left side, which may be `none`, and takes it. |
+| `bind_settle` of `src/anti/bindwrite.c`, line 208 | A record left out whose fields all spell. | The loop above leaves a record out only for a field that does not spell. |
+| `bind_settle` of `src/anti/bindwrite.c`, line 229 | A `static` function without the spelling of its result. | The reader of a header records the C spelling of every result of a function it reads. |
+| `doc_of` of `src/anti/bindwrite.c`, line 261 | An empty comment. | The reader of a description keeps no empty comment, and the reader of a header keeps no comment at all. |
+| `write_record` of `src/anti/bindwrite.c`, line 293 | A field without its C spelling. | Both readers record the C spelling of every field. |
+| `declare` of `src/anti/bindwrite.c`, lines 469 to 478 | An array type of a parameter of the shim, and a type without its spelling. | clang gives a parameter of an array its decayed type, a pointer, and every parameter has its spelling. |
+| `enum_named` and `settable` of `src/anti/bindwrite.c`, lines 601 and 708 | An enum of a field that the module does not hold. | Both readers record every enum that a field names, and a field names an enum of the module alone. |
+| `cut` of `src/anti/bindwrite.c`, line 613 | A path without its memory. | The walk appends to a path before it cuts it. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
