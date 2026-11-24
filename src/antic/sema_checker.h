@@ -766,6 +766,10 @@ bool sema_refuse_value_parts(struct checker *c, const struct expr *e);
 /* Whether e, a constant expression, names a function of the module or of
    the body of a type of the module. */
 bool sema_names_function(struct checker *c, const struct expr *e);
+/* Refuse e, the default of a field, when it names an `extern fn` or a
+   function of the body of a type, which a library file cannot carry.
+   True when it refused. */
+bool sema_refuse_uncarried_function(struct checker *c, const struct expr *e);
 bool sema_const_symbol(struct checker *c, struct symbol *sym,
                        struct pos use);
 

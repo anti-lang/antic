@@ -1,0 +1,21 @@
+//! A field default that names a function of the body of its class is no
+//! constant expression. A library file could carry no such default.
+
+class Handler
+{
+	pub n: int = 3,
+	pub call: fn(*Handler) -> int = Handler.get,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let h = alloc Handler { };
+	let r = h.call(h);
+	delete(h);
+	return r;
+}

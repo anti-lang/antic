@@ -1,0 +1,30 @@
+//! A field default of a nested class that names an `extern fn` of the module is
+//! no constant expression. A library file could carry no such default.
+
+extern fn abs(n: c_int) -> c_int;
+
+class Outer
+{
+	pub n: int = 0,
+
+	class Inner
+	{
+		pub call: fn(c_int) -> c_int = abs,
+	}
+
+	pub fn run(self) -> int
+	{
+		let i = alloc Inner { };
+		let r = i.call(-5);
+		delete(i);
+		return r as int;
+	}
+}
+
+fn main() -> int
+{
+	let o = alloc Outer { };
+	let r = o.run();
+	delete(o);
+	return r;
+}

@@ -1756,6 +1756,27 @@ bool sema_names_function(struct checker *c, const struct expr *e)
     return function_in(c, e) != NULL;
 }
 
+/* A field default travels in a library file as the name of a function
+   declared at module level, by T115 of docs/audit/tests-findings.md. An
+   `extern fn` and a function of the body of a type have no such form, so
+   a default that names one is refused, by item 1 of "Answers of
+   2026-11-24" in docs/decisions.md. */
+bool sema_refuse_uncarried_function(struct checker *c, const struct expr *e)
+{
+    const struct symbol *sym;
+
+    if (e->kind == EXPR_NAME) {
+        sym = e->qualified ? e->symbol : sema_lookup(c, &e->as.name);
+        if (sym == NULL || sym->kind != SYMBOL_EXTERN_FN) {
+            return false;
+        }
+    } else if (e->kind != EXPR_FIELD || !names_function(c, e)) {
+        return false;
+    }
+    fail_const(c, e, "a function");
+    return true;
+}
+
 /* The value of an enum, the width of a bitfield and the N of `align(N)`
    are numbers, read before the functions have their types. The check of
    a name of a function there finds no type and gives no message, as that

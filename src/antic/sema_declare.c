@@ -1544,7 +1544,8 @@ static void check_field_defaults(struct checker *c, struct item *it)
 /* The defaults of the fields of it that name a function, which
    check_field_defaults leaves until the functions have their types. Each
    is checked against the type of its field. A name of a function is no
-   constant, so lowering writes it from the expression. */
+   constant, so lowering writes it from the expression. A function that a
+   library file cannot carry is refused. */
 static void check_function_defaults(struct checker *c, struct item *it)
 {
     struct type *t = it->symbol->type;
@@ -1560,7 +1561,9 @@ static void check_function_defaults(struct checker *c, struct item *it)
             continue;
         }
         sema_enter_sized(c, &sized);
-        sema_require(c, value, sema_check_expr(c, value, ft), ft);
+        if (sema_require(c, value, sema_check_expr(c, value, ft), ft)) {
+            sema_refuse_uncarried_function(c, value);
+        }
         sema_leave(c, &sized);
     }
 }

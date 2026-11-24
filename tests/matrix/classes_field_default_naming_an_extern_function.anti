@@ -1,0 +1,17 @@
+//! A field default that names an `extern fn` of the module is no constant
+//! expression. A library file could carry no such default.
+
+extern fn abs(n: c_int) -> c_int;
+
+class Handler
+{
+	pub call: fn(c_int) -> c_int = abs,
+}
+
+fn main() -> int
+{
+	let h = alloc Handler { };
+	let r = h.call(-5);
+	delete(h);
+	return r as int;
+}

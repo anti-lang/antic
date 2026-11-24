@@ -4254,20 +4254,6 @@ antic_modules_test(function_default
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/function-default-modules")
 
-# An `extern fn` of a library and a function of the body of its class as
-# the defaults of fields of the class. T427 of
-# docs/audit/tests-findings.md.
-antic_modules_test(extern_function_default
-    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/extern_function_default"
-    LIBRARIES handlers
-    PROGRAM client
-    WORK "${CMAKE_CURRENT_BINARY_DIR}/extern-function-default-modules")
-antic_modules_test(body_function_default
-    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/body_function_default"
-    LIBRARIES handlers
-    PROGRAM client
-    WORK "${CMAKE_CURRENT_BINARY_DIR}/body-function-default-modules")
-
 # The default of a field of a class of a library, one field per kind of
 # value a default takes, read by a client that names no field.
 antic_modules_test(field_defaults
