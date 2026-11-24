@@ -79,8 +79,13 @@ bool lower_traced_class(const struct lowerer *l, const struct type *t)
     if (l->trace_marked && t->traced) {
         return true;
     }
+    /* A pattern that names a generic class names each copy of it, as
+       `trace` before the generic marks each copy, by T433 of
+       docs/audit/tests-findings.md. */
     for (i = 0; i < l->pattern_count; i++) {
-        if (pattern_names(l->patterns[i], t)) {
+        if (pattern_names(l->patterns[i], t) ||
+            (t->generic != NULL &&
+             pattern_names(l->patterns[i], t->generic))) {
             return true;
         }
     }

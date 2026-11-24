@@ -64,7 +64,9 @@ the error of an exit to the action, which calls `failed` first.
 
 `traced_class` answers for a class: it was written `trace class` and the
 build compiles marked code, or a `--trace` pattern names the class, its
-module path or a package above it. `traced_function` answers for a
+module path or a package above it. A pattern that names a generic class
+names each copy of it, since `trace` before the generic marks each copy.
+`traced_function` answers for a
 function: it has `self` and its name is none of the nine. It was then
 written `trace fn`, or it is `pub` in an instrumented class.
 
