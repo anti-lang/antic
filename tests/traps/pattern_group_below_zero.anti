@@ -1,0 +1,17 @@
+//! A group number below zero computed at run time names no group of the
+//! pattern, so `group` stops the program with the count of the pattern, as a
+//! number past them does.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let m = "2026-09".matches(re"(\d+)-(\d+)") else {
+		return 1;
+	};
+	let n = text.parse_int("-1") catch fatal;
+	let g = m.group(n);
+	return g.len as int;
+}

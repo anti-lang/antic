@@ -1,0 +1,9 @@
+exit 0
+limit from the end past the places 2 k=9;k=9
+empty with by a pattern 2 k=9;k=9
+empty with by a byte sequence 2 k=9;k=9
+a first byte without the rest 0 k=9;k=9
+the bytes to patch in do not fit the span they are written into
+offset below zero -1 k=9;k=9
+the search reached the match limit of its pattern
+match limit -1 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!

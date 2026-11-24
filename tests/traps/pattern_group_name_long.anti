@@ -1,0 +1,20 @@
+//! A group name computed at run time that is longer than any name PCRE2 takes
+//! names no group of the pattern, so `group` stops the program with the name,
+//! as a name the pattern lacks does.
+
+import anti.lang;
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let m = "2026-09".matches(re"(?<year>\d+)-(?<month>\d+)") else {
+		return 1;
+	};
+	let b = text.Builder.new();
+	for i in 0..256 {
+		b.append("y");
+	}
+	let g = m.group(b.text());
+	return g.len as int;
+}

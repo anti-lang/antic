@@ -1,0 +1,27 @@
+//! After an empty match the next search asks for a match at the same place that
+//! is not empty, and without one it steps a character on. Under the newline of
+//! a pattern that is no CR LF, the step past a CR before an LF is one byte, so
+//! an empty match stands between the two. A CR before another byte is one
+//! character as well.
+
+import anti.io;
+import anti.regex;
+import anti.text;
+
+fn count(line: str) -> int
+{
+	let n = 0;
+	for m in line.find_all(re"x*") {
+		n += 1;
+	}
+	return n;
+}
+
+fn main() -> int
+{
+	let pair = "a\r\nb";
+	let alone = "a\rb";
+	io.println(f"cr lf: {count(pair)}");
+	io.println(f"cr alone: {count(alone)}");
+	return 0;
+}

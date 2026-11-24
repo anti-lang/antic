@@ -1,0 +1,47 @@
+//! The sides of `patch` that `regex_patch_edges` leaves out: a limit from the
+//! end past the places of a pattern, an empty `with` by a pattern and by a byte
+//! sequence, which count their places and write nothing, a byte sequence whose
+//! first byte stands where the rest does not, an offset below zero computed at
+//! run time, which fails with `LengthMismatch`, and a compiled pattern that
+//! reaches its match limit, which fails with `TooExpensive`.
+
+import anti.io;
+import anti.regex;
+import anti.text;
+
+fn show(label: str, n: int, data: []byte)
+{
+	let shown = data.to_text() catch {
+		yield "?";
+	};
+	io.println(f"{label} {n} {shown}");
+}
+
+fn main() -> int
+{
+	let data = "k=1;k=2".to_bytes();
+	let n = data.patch(re"k=(\d)", b"9", 0, 0, -5);
+	show("limit from the end past the places", n, data);
+	n = data.patch(re"k=(\d)", b"");
+	show("empty with by a pattern", n, data);
+	n = data.patch(x"6B3D39", x"");
+	show("empty with by a byte sequence", n, data);
+	n = data.patch(x"6B3B", x"5A");
+	show("a first byte without the rest", n, data);
+	let at = text.parse_int("-1") catch fatal;
+	n = data.patch(x"6B", x"5A", 0, at) catch e {
+		io.println(e.message);
+		yield -1;
+	};
+	show("offset below zero", n, data);
+	let r = ByteRegex.compile(r"(*LIMIT_MATCH=1000)^(\w+\s?)*$") catch fatal;
+	let long = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!".to_bytes();
+	n = long.patch(r, b"z", 1) catch e {
+		io.println(e.message);
+		yield -1;
+	};
+	show("match limit", n, long);
+	free(long.ptr);
+	free(data.ptr);
+	return 0;
+}

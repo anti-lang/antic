@@ -2176,6 +2176,10 @@ add_test(NAME trap_table
 # program with the name or the template, and pattern_group_name_empty an
 # empty name as well. pattern_group_bytes: a group of a
 # byte match past those of its pattern stops it with their count.
+# pattern_group_below_zero: a group number below zero computed at run
+# time stops it with the count of the pattern, and
+# pattern_group_name_long a name longer than any name PCRE2 takes with
+# the name.
 # send_closed and send_closed_waiting: a `send` on a closed channel stops
 # it, one that waits on a full channel included. take_in_refused,
 # error_text_refused and trace_names_refused: the text that `take_in`
@@ -2189,7 +2193,8 @@ foreach(name IN ITEMS parallel_size alloc_literal alloc_construct
         pattern_group_count pattern_patch_into
         pattern_patch_into_two_groups
         chan_capacity cast_failed pattern_group_name pattern_group_name_empty
-        pattern_template pattern_group_bytes
+        pattern_template pattern_group_bytes pattern_group_below_zero
+        pattern_group_name_long
         send_closed send_closed_waiting take_in_refused error_text_refused
         trace_names_refused room_list room_list_reserve room_deque_reserve
         room_grid room_map room_map_reserve room_hash_map room_sorted
