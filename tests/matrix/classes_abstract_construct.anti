@@ -1,0 +1,21 @@
+//! A `construct` is never abstract, since the class runs its own after a
+//! literal.
+
+abstract class Shape
+{
+	pub side: int = 1,
+
+	abstract fn construct(self);
+}
+
+class Square inherits Shape
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let s = alloc Square { };
+	delete(s);
+	return 0;
+}

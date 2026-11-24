@@ -529,6 +529,18 @@ static bool declared_twice(const struct item *it, const struct item *m)
     return false;
 }
 
+/* Whether m is `abstract fn construct` or `abstract fn destruct`, which
+   check_contracts refuses. The class runs its own `construct` and
+   `destruct`, so neither is an open function, by item 3 of "Answers of
+   2026-11-24" in docs/decisions.md. The refusal is the one message, so no
+   class asks for the mark `abstract` or for a body below it. */
+static bool abstract_lifecycle(const struct item *m)
+{
+    return m->kind == ITEM_FN && m->contract == FN_ABSTRACT &&
+           (sema_name_is(&m->name, "construct") ||
+            sema_name_is(&m->name, "destruct"));
+}
+
 static void check_contracts(struct checker *c, const struct item *it,
                             const struct type *t)
 {
@@ -545,6 +557,11 @@ static void check_contracts(struct checker *c, const struct item *it,
             continue;
         }
         above = matched_above(t, m);
+        if (abstract_lifecycle(m)) {
+            sema_error_at(c, m->name_pos, "`%.*s` cannot be abstract",
+                          (int)m->name.length, m->name.text);
+            continue;
+        }
         /* R117 of "Rules of 2026-10-13": an abstract function is an
            entry of the table, which an object reaches through `self`. */
         if (m->contract == FN_ABSTRACT && !m->has_self) {
@@ -681,7 +698,7 @@ static void require_filled_chain(struct checker *c, const struct item *it,
             const struct item *a = base->members[j];
             const struct item *filled;
             if (a->kind != ITEM_FN || a->contract != FN_ABSTRACT ||
-                a->type_param_count > 0) {
+                a->type_param_count > 0 || abstract_lifecycle(a)) {
                 continue;
             }
             filled = types_primary_member(t, &a->name);
@@ -771,7 +788,7 @@ static void require_abstract_mark(struct checker *c, const struct item *it)
     for (j = 0; j < it->member_count; j++) {
         const struct item *m = it->members[j];
         if (m->kind != ITEM_FN || m->contract != FN_ABSTRACT ||
-            m->type_param_count > 0) {
+            m->type_param_count > 0 || abstract_lifecycle(m)) {
             continue;
         }
         if (last != NULL) {

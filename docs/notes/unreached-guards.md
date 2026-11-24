@@ -1963,6 +1963,16 @@ The line numbers are those of the coverage run after the batch.
 | `default_eq` of `src/antic/sema_hash.c`, line 604 | A simd struct. | `==` on two simd structs compares lane by lane, and `meets_hook` of `src/antic/sema_generic.c` answers for a simd part with `sema_simd_meets` before it asks for the default. |
 | `sema_class_defaults` of `src/antic/sema_hash.c`, lines 688 and 689 | A class without its symbol or its type, and an item of kind class whose type is no class. | The pass runs once the checker passed, over items that each have their symbol and their type, and a class item has a class type. |
 
+## The sides of the answers of 2026-11-24
+
+Item 3 of "Answers of 2026-11-24" in `docs/decisions.md` refuses
+`abstract fn construct(self);` and `abstract fn destruct(self);`. The line
+number is that of the source at the commit that builds it.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `carried_member` of `src/antic/antl_write.c`, line 67 | A private `construct` or `destruct` without a body. | A function of a body without a body is abstract, and an abstract function is `pub`, so the test of the level decides first. An abstract `construct` or `destruct` is refused as well, `` `construct` cannot be abstract ``, so no library file holds one. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE

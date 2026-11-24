@@ -1,0 +1,14 @@
+//! A `construct` is never abstract, in a class without the mark `abstract` as
+//! well. It is no open function, so the class needs no mark.
+
+class Shape
+{
+	pub side: int = 1,
+
+	abstract fn construct(self);
+}
+
+fn main() -> int
+{
+	return 0;
+}

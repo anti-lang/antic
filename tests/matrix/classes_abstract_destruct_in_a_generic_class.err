@@ -1,0 +1,1 @@
+classes_abstract_destruct_in_a_generic_class.anti:7:14: error: `destruct` cannot be abstract

@@ -1,0 +1,1 @@
+classes_abstract_construct_in_a_nested_class.anti:11:15: error: `construct` cannot be abstract

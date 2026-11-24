@@ -1,0 +1,21 @@
+//! A `destruct` is never abstract, and a class that inherits the class gets no
+//! second message for it.
+
+abstract class Shape
+{
+	pub side: int = 1,
+
+	abstract fn destruct(self);
+}
+
+class Square inherits Shape
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let s = alloc Square { };
+	delete(s);
+	return 0;
+}

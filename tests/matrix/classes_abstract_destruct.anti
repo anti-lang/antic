@@ -1,0 +1,20 @@
+//! A `destruct` is never abstract, since the class runs its own at its end.
+
+abstract class Shape
+{
+	pub side: int = 1,
+
+	abstract fn destruct(self);
+}
+
+class Square inherits Shape
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let s = alloc Square { };
+	delete(s);
+	return 0;
+}

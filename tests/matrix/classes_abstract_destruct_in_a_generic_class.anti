@@ -1,0 +1,20 @@
+//! A `destruct` is never abstract, in a generic class as well.
+
+abstract class Holder<T>
+{
+	pub item: T,
+
+	abstract fn destruct(self);
+}
+
+class Box inherits Holder<int>
+{
+	pub n: int = 0,
+}
+
+fn main() -> int
+{
+	let b = alloc Box { item: 1 };
+	delete(b);
+	return 0;
+}

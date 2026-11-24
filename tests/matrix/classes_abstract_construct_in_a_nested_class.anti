@@ -1,0 +1,34 @@
+//! A `construct` is never abstract, in a nested class as well.
+
+class Outer
+{
+	pub n: int = 0,
+
+	abstract class Inner
+	{
+		pub side: int = 1,
+
+		abstract fn construct(self);
+	}
+
+	class Square inherits Inner
+	{
+		pub n: int = 0,
+	}
+
+	pub fn make(self) -> int
+	{
+		let s = alloc Square { };
+		let n = s.n;
+		delete(s);
+		return n;
+	}
+}
+
+fn main() -> int
+{
+	let o = alloc Outer { };
+	let n = o.make();
+	delete(o);
+	return n;
+}
