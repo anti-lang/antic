@@ -8300,7 +8300,8 @@ endforeach()
 # and values the macros of tests/bind/values.h. functions binds the
 # functions of tests/bind/functions.h, and huge_enum and nested_enum each
 # bind a header of one enum. api_parts, api_callbacks, api_literals,
-# api_types, api_words, api_aliases and api_docs each bind a description of
+# api_types, api_words, api_aliases, api_docs, api_spellings,
+# api_many_params and api_binary_length each bind a description of
 # tests/bind in the format of rlparser, and miniaudio one whose module
 # names a bundled library. words binds the names of tests/bind/words.h that are
 # words of Anti, unsigned_bitfield the bitfield of tests/bind/bits.h and
@@ -8330,7 +8331,8 @@ set(anti_bind_cases header clang headers escaped_path raymath raylib
     clang_of_the_tree clang_of_the_tree_relative api_aliases miniaudio
     api_alias_chain_long api_docs enum_declared_first shift_types cast_types
     struct_literal_ranges clang_sides macro_sides tag_beside_function
-    probe_anonymous_member unnamed_bitfield write_sides)
+    probe_anonymous_member unnamed_bitfield write_sides api_spellings
+    api_many_params api_binary_length)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # The cases refusals, ast_malformed, clang_typedef_chain, ast_sides and
     # ast_refusals stand a shell script in for clang.

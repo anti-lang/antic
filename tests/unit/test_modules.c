@@ -692,6 +692,22 @@ static void module_paths(void)
     path_of(".anti", NULL, 0, "`` in .anti is not a lowercase identifier");
     path_of("src/.anti", roots, 2,
             "`` in src/.anti is not a lowercase identifier");
+    path_of("src/.git/geo.anti", roots, 2,
+            "`.git` in src/.git/geo.anti is not a lowercase identifier");
+    path_of("src/a{b/geo.anti", roots, 2,
+            "`a{b` in src/a{b/geo.anti is not a lowercase identifier");
+    path_of("src/com/geo.txt", roots, 2,
+            "`geo.txt` in src/com/geo.txt is not a lowercase identifier");
+    /* A file without the suffix is named in full. */
+    path_of("src/com/geo", roots, 2, "com.geo");
+    /* A root holds the directories below it, not one whose name it
+       starts. */
+    path_of("srcx/geo.anti", roots, 2, "geo");
+    /* A file at the root of the file system, and one in a directory of
+       two characters, the second of them `:` or not. */
+    path_of("/geo.anti", NULL, 0, "geo");
+    path_of("a:/geo.anti", NULL, 0, "geo");
+    path_of("ab/geo.anti", NULL, 0, "geo");
     /* A Windows host separates the parts of a path with `\` as well, as
        its programs and a script that joins a path there write it. */
     if (platform_separator() == '\\') {
@@ -707,6 +723,15 @@ static void module_paths(void)
     CHECK(!modpath_reserved("antique.text"));
     CHECK(modpath_segments("com.niese.geo") == 3);
     CHECK_STR(modpath_last("com.niese.geo"), "geo");
+}
+
+/* The root of the file system holds every absolute path, so the module
+   path of a source under it is the whole path. */
+static void module_path_under_the_root(void)
+{
+    static const char *const roots[] = {"/"};
+
+    path_of("/com/niese/geo.anti", roots, 1, "com.niese.geo");
 }
 
 /* An import names the full module path. The last segment, or the name
@@ -6354,6 +6379,7 @@ void test_modules(void)
     package_and_docs();
     private_field_docs();
     module_paths();
+    module_path_under_the_root();
     dotted_imports();
     unique_exports();
     keeps_extensions();

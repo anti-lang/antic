@@ -1,0 +1,2 @@
+{"functions": [{"name": "t_bits", "returnType": "void", "params": [{"name": "p", "type": "Bits *"}]}],
+ "structs": [{"name": "Bits", "fields": [{"name": "a", "type": "int[0b101]"}, {"name": "b", "type": "char[0B11]"}]}]}

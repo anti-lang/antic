@@ -1,0 +1,11 @@
+//! The binding of api_binary_length, which `anti bind` wrote from
+//! `api_binary_length.json`. Nothing in it is written by hand. Run `anti bind`
+//! again to change it.
+
+pub struct Bits
+{
+	a: [5]c_int,
+	b: [3]c_char,
+}
+
+pub extern fn t_bits(p: ?*Bits);

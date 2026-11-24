@@ -1,0 +1,18 @@
+//! The binding of api_spellings, which `anti bind` wrote from
+//! `api_spellings.json`. Nothing in it is written by hand. Run `anti bind`
+//! again to change it.
+
+pub struct Lengths
+{
+	a: [16]c_int,
+	b: [16]c_int,
+	c: [16]c_int,
+	d: [16]c_int,
+	e: [31]c_int,
+}
+
+pub extern fn t_va_builtin(p: ?*byte);
+
+pub extern fn t_va_gnuc(p: ?*byte);
+
+pub extern fn t_void_dots(p: ?*byte);

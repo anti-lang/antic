@@ -1,0 +1,5 @@
+anti: api_spellings.json: warning: `t_word_before_tag` is left out: the type `long struct Lengths *` does not parse
+anti: api_spellings.json: warning: `t_deep_group` is left out: the type `int ***************************************************************************************************************************************************************************************************************************************************************(*)(int)` does not parse
+anti: api_spellings.json: warning: `t_group_without_inner` is left out: the type `int (*[x])(void)` does not parse
+anti: api_spellings.json: warning: `t_atomic_word` is left out: Anti has no form for the type of a parameter
+anti: api_spellings.json: warning: `t_attribute_word` is left out: Anti has no form for the type of a parameter

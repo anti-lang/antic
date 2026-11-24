@@ -1,0 +1,2 @@
+{"functions": [{"name": "t_many", "returnType": "void",
+                "params": [{"name": "p", "type": "void (*)(int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int)"}]}]}

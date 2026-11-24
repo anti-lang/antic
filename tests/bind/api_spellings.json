@@ -1,0 +1,11 @@
+{"functions": [{"name": "t_va_builtin", "returnType": "void", "params": [{"name": "p", "type": "__builtin_va_list"}]},
+               {"name": "t_va_gnuc", "returnType": "void", "params": [{"name": "p", "type": "__gnuc_va_list"}]},
+               {"name": "t_void_dots", "returnType": "void", "params": [{"name": "p", "type": "void (*)(void, ...)"}]},
+               {"name": "t_word_before_tag", "returnType": "void", "params": [{"name": "p", "type": "long struct Lengths *"}]},
+               {"name": "t_atomic_word", "returnType": "void", "params": [{"name": "p", "type": "_Atomic int"}]},
+               {"name": "t_attribute_word", "returnType": "void", "params": [{"name": "p", "type": "int __attribute__"}]},
+               {"name": "t_deep_group", "returnType": "void", "params": [{"name": "p", "type": "int ***************************************************************************************************************************************************************************************************************************************************************(*)(int)"}]},
+               {"name": "t_group_without_inner", "returnType": "void", "params": [{"name": "p", "type": "int (*[x])(void)"}]}],
+ "structs": [{"name": "Lengths", "fields": [{"name": "a", "type": "int[0X10]"}, {"name": "b", "type": "int[16U]"},
+                                           {"name": "c", "type": "int[16l]"}, {"name": "d", "type": "int[16L]"},
+                                           {"name": "e", "type": "int[0x1Fu]"}]}]}
