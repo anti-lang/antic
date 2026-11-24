@@ -1,0 +1,26 @@
+//! A function in a struct literal of a field default is no constant expression.
+//! A library file could carry no such default.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+struct Step
+{
+	call: fn(int) -> int,
+	n: int,
+}
+
+class Box
+{
+	pub step: Step = Step { call: twice, n: 1 },
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let r = b.step.call(b.step.n);
+	delete(b);
+	return r;
+}

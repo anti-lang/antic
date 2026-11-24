@@ -1,0 +1,20 @@
+//! A function in a tuple of a field default is no constant expression. A
+//! library file could carry no such default.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+class Box
+{
+	pub pair: (fn(int) -> int, int) = (twice, 1),
+}
+
+fn main() -> int
+{
+	let b = alloc Box { };
+	let r = b.pair.0(b.pair.1);
+	delete(b);
+	return r;
+}
