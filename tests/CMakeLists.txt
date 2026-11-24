@@ -3695,6 +3695,12 @@ antic_program_test(matrix_classes_trace_pattern_of_a_generic_class_pattern
     OPTIONS "--trace,Box"
     EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_trace_generic.pattern.expected"
     WORK "${MATRIX_WORK}/trace-pattern-generic")
+# A pattern that names another class reaches no copy of the generic.
+antic_program_test(matrix_classes_trace_pattern_of_a_generic_class_other
+    "${MATRIX}/classes_trace_pattern_of_a_generic_class.anti"
+    OPTIONS "--trace,Watch"
+    EXPECTED "${MATRIX}/classes_trace_pattern_of_a_generic_class.expected"
+    WORK "${MATRIX_WORK}/trace-pattern-generic-other")
 # A write under --trace writes that calls no `changed`: a write to a field
 # of a class that asks for no call hooks, to a field of a struct and to a
 # local. A write to a field of an instrumented class before each calls the
