@@ -9,8 +9,8 @@
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree,
 #             clang_of_the_tree_relative, enum_declared_first, shift_types,
 #             cast_types, struct_literal_ranges, clang_sides, macro_sides,
-#             ast_sides, ast_refusals, tag_beside_function or
-#             probe_anonymous_member
+#             ast_sides, ast_refusals, tag_beside_function,
+#             probe_anonymous_member or unnamed_bitfield
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -1214,6 +1214,19 @@ elseif(CASE STREQUAL "probe_anonymous_member")
                 --probe -o "${WORK}/out" --runtime "${RUNTIME}")
     compile_binding(anon bindtest.anon)
     compare_probes(anon "${WORK}")
+elseif(CASE STREQUAL "unnamed_bitfield")
+    # T439: an unnamed bitfield of C that is not zero-width binds as a
+    # field of its own name, since `_` is the zero-width bitfield of Anti.
+    # The probes give it no value, as C names it not, and walk past it in
+    # a record that another holds. The module compiles and the two probes
+    # agree.
+    file(WRITE "${WORK}/gap.h" "struct Gap { int : 3; int b; };\n"
+         "struct Nest { struct Gap g; };\n"
+         "void take_gap(struct Gap *g, struct Nest *n);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/gap.h" --module bindtest.gap
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    compile_binding(gap bindtest.gap)
+    compare_probes(gap "${WORK}")
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()
