@@ -1,0 +1,29 @@
+//! A class beside a plain function `hash` and a constant `eq` of its module.
+//! Neither is an `operator fn`, so the class keeps its default `==` and hash.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 0,
+}
+
+fn hash(a: Point) -> u64
+{
+	return 7;
+}
+
+const eq: int = 1;
+
+fn main() -> int
+{
+	let a = Point { x: 1 };
+	let b = Point { x: 1 };
+	if a == b {
+		printf("equal\n".ptr);
+	}
+	if a.hash() != 7 {
+		printf("default hash\n".ptr);
+	}
+	return 0;
+}

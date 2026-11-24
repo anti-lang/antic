@@ -1,0 +1,20 @@
+//! `for x in w` over a struct whose module gives it `operator fn next` and no
+//! `value`. An iterator needs both, so the struct walks nothing.
+
+struct Walk
+{
+	i: int,
+}
+
+operator fn next(w: *Walk) -> bool
+{
+	return false;
+}
+
+fn main() -> int
+{
+	let w = Walk { i: 0 };
+	for x in w {
+	}
+	return 0;
+}

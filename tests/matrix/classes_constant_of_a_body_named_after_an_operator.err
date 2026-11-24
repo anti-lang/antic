@@ -1,0 +1,1 @@
+classes_constant_of_a_body_named_after_an_operator.anti:14:10: error: `+` needs numeric operands, found `Counter`

@@ -1,0 +1,20 @@
+//! `for x in c` over a class whose body holds a plain function `iter`. A hook
+//! is written `operator fn`, so the class walks nothing.
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn iter(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let c = Counter { n: 1 };
+	for x in c {
+	}
+	return 0;
+}

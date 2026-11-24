@@ -1,0 +1,19 @@
+//! `p + p` beside an `operator fn add` of its module that takes no parameter.
+//! The operator takes no struct first, so it is no operator of the struct.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn add() -> Pair
+{
+	return Pair { v: 1 };
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let q = p + p;
+	return q.v;
+}

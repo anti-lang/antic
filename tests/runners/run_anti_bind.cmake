@@ -1231,10 +1231,11 @@ elseif(CASE STREQUAL "write_sides")
     # The sides of the writer of a module and of its probes that a header
     # or a description reaches: a pointer to a `va_list` and to a type
     # Anti has no form for, an array at the end of a struct and an unnamed
-    # bitfield of such a type, which leave their struct out, a function of
-    # `...` alone, a result of an array, a struct that holds itself, records
-    # that hold no value reached twice and a chain of records deeper than
-    # the walk of a probe goes.
+    # bitfield of such a type, which leave their struct out, an anonymous
+    # member of a record that another holds, a function of `...` alone, a
+    # result of an array, a struct that holds itself, records that hold no
+    # value reached twice inside one record and a chain of records deeper
+    # than the walk of a probe goes.
     file(WRITE "${WORK}/forms.h" "#include <stdarg.h>\n"
          "struct Flex { int n; int data[]; };\n"
          "struct Wide { int n; __int128 : 3; };\n"
@@ -1260,6 +1261,13 @@ elseif(CASE STREQUAL "write_sides")
         endif()
     endforeach()
     compile_binding(forms bindtest.forms)
+    # An anonymous member inside a record that another record holds.
+    file(WRITE "${WORK}/nested.h" "struct Inner { struct { int x; }; int a; };\n"
+         "struct Wrap { struct Inner i; };\nvoid take_wrap(struct Wrap *w);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/nested.h" --module bindtest.nested
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    compile_binding(nested bindtest.nested)
+    compare_probes(nested "${WORK}")
     # D0 to D65 nest 65 records below D0, one more than the walk enters.
     set(chain "")
     foreach(i RANGE 0 64)
@@ -1273,7 +1281,8 @@ elseif(CASE STREQUAL "write_sides")
         "{\"name\": \"Hollow\", \"fields\": [{\"name\": \"p\", \"type\": \"void *\"}]}, "
         "{\"name\": \"Empty\", \"fields\": [{\"name\": \"q\", \"type\": \"int *\"}]}, "
         "{\"name\": \"Holder\", \"fields\": [{\"name\": \"a\", \"type\": \"Hollow\"}, {\"name\": \"b\", \"type\": \"Empty\"}, "
-        "{\"name\": \"c\", \"type\": \"Empty\"}, {\"name\": \"n\", \"type\": \"int\"}]}"
+        "{\"name\": \"c\", \"type\": \"Empty\"}, {\"name\": \"n\", \"type\": \"int\"}]}, "
+        "{\"name\": \"Top\", \"fields\": [{\"name\": \"h\", \"type\": \"Holder\"}]}"
         "${chain}, {\"name\": \"D65\", \"fields\": [{\"name\": \"n\", \"type\": \"int\"}]}]}")
     file(WRITE "${WORK}/api.json" "${api}")
     tool_run("" "${ANTI}" bind "${WORK}/api.json" --probe -o "${WORK}/out")
@@ -1287,7 +1296,7 @@ elseif(CASE STREQUAL "write_sides")
         message(FATAL_ERROR "api.anti holds no function `many`\n${module}")
     endif()
     file(READ "${WORK}/out/probe_api.c" probe)
-    foreach(line "v.s.n = 1;" "dump(\"Holder.n\"" "dump(\"D1.d\"")
+    foreach(line "v.s.n = 1;" "dump(\"Holder.n\"" "v.h.n = 1;" "dump(\"D1.d\"")
         string(FIND "${probe}" "${line}" at)
         if(at EQUAL -1)
             message(FATAL_ERROR "probe_api.c holds no `${line}`\n${probe}")

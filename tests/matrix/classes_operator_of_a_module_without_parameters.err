@@ -1,0 +1,1 @@
+classes_operator_of_a_module_without_parameters.anti:17:10: error: `+` needs numeric operands, found `Pair`

@@ -1,0 +1,1 @@
+flow_for_over_a_struct_with_next_alone.anti:17:11: error: `for` walks a range, a slice, an array, a collection or an iterator, found `Walk`

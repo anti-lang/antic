@@ -1,0 +1,1 @@
+flow_for_over_a_constant_of_a_body_named_after_a_hook.anti:14:11: error: `for` walks a range, a slice, an array, a collection or an iterator, found `Counter`

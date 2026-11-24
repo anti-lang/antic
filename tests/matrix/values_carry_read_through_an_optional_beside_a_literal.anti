@@ -1,0 +1,10 @@
+//! `1 + g?.carry` with `g` a `?Flags`. A literal on the left takes the type of
+//! the right unless the right is a carry, and `g?.carry` is none.
+
+fn main() -> int
+{
+	let (r, f) = 1 + 2;
+	let g: ?Flags = f;
+	let s = 1 + g?.carry;
+	return s + r;
+}

@@ -1,0 +1,25 @@
+//! A class whose module gives it an `operator fn eq` of one parameter, which no
+//! comparison uses. The operator gives the class no `equals`, so it keeps its
+//! default one.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Point
+{
+	pub x: int = 0,
+}
+
+operator fn eq(a: Point) -> bool
+{
+	return true;
+}
+
+fn main() -> int
+{
+	let a = Point { x: 1 };
+	let b = Point { x: 2 };
+	if !a.equals(&b) {
+		printf("differ\n".ptr);
+	}
+	return 0;
+}
