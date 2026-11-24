@@ -47,8 +47,11 @@ static struct type *right_literal_type(struct checker *c, enum token_kind op,
        left operand gives it, so `a + 5` against `b: T` with a Key<int> on
        the left gives the literal the type int, by T074, before the copy
        of the operator is made. T176 of docs/audit/tests-findings.md. */
+    /* A parameter that the left operand leaves open gives the literal no
+       type, so the literal takes its own, as the call `add(a, 5)` gives
+       it, T435 of docs/audit/tests-findings.md. */
     param = sema_operator_right(c, fn, left);
-    return sema_has_params(param) ? left : param;
+    return sema_has_params(param) ? NULL : param;
 }
 
 /* Check both operands of a binary operator so that a literal takes the
