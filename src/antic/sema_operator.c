@@ -33,6 +33,12 @@ static struct type *right_literal_type(struct checker *c, enum token_kind op,
         return left;
     }
     fn = sema_operator_symbol(c, left, called);
+    /* An operator whose signature the checker refused gives the literal
+       no type, so the refusal of its declaration is the one message,
+       T434 of docs/audit/tests-findings.md. */
+    if (fn != NULL && sema_is_error(fn->type)) {
+        return NULL;
+    }
     if (fn == NULL || fn->type == NULL || fn->type->kind != TYPE_FN ||
         fn->type->param_count < 2) {
         return left;
@@ -224,6 +230,9 @@ static bool refused_takes_first(struct checker *c, const struct symbol *sym,
    one module declares one function of a name. The `operator fn eq` of
    one struct is therefore no operator of another struct of the module,
    which keeps its default `==`. */
+/* An operator whose signature the checker refused is found as well, as
+   sema_hook finds such a hook. Its uses then give no second message,
+   T434 of docs/audit/tests-findings.md. */
 struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
                                     const char *text)
 {
@@ -242,7 +251,8 @@ struct symbol *sema_operator_symbol(struct checker *c, struct type *t,
     }
     sym = sema_method_symbol(c, t, &name);
     if (sym != NULL && symbol_is_operator(sym) &&
-        (m != NULL || takes_first(sym, t))) {
+        (m != NULL || takes_first(sym, t) ||
+         refused_takes_first(c, sym, t))) {
         return sym;
     }
     return NULL;
@@ -261,7 +271,7 @@ bool sema_module_operator(struct checker *c, struct type *t,
     name.length = strlen(text);
     fn = sema_module_function(c, t, &name);
     return fn != NULL && fn->kind == SYMBOL_FN && symbol_is_operator(fn) &&
-           takes_first(fn, t);
+           (takes_first(fn, t) || refused_takes_first(c, fn, t));
 }
 
 /* DESIGN: a language hook belongs to the type t, or to the type that a
@@ -375,6 +385,10 @@ static struct type *check_operator(struct checker *c, struct expr *e,
     struct expr *callee = sema_new_node(c, EXPR_NAME, e->pos);
     struct expr **args = arena_alloc(c->arena, 2 * sizeof *args);
 
+    /* The refusal of the signature is the one message, T434. */
+    if (sema_is_error(sig)) {
+        return sema_builtin(c, TYPE_ERROR);
+    }
     sig = sema_operator_copy(c, call, sig, fn, a->type, b->type);
     if (sig == NULL) {
         return sema_builtin(c, TYPE_ERROR);

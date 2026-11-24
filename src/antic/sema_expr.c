@@ -1029,8 +1029,16 @@ static struct type *check_unary(struct checker *c, struct expr *e,
             }
             if (!sema_is_error(t) &&
                 (fn = sema_operator_symbol(c, t, called)) != NULL) {
-                struct expr *call = sema_new_node(c, EXPR_CALL, e->pos);
-                struct expr *callee = sema_new_node(c, EXPR_FIELD, e->pos);
+                struct expr *call;
+                struct expr *callee;
+                /* An operator whose signature the checker refused has
+                   the one message of its declaration, T434 of
+                   docs/audit/tests-findings.md. */
+                if (sema_is_error(fn->type)) {
+                    return sema_builtin(c, TYPE_ERROR);
+                }
+                call = sema_new_node(c, EXPR_CALL, e->pos);
+                callee = sema_new_node(c, EXPR_FIELD, e->pos);
                 callee->as.field.base = operand;
                 callee->as.field.name = fn->item->name;
                 callee->as.field.promoted = true;
