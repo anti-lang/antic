@@ -869,6 +869,7 @@ static void read_fields(struct reader *r, struct bind_record *rec,
             struct text synth = {0};
             text_appendf(&synth, "anon%zu", anon++);
             f->name = bind_strdup(r->b, text_cstr(&synth));
+            f->anonymous = true;
             text_free(&synth);
             bind_warn(r->b, "an anonymous member of `%s` is the field `%s`",
                       rec->name, f->name);

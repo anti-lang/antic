@@ -159,7 +159,9 @@ no value, since C and Anti write no pointer constant alike. The Anti probe
 finds the alignment as the offset of the record after one byte, which
 `tests/abi/probe.anti` does too. A record that C names only through its
 field takes `__typeof__` of that field, and an anonymous member is not
-probed. The C probe declares its object as `__typeof_unqual__` of the record, so
+probed. A field of an anonymous member is a field of the record in C, so
+the probe of C writes `v.x` where the probe of Anti writes `v.anon0.x`,
+by T438 of `docs/audit/tests-findings.md`. The C probe declares its object as `__typeof_unqual__` of the record, so
 a record of a const type takes the bytes of each field too.
 
 ## Output

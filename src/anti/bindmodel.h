@@ -51,6 +51,8 @@ struct bind_field {
     const struct bind_type *type;
     const char *c_type;         /* the C spelling, NULL where none is known */
     int64_t bits;               /* the width of a bitfield, or -1 */
+    bool anonymous;             /* an anonymous member of C11, whose
+                                   fields C names as fields of the record */
 };
 
 struct bind_record {

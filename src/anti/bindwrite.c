@@ -653,7 +653,12 @@ static bool settable_record(const struct bind_module *b,
         if (f->name == NULL) {
             continue;
         }
-        text_appendf(&s->c_path, ".%s", f->name);
+        /* C names the fields of an anonymous member as fields of the
+           record that holds it, so its name stands in the path of Anti
+           alone, T438 of docs/audit/tests-findings.md. */
+        if (!f->anonymous) {
+            text_appendf(&s->c_path, ".%s", f->name);
+        }
         text_append(&s->anti_path, ".");
         name_of(f->name, &s->anti_path);
         if (settable(b, f->type, f->bits, s)) {
@@ -774,9 +779,10 @@ void bind_write_probe_c(const struct bind_module *b, struct text *out)
             if (f->name != NULL && settable(b, f->type, f->bits, &s)) {
                 text_appendf(out, "    {\n        __typeof_unqual__(%s) v;\n"
                              "        memset(&v, 0, "
-                             "sizeof v);\n        v.%s%s = %s;\n        "
+                             "sizeof v);\n        v%s%s%s = %s;\n        "
                              "dump(\"%s.%s\", &v, sizeof v);\n    }\n",
-                             r->c_name, f->name, text_cstr(&s.c_path),
+                             r->c_name, f->anonymous ? "" : ".",
+                             f->anonymous ? "" : f->name, text_cstr(&s.c_path),
                              text_cstr(&s.c_value), r->name, f->name);
             }
             setting_free(&s);
