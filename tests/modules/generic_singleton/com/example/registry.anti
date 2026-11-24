@@ -1,0 +1,14 @@
+//! A generic singleton, and a function that counts in its copy of `int`, so the
+//! library file holds that copy.
+
+/// One counter per type argument.
+pub singleton class Reg<T>
+{
+	pub atomic count: int = 0,
+}
+
+/// Add ten to the counter of `int`.
+pub fn bump()
+{
+	Reg<int>.get().count.add(10);
+}

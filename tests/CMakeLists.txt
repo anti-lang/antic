@@ -3311,7 +3311,7 @@ foreach(case static shared exports two loader header bundle classes
         generics optional forms views never never_cpp ctypes
         ctypes_shared ctypes_bundle tight tight_aligned wide callbacks
         forged_notice doc_close constant_names tuple_names keyword_names
-        levels copy_header)
+        levels copy_header created)
     # The C program of ledger starts its threads with pthreads.
     if(case STREQUAL "ledger" AND ANTIC_HOST_OS STREQUAL "windows")
         continue()
@@ -4228,6 +4228,15 @@ antic_modules_test(generic_atomic
     LIBRARIES tally mid
     PROGRAM client
     WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_atomic")
+
+# The `get` of a copy of a generic singleton of a library module. The
+# library file holds the copy of `int`, and the client makes the copy of
+# `u8`. T440 of docs/audit/tests-findings.md.
+antic_modules_test(generic_singleton
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/generic_singleton"
+    LIBRARIES registry
+    PROGRAM client
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/generic_singleton")
 
 # A generic list of a library module whose nodes own their successor, and
 # whose functions move a node with `take`. The client makes its copies

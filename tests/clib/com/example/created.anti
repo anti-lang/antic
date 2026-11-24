@@ -1,0 +1,33 @@
+//! A library for C whose class replaces `created` and has a `construct` with an
+//! argument that may fail.
+
+import anti.lang;
+
+/// A meter whose hook records the limit that `construct` gave it.
+export class Meter
+{
+	pub limit: c_int = 0,
+	pub seen: c_int = -1,
+
+	/// Take the limit, or fail when it is not positive.
+	fn construct(self, limit: c_int) may fail
+	{
+		if limit <= 0 { fail "the limit must be positive"; }
+		self.limit = limit;
+	}
+
+	/// Record the limit once the object is built.
+	concrete fn created(self)
+	{
+		self.seen = self.limit;
+	}
+}
+
+/// What the hook of `Meter(limit)` recorded, or -2 when it failed.
+export fn meter_seen(limit: c_int) -> c_int
+{
+	let m = Meter(limit) catch e {
+		return -2;
+	};
+	return m.seen;
+}
