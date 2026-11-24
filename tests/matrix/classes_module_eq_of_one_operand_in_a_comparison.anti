@@ -1,0 +1,21 @@
+//! `c == c` on a class whose module gives it an `operator fn eq` of one
+//! parameter. The comparison names the operand the operator lacks.
+
+class Point
+{
+	pub x: int = 0,
+}
+
+operator fn eq(a: Point) -> bool
+{
+	return true;
+}
+
+fn main() -> int
+{
+	let c = Point { x: 1 };
+	if c == c {
+		return 1;
+	}
+	return 0;
+}

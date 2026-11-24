@@ -10,7 +10,7 @@
 #             clang_of_the_tree_relative, enum_declared_first, shift_types,
 #             cast_types, struct_literal_ranges, clang_sides, macro_sides,
 #             ast_sides, ast_refusals, tag_beside_function,
-#             probe_anonymous_member or unnamed_bitfield
+#             probe_anonymous_member, unnamed_bitfield or write_sides
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -1227,6 +1227,79 @@ elseif(CASE STREQUAL "unnamed_bitfield")
                 --probe -o "${WORK}/out" --runtime "${RUNTIME}")
     compile_binding(gap bindtest.gap)
     compare_probes(gap "${WORK}")
+elseif(CASE STREQUAL "write_sides")
+    # The sides of the writer of a module and of its probes that a header
+    # or a description reaches: a pointer to a `va_list` and to a type
+    # Anti has no form for, an array at the end of a struct and an unnamed
+    # bitfield of such a type, which leave their struct out, a function of
+    # `...` alone, a result of an array, a struct that holds itself, records
+    # that hold no value reached twice and a chain of records deeper than
+    # the walk of a probe goes.
+    file(WRITE "${WORK}/forms.h" "#include <stdarg.h>\n"
+         "struct Flex { int n; int data[]; };\n"
+         "struct Wide { int n; __int128 : 3; };\n"
+         "void take_list(va_list *ap);\nvoid take_wide(__int128 *q);\n"
+         "void take_flex(struct Flex *p);\n"
+         "void take_wide_struct(struct Wide *w);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/forms.h" --module bindtest.forms
+                -o "${WORK}/out" --runtime "${RUNTIME}")
+    file(READ "${WORK}/out/forms.anti" module)
+    foreach(line "pub extern fn take_list(ap: ?*byte);"
+                 "pub extern fn take_wide(q: ?*byte);"
+                 "pub extern fn take_flex(p: ?*byte);")
+        string(FIND "${module}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "forms.anti holds no line `${line}`\n${module}")
+        endif()
+    endforeach()
+    foreach(warning "`Flex` is left out: Anti has no form for the type of its field `data`"
+                    "`Wide` is left out: Anti has no form for the type of its field `_`")
+        string(FIND "${tool_stderr}" "${warning}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "anti bind gave no warning `${warning}`\n${tool_stderr}")
+        endif()
+    endforeach()
+    compile_binding(forms bindtest.forms)
+    # D0 to D65 nest 65 records below D0, one more than the walk enters.
+    set(chain "")
+    foreach(i RANGE 0 64)
+        math(EXPR next "${i} + 1")
+        string(APPEND chain ", {\"name\": \"D${i}\", \"fields\": [{\"name\": \"d\", \"type\": \"D${next}\"}]}")
+    endforeach()
+    string(CONCAT api "{\"functions\": ["
+        "{\"name\": \"many\", \"returnType\": \"int\", \"params\": [{\"type\": \"...\", \"name\": \"args\"}]}, "
+        "{\"name\": \"four\", \"returnType\": \"int[4]\", \"params\": []}], "
+        "\"structs\": [{\"name\": \"Self\", \"fields\": [{\"name\": \"s\", \"type\": \"Self\"}, {\"name\": \"n\", \"type\": \"int\"}]}, "
+        "{\"name\": \"Hollow\", \"fields\": [{\"name\": \"p\", \"type\": \"void *\"}]}, "
+        "{\"name\": \"Empty\", \"fields\": [{\"name\": \"q\", \"type\": \"int *\"}]}, "
+        "{\"name\": \"Holder\", \"fields\": [{\"name\": \"a\", \"type\": \"Hollow\"}, {\"name\": \"b\", \"type\": \"Empty\"}, "
+        "{\"name\": \"c\", \"type\": \"Empty\"}, {\"name\": \"n\", \"type\": \"int\"}]}"
+        "${chain}, {\"name\": \"D65\", \"fields\": [{\"name\": \"n\", \"type\": \"int\"}]}]}")
+    file(WRITE "${WORK}/api.json" "${api}")
+    tool_run("" "${ANTI}" bind "${WORK}/api.json" --probe -o "${WORK}/out")
+    string(FIND "${tool_stderr}" "`four` is left out: Anti has no form for its result" at)
+    if(at EQUAL -1)
+        message(FATAL_ERROR "anti bind left `four` in\n${tool_stderr}")
+    endif()
+    file(READ "${WORK}/out/api.anti" module)
+    string(FIND "${module}" "pub extern fn many(...) -> c_int;" at)
+    if(at EQUAL -1)
+        message(FATAL_ERROR "api.anti holds no function `many`\n${module}")
+    endif()
+    file(READ "${WORK}/out/probe_api.c" probe)
+    foreach(line "v.s.n = 1;" "dump(\"Holder.n\"" "dump(\"D1.d\"")
+        string(FIND "${probe}" "${line}" at)
+        if(at EQUAL -1)
+            message(FATAL_ERROR "probe_api.c holds no `${line}`\n${probe}")
+        endif()
+    endforeach()
+    foreach(line "dump(\"Holder.a\"" "dump(\"Holder.b\"" "dump(\"Holder.c\""
+                 "dump(\"D0.d\"")
+        string(FIND "${probe}" "${line}" at)
+        if(NOT at EQUAL -1)
+            message(FATAL_ERROR "probe_api.c gives a value through `${line}`\n${probe}")
+        endif()
+    endforeach()
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()

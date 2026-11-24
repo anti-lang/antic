@@ -1,0 +1,22 @@
+//! A parameter of function type holds the form of two words, and a local that a
+//! named function initialises the plain form. `<` takes no function value, and
+//! the message names the form of each side.
+
+fn twice(n: int) -> int
+{
+	return n * 2;
+}
+
+fn before(p: fn(int) -> int) -> bool
+{
+	let g: fn(int) -> int = twice;
+	return p < g;
+}
+
+fn main() -> int
+{
+	if before(twice) {
+		return 1;
+	}
+	return 0;
+}

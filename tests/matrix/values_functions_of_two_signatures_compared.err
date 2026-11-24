@@ -1,0 +1,1 @@
+values_functions_of_two_signatures_compared.anti:16:5: error: the operands of `==` have the types `fn()` and `fn(int)`

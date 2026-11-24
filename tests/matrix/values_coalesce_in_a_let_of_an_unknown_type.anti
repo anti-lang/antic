@@ -1,0 +1,11 @@
+//! `p ?? q` in a `let` whose type is not there. The unknown type is the one
+//! message.
+
+fn main() -> int
+{
+	let n = 1;
+	let m = 2;
+	let p: ?*int = &n;
+	let x: Missing = p ?? &m;
+	return 0;
+}

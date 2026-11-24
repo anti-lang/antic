@@ -1,0 +1,1 @@
+values_function_of_two_words_ordered_with_a_plain_one.anti:13:9: error: the operands of `<` have the types `fn(int) -> int` and `fn(int) -> int`, the form of two words on the left and the plain form on the right

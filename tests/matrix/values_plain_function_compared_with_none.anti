@@ -1,0 +1,19 @@
+//! A function value that is no `?fn(...)` compares with `none`, as a `*T` does,
+//! and is never `none`.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn greet()
+{
+}
+
+fn main() -> int
+{
+	let f: fn() = greet;
+	if f == none {
+		printf("none\n".ptr);
+	} else {
+		printf("set\n".ptr);
+	}
+	return 0;
+}

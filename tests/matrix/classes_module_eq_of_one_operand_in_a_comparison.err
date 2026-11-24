@@ -1,0 +1,1 @@
+classes_module_eq_of_one_operand_in_a_comparison.anti:17:5: error: `operator fn eq` takes one operand beside its own

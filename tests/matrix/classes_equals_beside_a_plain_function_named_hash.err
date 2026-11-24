@@ -1,0 +1,1 @@
+classes_equals_beside_a_plain_function_named_hash.anti:5:7: error: `Point` replaces `equals` without `hash`

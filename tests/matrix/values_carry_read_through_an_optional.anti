@@ -1,0 +1,11 @@
+//! `r + g?.carry` with `g` a `?Flags`. A carry is read as `f.carry`, so the
+//! form with `?.` is no carry, and `?.` on a field that is no pointer is
+//! refused.
+
+fn main() -> int
+{
+	let (r, f) = 1 + 2;
+	let g: ?Flags = f;
+	let s = r + g?.carry;
+	return s;
+}

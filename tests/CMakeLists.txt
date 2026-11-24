@@ -8306,7 +8306,8 @@ endforeach()
 # the conditions of the reader of a header and of the evaluator.
 # probe_anonymous_member compares the probes of a record that holds an
 # anonymous member of C11, and unnamed_bitfield those of a record with an
-# unnamed bitfield.
+# unnamed bitfield. write_sides reaches the sides of the writer of a
+# module and of its probes.
 set(anti_bind_cc ${ANTIC_TEST_CC})
 if(ANTIC_HOST_OS STREQUAL "macos")
     list(APPEND anti_bind_cc -mmacosx-version-min=11.0)
@@ -8319,7 +8320,7 @@ set(anti_bind_cases header clang headers escaped_path raymath raylib
     clang_of_the_tree clang_of_the_tree_relative api_aliases miniaudio
     api_alias_chain_long api_docs enum_declared_first shift_types cast_types
     struct_literal_ranges clang_sides macro_sides tag_beside_function
-    probe_anonymous_member unnamed_bitfield)
+    probe_anonymous_member unnamed_bitfield write_sides)
 if(NOT ANTIC_HOST_OS STREQUAL "windows")
     # The cases refusals, ast_malformed, clang_typedef_chain, ast_sides and
     # ast_refusals stand a shell script in for clang.

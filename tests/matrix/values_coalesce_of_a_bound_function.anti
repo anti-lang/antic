@@ -1,0 +1,20 @@
+//! `f ?? c.m` where `f` holds a bound function, which is never `none`. `??`
+//! follows a value that may be `none` alone.
+
+class Counter
+{
+	pub n: int = 0,
+
+	pub fn get(self) -> int
+	{
+		return self.n;
+	}
+}
+
+fn main() -> int
+{
+	let c = Counter { n: 1 };
+	let f = c.get;
+	f = f ?? c.get;
+	return f();
+}

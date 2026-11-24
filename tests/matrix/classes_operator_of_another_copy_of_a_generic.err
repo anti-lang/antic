@@ -1,0 +1,1 @@
+classes_operator_of_another_copy_of_a_generic.anti:17:10: error: `+` needs numeric operands, found `Box<i8>`

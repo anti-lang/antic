@@ -1,0 +1,19 @@
+//! `p + p` with `p` a `Box<i8>` and an `operator fn add` of `Box<int>`. The
+//! operator of one copy is no operator of another.
+
+struct Box<T>
+{
+	v: T,
+}
+
+operator fn add(a: Box<int>, b: Box<int>) -> Box<int>
+{
+	return Box<int> { v: a.v + b.v };
+}
+
+fn main() -> int
+{
+	let p = Box<i8> { v: 1 };
+	let q = p + p;
+	return q.v as int;
+}

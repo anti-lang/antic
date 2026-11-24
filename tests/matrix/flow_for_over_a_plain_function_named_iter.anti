@@ -1,0 +1,35 @@
+//! `for x in b` over a struct whose module has a plain function `iter` that
+//! takes it. A hook is written `operator fn`, so the struct has none.
+
+struct Bag
+{
+	n: int,
+}
+
+struct Walk
+{
+	i: int,
+}
+
+operator fn next(w: *Walk) -> bool
+{
+	return false;
+}
+
+operator fn value(w: *Walk) -> int
+{
+	return w.i;
+}
+
+fn iter(b: *Bag) -> Walk
+{
+	return Walk { i: 0 };
+}
+
+fn main() -> int
+{
+	let b = Bag { n: 3 };
+	for x in b {
+	}
+	return 0;
+}

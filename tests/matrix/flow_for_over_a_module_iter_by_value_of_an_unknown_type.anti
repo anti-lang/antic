@@ -1,0 +1,21 @@
+//! `for x in b` over a struct whose `operator fn iter` at module level takes it
+//! by value and names a type that is not there. The declaration is the mistake
+//! and gets the one message, as T233 holds for a hook that takes a pointer.
+
+struct Bag
+{
+	n: int,
+}
+
+operator fn iter(b: Bag, extra: Missing) -> int
+{
+	return 0;
+}
+
+fn main() -> int
+{
+	let b = Bag { n: 3 };
+	for x in b {
+	}
+	return 0;
+}

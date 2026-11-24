@@ -1,0 +1,20 @@
+//! `p + n` with an `operator fn add` whose operands are pointers to a struct
+//! and `n` an `int`. The address of an operand is taken for a struct alone.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn add(a: *Pair, b: *Pair) -> Pair
+{
+	return Pair { v: a.v + b.v };
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let n = 1;
+	let q = p + n;
+	return q.v;
+}

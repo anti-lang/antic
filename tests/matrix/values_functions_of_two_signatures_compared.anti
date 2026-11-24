@@ -1,0 +1,20 @@
+//! `f == k` with two function values of two signatures in one form. The message
+//! names the types, since they differ.
+
+fn greet()
+{
+}
+
+fn take(n: int)
+{
+}
+
+fn main() -> int
+{
+	let f: fn() = greet;
+	let k: fn(int) = take;
+	if f == k {
+		return 1;
+	}
+	return 0;
+}
