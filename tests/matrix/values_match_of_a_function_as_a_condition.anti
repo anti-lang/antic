@@ -1,0 +1,22 @@
+//! A match that a function gives stands as a condition.
+
+import anti.lang;
+import anti.regex;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn first(line: str) -> ?Match
+{
+	return line.matches(re"a+");
+}
+
+fn main() -> int
+{
+	if first("baaa") {
+		printf("matched\n".ptr);
+	}
+	if !first("b") {
+		printf("no match\n".ptr);
+	}
+	return 0;
+}
