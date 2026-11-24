@@ -1,0 +1,20 @@
+//! `-p` on a class whose `operator fn neg` names a type that is not there. The
+//! declaration is the mistake and gets the one message, and the negation gives
+//! none.
+
+class Point
+{
+	pub x: int = 0,
+
+	operator fn neg(self, other: Missing) -> Point
+	{
+		return Point { x: 1 };
+	}
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	let q = -p;
+	return q.x;
+}

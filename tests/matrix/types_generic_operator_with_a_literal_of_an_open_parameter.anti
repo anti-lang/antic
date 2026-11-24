@@ -1,0 +1,23 @@
+//! A literal as the second operand of a generic operator whose second parameter
+//! is a type parameter that the first operand leaves open. The literal takes
+//! its own type, as the call `add(a, 5)` gives it.
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Key<T>
+{
+	k: T,
+}
+
+operator fn add<T: Number, U: Number>(a: Key<T>, b: U) -> T
+{
+	return a.k;
+}
+
+fn main() -> int
+{
+	let a = Key<int> { k: 1 };
+	let n = a + 5;
+	printf("%lld\n".ptr, n);
+	return 0;
+}

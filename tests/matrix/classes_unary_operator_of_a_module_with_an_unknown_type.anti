@@ -1,0 +1,20 @@
+//! `-p` on a struct whose `operator fn neg` at module level names a type that
+//! is not there. The declaration is the mistake and gets the one message, and
+//! the negation gives none.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn neg(a: Pair, b: Missing) -> Pair
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let q = -p;
+	return q.v;
+}

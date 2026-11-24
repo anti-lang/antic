@@ -1,0 +1,20 @@
+//! `p + p` on a class whose `operator fn add` names a type that is not there.
+//! The declaration is the mistake and gets the one message, and the sum gives
+//! none, as T161 holds for a hook of a class.
+
+class Point
+{
+	pub x: int = 0,
+
+	operator fn add(self, other: Missing) -> Point
+	{
+		return Point { x: 1 };
+	}
+}
+
+fn main() -> int
+{
+	let p = Point { x: 1 };
+	let q = p + p;
+	return q.x;
+}

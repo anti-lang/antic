@@ -9,7 +9,8 @@
 #             api_typedef_chain, clang_typedef_chain, clang_of_the_tree,
 #             clang_of_the_tree_relative, enum_declared_first, shift_types,
 #             cast_types, struct_literal_ranges, clang_sides, macro_sides,
-#             ast_sides, ast_refusals or tag_beside_function
+#             ast_sides, ast_refusals, tag_beside_function or
+#             probe_anonymous_member
 #   SOURCES   tests/clib, for the case header
 #   HEADERS   tests/clib/headers, the headers that antic --lib writes
 #   BIND      tests/bind, the fixtures of the other cases
@@ -1201,6 +1202,18 @@ elseif(CASE STREQUAL "tag_beside_function")
         endif()
     endforeach()
     compile_binding(tag bindtest.tag)
+elseif(CASE STREQUAL "probe_anonymous_member")
+    # T438: a record that holds an anonymous member of C11 is probed through
+    # each field of the member. C names it as a field of the record, and the
+    # module through the field `anon0`. The module compiles and the two
+    # probes agree.
+    file(WRITE "${WORK}/anon.h" "struct Outer {\n    int a;\n"
+         "    struct { int x; int y; };\n    union { float f; int i; };\n"
+         "    int z;\n};\nvoid take(struct Outer *o);\n")
+    tool_run("" "${ANTI}" bind --clang "${WORK}/anon.h" --module bindtest.anon
+                --probe -o "${WORK}/out" --runtime "${RUNTIME}")
+    compile_binding(anon bindtest.anon)
+    compare_probes(anon "${WORK}")
 else()
     message(FATAL_ERROR "unknown case ${CASE}")
 endif()

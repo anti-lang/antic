@@ -1,0 +1,20 @@
+//! `p * 3` on a struct whose `operator fn mul` at module level names a type
+//! that is not there for its second operand. The declaration is the mistake and
+//! gets the one message, and the literal takes no type from the operator.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn mul(a: Pair, k: Missing) -> Pair
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 2 };
+	let q = p * 3;
+	return q.v;
+}

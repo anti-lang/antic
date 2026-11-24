@@ -1,0 +1,20 @@
+//! `p + p` on a struct whose `operator fn add` at module level names a type
+//! that is not there. The declaration is the mistake and gets the one message,
+//! and the sum gives none.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn add(a: Pair, b: Missing) -> Pair
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let q = p + p;
+	return q.v;
+}

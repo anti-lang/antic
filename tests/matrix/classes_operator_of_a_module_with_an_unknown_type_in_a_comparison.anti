@@ -1,0 +1,23 @@
+//! `p < q` on a struct whose `operator fn lt` at module level names a type that
+//! is not there. The declaration is the mistake and gets the one message, and
+//! the comparison gives none, as T233 holds for a hook of a module.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn lt(a: Pair, b: Missing) -> bool
+{
+	return true;
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let q = Pair { v: 2 };
+	if p < q {
+		return 1;
+	}
+	return 0;
+}

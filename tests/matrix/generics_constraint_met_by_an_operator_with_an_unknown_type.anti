@@ -1,0 +1,26 @@
+//! A generic call whose constraint `add` a struct meets with an operator at
+//! module level, `operator fn add`, that names a type that is not there. The
+//! declaration is the mistake and gets the one message, and the call gives
+//! none.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn add(a: Pair, b: Missing) -> Pair
+{
+	return a;
+}
+
+fn twice<T: add>(x: T) -> T
+{
+	return x + x;
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let q = twice(p);
+	return q.v;
+}

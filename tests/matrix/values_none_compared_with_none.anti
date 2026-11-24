@@ -1,0 +1,10 @@
+//! `none == none` gives neither side a type. The comparison is the one mistake
+//! and gets one message.
+
+fn main() -> int
+{
+	if none == none {
+		return 1;
+	}
+	return 0;
+}

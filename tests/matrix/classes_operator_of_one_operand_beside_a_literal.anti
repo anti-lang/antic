@@ -1,0 +1,19 @@
+//! `p + 1` with an `operator fn add` of one parameter. The operator lacks the
+//! second operand, which the message names, as it does for `p + p`.
+
+struct Pair
+{
+	v: int,
+}
+
+operator fn add(a: Pair) -> Pair
+{
+	return a;
+}
+
+fn main() -> int
+{
+	let p = Pair { v: 1 };
+	let q = p + 1;
+	return q.v;
+}
