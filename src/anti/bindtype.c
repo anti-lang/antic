@@ -361,7 +361,9 @@ static const struct bind_type *function_of(struct parser *p,
                                            const struct bind_type *result)
 {
     struct bind_type *t = bind_type_new(p->b, BIND_FUNCTION);
-    const struct bind_type *params[64];
+    const struct bind_type *first[64];
+    const struct bind_type **params = first;
+    size_t room = sizeof first / sizeof first[0];
     size_t count = 0;
 
     if (!deeper()) {
@@ -382,8 +384,17 @@ static const struct bind_type *function_of(struct parser *p,
             break;
         }
         param = parse_type(p);
-        if (param == NULL || count == sizeof params / sizeof params[0]) {
+        if (param == NULL) {
             return NULL;
+        }
+        /* A list past the room on the stack moves to the arena, so the parser
+           refuses no count of parameters. */
+        if (count == room) {
+            const struct bind_type **more =
+                arena_alloc(&p->b->arena, 2 * room * sizeof *more);
+            memcpy((void *)more, (void *)params, count * sizeof *more);
+            params = more;
+            room *= 2;
         }
         params[count++] = param;
         if (p->kind != T_COMMA) {
