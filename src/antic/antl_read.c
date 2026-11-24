@@ -994,6 +994,7 @@ static bool field_type_fits(const struct type *t, enum field_form form)
 static void bind_struct(struct reader *r, struct field_refs *s,
                         uint32_t count)
 {
+    static const struct name get_name = {"get", 3};
     uint32_t j;
 
     for (j = 0; j < s->count; j++) {
@@ -1053,6 +1054,12 @@ static void bind_struct(struct reader *r, struct field_refs *s,
         m->symbol->type = fn;
         m->symbol->name =
             types_member_symbol(r->arena, &s->s->name, m);
+        /* A singleton declares no `get` of its own, by R112 of "Rules
+           of 2026-10-13", so its `get` is the one the compiler writes.
+           A copy of a generic singleton then writes its own, by T440 of
+           docs/audit/tests-findings.md. */
+        m->singleton_get = s->s->is_singleton && !m->has_self &&
+                           types_same_name(&m->name, &get_name);
     }
     for (j = 0; j < s->value_count && !r->failed; j++) {
         struct item *m = s->values[j];
