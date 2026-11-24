@@ -1,0 +1,46 @@
+//! A library whose function makes an object of its own class on the heap that
+//! holds an object of another class of the library as a value. The object on
+//! the heap counts, and the one inside it does not.
+
+import net.example.tasks;
+
+provides net.example.tasks.Tasks as Nested;
+
+/// A class that stands as a value inside another.
+class Inner
+{
+	pub n: int = 0,
+}
+
+/// A class that holds an `Inner` as a value.
+class Outer
+{
+	pub inner: Inner = Inner { n: 2 },
+}
+
+/// The tasks of the library.
+pub class Nested
+{
+	implements t: tasks.Tasks,
+
+	/// The number the object inside an object on the heap holds.
+	pub concrete fn local(self, with_destruct: bool) -> int
+	{
+		let o = alloc Outer { };
+		let n = o.inner.n;
+		delete(o);
+		return n;
+	}
+
+	/// A text that names `n`, which the caller frees.
+	pub concrete fn label(self, n: int) -> str
+	{
+		return "";
+	}
+
+	/// The sum of the squares below `n`.
+	pub concrete fn squares(self, n: int) -> int
+	{
+		return 0;
+	}
+}

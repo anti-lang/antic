@@ -1,0 +1,61 @@
+//! The `changed` hook under `--trace writes` and a struct: a write to a field
+//! of an instrumented class calls the hook, and a write to a field of a struct
+//! calls none, since a struct has no hooks. Without `--trace writes` the
+//! program prints the values alone.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+struct Pair
+{
+	a: int,
+	b: int,
+}
+
+trace class Counted
+{
+	pub n: int = 0,
+}
+
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		printf("changed %.*s\n".ptr, field.name.len as c_int, field.name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let watch = alloc Watch { };
+	lang.Trace.install(watch);
+
+	let counted = alloc Counted { };
+	let pair = Pair { a: 1, b: 2 };
+	counted.n = 1;
+	pair.a = 3;
+	printf("fields %d %d %d\n".ptr, counted.n as c_int, pair.a as c_int,
+		pair.b as c_int);
+
+	lang.Trace.install(none);
+	delete(counted);
+	delete(watch);
+	return 0;
+}

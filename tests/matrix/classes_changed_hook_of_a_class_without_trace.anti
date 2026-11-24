@@ -1,0 +1,60 @@
+//! The `changed` hook under `--trace writes` and a class that asks for no call
+//! hooks: a write to a field of the class `trace` marks calls the hook, and a
+//! write to a field of a class without the mark calls none, since no pattern
+//! names it. Without `--trace writes` the program prints the values alone.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+trace class Counted
+{
+	pub n: int = 0,
+}
+
+class Plain
+{
+	pub n: int = 0,
+}
+
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		printf("changed %.*s\n".ptr, field.name.len as c_int, field.name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let watch = alloc Watch { };
+	lang.Trace.install(watch);
+
+	let counted = alloc Counted { };
+	let plain = alloc Plain { };
+	counted.n = 1;
+	plain.n = 2;
+	printf("fields %d %d\n".ptr, counted.n as c_int, plain.n as c_int);
+
+	lang.Trace.install(none);
+	delete(plain);
+	delete(counted);
+	delete(watch);
+	return 0;
+}

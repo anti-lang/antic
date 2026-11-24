@@ -938,13 +938,17 @@ endforeach()
 # drops the call hooks that --trace turned on, which gives the output of
 # release.
 # The value of --trace names a module as well, which reaches every class
-# of it.
+# of it. A pattern that ends inside a segment of the module path, `hook`,
+# and one of the length of the path that names another module,
+# `hook_track`, reach no class.
 foreach(case "hooks|no_hooks|--no-hooks|hooks.no-hooks.expected"
         "hook_trace|trace|--trace|hook_trace.trace.expected"
         "hook_trace|writes|--trace,--trace,writes|hook_trace.writes.expected"
         "hook_trace|pattern|--trace,Quiet|hook_trace.pattern.expected"
         "hook_trace|trace_no_hooks|--trace,--no-hooks|hook_trace.expected"
         "hook_trace|module|--trace,hook_trace|hook_trace.module.expected"
+        "hook_trace|pattern_inside_a_segment|--trace,hook|hook_trace.expected"
+        "hook_trace|pattern_of_another_module|--trace,hook_track|hook_trace.expected"
         "trace_handlers|traced|--trace,--trace,writes|trace_handlers.traced.expected"
         "hooks_super|writes|--trace,--trace,writes|hooks_super.writes.expected")
     string(REPLACE "|" ";" parts "${case}")
@@ -2958,6 +2962,23 @@ add_test(NAME plugin_locals
         "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/locals_host.expected"
         -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
 
+# An object of a library on the heap that holds an object of the library
+# as a value counts once: its `created` hook marks the memory on the heap,
+# and that of the value inside it does not, so the library unloads once
+# the host ended what it holds.
+add_test(NAME plugin_nested
+    COMMAND "${CMAKE_COMMAND}"
+        ${ANTIC_AND_RUNTIME}
+        "-DSOURCES=${CMAKE_CURRENT_SOURCE_DIR}/plugin"
+        "-DSUFFIX=${plugin_suffix}"
+        "-DEXE=${plugin_exe}"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/plugin-nested"
+        "-DHOST=nested_host"
+        "-DLIBRARY=nested"
+        "-DINTERFACE=tasks"
+        "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/plugin/nested_host.expected"
+        -P "${ANTIC_RUNNERS}/run_plugin_kinds.cmake")
+
 # An unload while another thread runs the code of the library: while
 # `reflect.new` runs the `construct` of a class of the library, and while
 # `delete` runs the `destruct` of an object of it. Each is refused. S307
@@ -3674,6 +3695,21 @@ antic_program_test(matrix_classes_trace_pattern_of_a_generic_class_pattern
     OPTIONS "--trace,Box"
     EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_trace_generic.pattern.expected"
     WORK "${MATRIX_WORK}/trace-pattern-generic")
+# A write under --trace writes that calls no `changed`: a write to a field
+# of a class that asks for no call hooks, to a field of a struct and to a
+# local. A write to a field of an instrumented class before each calls the
+# hook. The matrix runs each program without the option.
+foreach(case "class_without_trace|untraced" "field_of_a_struct|struct"
+        "local|local")
+    string(REPLACE "|" ";" parts "${case}")
+    list(GET parts 0 case_source)
+    list(GET parts 1 case_expected)
+    antic_program_test(matrix_classes_changed_hook_of_a_${case_source}_trace_writes
+        "${MATRIX}/classes_changed_hook_of_a_${case_source}.anti"
+        OPTIONS "--trace,--trace,writes"
+        EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_${case_expected}.writes.expected"
+        WORK "${MATRIX_WORK}/trace-writes-${case_expected}")
+endforeach()
 # `join` of a job without a result and `join_all` call the runtime without
 # the `joined` hook under --no-hooks.
 antic_program_test(matrix_threads_jobs_no_hooks
@@ -3834,6 +3870,18 @@ antic_modules_test(trace_package
     STD lang
     LIB_OPTIONS --trace com
     WORK "${CMAKE_CURRENT_BINARY_DIR}/trace-package-modules")
+
+# A pattern of `--trace` that stands where a package above the module
+# would and names another, `org` for `com.example.plain`, reaches no class.
+# The library is built with `--trace org`, and the program without the
+# option.
+antic_modules_test(trace_other_package
+    ROOT "${CMAKE_CURRENT_SOURCE_DIR}/modules/trace_package"
+    LIBRARIES plain
+    PROGRAM untraced
+    STD lang
+    LIB_OPTIONS --trace org
+    WORK "${CMAKE_CURRENT_BINARY_DIR}/trace-other-package-modules")
 
 # A program of two modules holds one descriptor and one table per class,
 # so `is`, `==`, `equals` and `reflect.new` agree whichever module made
@@ -6663,6 +6711,14 @@ antic_dump_test(ast test_blocks
 antic_dump_test(ast nodes
     "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.ast"
     ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/nodes.anti")
+
+# The sides of the tree that no other dump reaches: a `\` in a doc
+# comment, `<<%`, `+%`, `+|`, `-%` and `-|`, an anonymous function without
+# a result, a byte string, a variant without its types and an enum without
+# a base.
+antic_dump_test(ast sides
+    "${CMAKE_CURRENT_SOURCE_DIR}/dump/sides.ast"
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}/dump/sides.anti")
 
 # The nodes the checker writes into the tree: an atomic read and write,
 # `p?.x`, `to_slice`, the built-ins of a simd struct, `mul_high`, a call

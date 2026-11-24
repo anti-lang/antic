@@ -1,0 +1,52 @@
+module_doc "The sides of the dump of the tree that no other dump reaches: a `\\` in a doc\ncomment, the shift that wraps and the wrapping and saturating forms of `+`\nand `-`, an anonymous function without a result, a byte string, a variant in\nthe tree without its types and an enum without a base."
+variant_decl Shape
+  doc "The cases of a value, with a `\\` in their comment."
+  case Dot
+    field r
+      type int
+  case Empty
+enum_decl Mode
+  doc "An enum that names no base."
+  value Off
+  value On
+function main
+  result
+    type int
+  block
+    let_stmt a
+      shift <<%
+        int_lit 1
+        int_lit 2
+    let_stmt b
+      additive +%
+        ident a
+        int_lit 1
+    let_stmt c
+      additive +|
+        ident a
+        int_lit 1
+    let_stmt d
+      additive -%
+        ident a
+        int_lit 1
+    let_stmt e
+      additive -|
+        ident a
+        int_lit 1
+    let_stmt bytes
+      string_lit b"xy"
+    let_stmt f
+      fn_expr
+        param x
+          type int
+        block
+    return_stmt
+      additive +
+        additive +
+          additive +
+            additive +
+              ident a
+              ident b
+            ident c
+          ident d
+        ident e

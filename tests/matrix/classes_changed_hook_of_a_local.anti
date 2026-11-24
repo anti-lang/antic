@@ -1,0 +1,54 @@
+//! The `changed` hook under `--trace writes` and a local: a write to a field of
+//! an instrumented class calls the hook, and a write to a local calls none,
+//! since a local is no field. Without `--trace writes` the program prints the
+//! values alone.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+trace class Counted
+{
+	pub n: int = 0,
+}
+
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str) { }
+
+	concrete fn leave(self, o: *Object, name: str) { }
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor)
+	{
+		printf("changed %.*s\n".ptr, field.name.len as c_int, field.name.ptr);
+	}
+}
+
+fn main() -> int
+{
+	let watch = alloc Watch { };
+	lang.Trace.install(watch);
+
+	let counted = alloc Counted { };
+	let local = 0;
+	counted.n = 1;
+	local = 4;
+	printf("values %d %d\n".ptr, counted.n as c_int, local as c_int);
+
+	lang.Trace.install(none);
+	delete(counted);
+	delete(watch);
+	return 0;
+}

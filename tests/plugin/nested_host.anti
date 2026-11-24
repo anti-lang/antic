@@ -1,0 +1,23 @@
+//! A host that calls a function of a library that makes an object on the heap,
+//! which holds another object of the library as a value, and ends it. After the
+//! call the one object of the library that lives is the one the host holds, and
+//! after the host ended it the library unloads.
+
+import anti.lang;
+import anti.plugin;
+import net.example.tasks;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+fn main(args: []str) -> int
+{
+	let lib = plugin.load(args[1]) catch fatal;
+	let t = lib.instance(tasks.Tasks) catch fatal;
+	printf("an object inside an object gives %lld, alive %lld\n".ptr, t.local(true), lib.live());
+	delete(t);
+	printf("after the delete %lld\n".ptr, lib.live());
+	lib.unload() catch fatal;
+	printf("unloaded\n".ptr);
+	delete(lib);
+	return 0;
+}

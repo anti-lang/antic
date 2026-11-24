@@ -1,0 +1,30 @@
+//! The sides of the dump of the tree that no other dump reaches: a `\` in a doc
+//! comment, the shift that wraps and the wrapping and saturating forms of `+`
+//! and `-`, an anonymous function without a result, a byte string, a variant in
+//! the tree without its types and an enum without a base.
+
+/// The cases of a value, with a `\` in their comment.
+variant Shape
+{
+	Dot { r: int },
+	Empty,
+}
+
+/// An enum that names no base.
+enum Mode
+{
+	Off,
+	On,
+}
+
+fn main() -> int
+{
+	let a = 1 <<% 2;
+	let b = a +% 1;
+	let c = a +| 1;
+	let d = a -% 1;
+	let e = a -| 1;
+	let bytes = b"xy";
+	let f = fn(x: int) { };
+	return a + b + c + d + e;
+}
