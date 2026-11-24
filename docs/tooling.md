@@ -442,6 +442,9 @@ has four sections in this order:
 4. Lowered, unoptimised IR of every function body.
 
 What is never stored: `//#` notes, `///` comments on private items, ordinary comments.
+In a type the file makes public, a private field keeps its `///` text, and so do a
+`construct` and a `destruct` of any level, since the header of `--lib` and the one
+`anti bind --header` writes print them.
 `anti build --strip-docs` removes the doc text from section 3.
 
 A downloaded `.antl` whose header disagrees with its index entry is refused.

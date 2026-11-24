@@ -103,6 +103,7 @@ class Circle inherits Shape
 ## Fields
 
 - `name: T` declares a field. `name: T = e` gives a default, a constant expression, applied by every literal that omits the field.
+- The default of a field of a function type may name a function declared at module level in the module of its class. A function of another module, an `extern fn` and a function of the body of a class are no constant expression. A library file carries none of them.
 - A field is private unless marked. `pub name: T` is visible everywhere. `protected name: T` is visible to the class and every class in its chain below. A field without a marker is visible to the class only. See [Visibility](#visibility).
 - `own name: *T`, `own name: []T` and `own name: []byte` mark a pointer or slice field as owned. See [Ownership and copies](#ownership-and-copies).
 - A field of class or struct type is inline and owned by definition. `own` on it is refused as redundant.
@@ -117,7 +118,7 @@ class Circle inherits Shape
 - `self` is the receiver, of type `*Class`, written as the first parameter. Fields are reached through `self.x`. A bare `x` in a function body is a local, a parameter or a module item, never a field.
 - A function without `self` is a static function, called as `Class.f(args)`.
 - `pub fn` has an entry in the class's table and is visible everywhere. `protected fn` and `fn` without a marker have no entry and are called directly. See [Visibility](#visibility).
-- `abstract fn f(self) -> R;` is a `pub` function without a body. It takes `self`, and one without is refused.
+- `abstract fn f(self) -> R;` is a `pub` function without a body. It takes `self`, and one without is refused. `construct` and `destruct` are never abstract, since the class runs its own.
 - `concrete fn` marks a function that replaces an inherited entry. See [Tables and dispatch](#tables-and-dispatch).
 - `final fn` forbids replacement in any derived class.
 - `operator fn` marks a function that an operator calls. See [Operators](#operators).

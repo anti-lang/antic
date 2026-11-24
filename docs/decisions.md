@@ -992,7 +992,7 @@ What antic does that the design above leaves open, as far as a user of the langu
 - Chapter 9 symbol form on Windows: `_A`, the decimal length and the text of each segment of the module path, `_` and the function name. The form stays, whatever `link.exe` accepts. `geometry.length` becomes `_A8geometry_length`, and `com.example.scale.scale` becomes `_A3com7example5scale_scale`. It holds only letters, digits and `_`, and the length keeps two name pairs apart. C reserves names that start with `_A`.
 - `antic -c file.anti lib.antl...` writes `file.antl` beside the source, or at `-o`. Every library a program needs, transitive imports included, goes on the command line in any order. antic loads each file after the files it imports. `--dump-ir` prints the whole program after loading.
 - The interface in a library file holds the `pub` `fn`, `extern fn`, `struct` and `const` items, each `const` with its value. Every struct of the module that those items reach is stored with its fields, private ones included. The `///` text of the fields of a private struct is not stored. A struct of another module is stored as its module and name.
-- [provisional] A library file stores no `///` text of a private function of a generic class and none of a function or a constant of a type the file does not make public. It stores the text of a private field of a class, of a `construct` and a `destruct` whatever their level and of each value of an enum. Reason: T422. The C header that `anti bind --header` writes from a library file prints those, as the header of `--lib` prints them from the source, and a value of an enum stands for a case of a variant there.
+- A library file stores no `///` text of a private function of a generic class and none of a function or a constant of a type the file does not make public. It stores the text of a private field of a class, of a `construct` and a `destruct` whatever their level and of each value of an enum. Reason: T422. The C header that `anti bind --header` writes from a library file prints those, as the header of `--lib` prints them from the source, and a value of an enum stands for a case of a variant there. Item 2 of "Answers of 2026-11-24" keeps it.
 - A method call on a struct of another module finds the `pub` functions of the module that declares the struct.
 - The optimizer always runs on the whole program. antic has no option to skip it. `--dump-opt` prints the optimized IR.
 - antic generates position-independent code on all six targets. The xnu loader requires PIE for ARM64 executables, and Windows cannot disable ASLR on ARM64.
@@ -3685,6 +3685,15 @@ Eddie answered every open question of the third phase of coverage on 2026-11-23:
 Eddie answered the question of `docs/reports/2026-11-23-answers-2026-11-23.md` on 2026-11-23: "follow your recommendations". `docs/reports/2026-11-23-answers-2026-11-23-second.md` reports the step that builds it.
 
 - 1. A page of `anti doc` writes the base after `inherits` as the header of the class spells it, as item 1 of "Answers of 2026-11-23" writes every other type of another module. The base stands as `log.Logger` where the header writes `log.Logger`, as `m.Allocator` under `import anti.mem as m` and as `Clock` under a direct import. A base of the module itself stands bare, as the header writes it. `anti.lang.Object` stays left out. A page built from a library file writes the same, so the doc-equivalence test of `docs/tooling.md` holds.
+
+## Answers of 2026-11-24
+
+Eddie answered the four questions of "Questions for Eddie" in `docs/reports/2026-11-23-coverage-phase-3ax.md` on 2026-11-24, with "yes" to the recommendation of each. `docs/reports/2026-11-24-answers-2026-11-24.md` reports the step that builds them. Item 3 lets in the one new message its refusal needs, as "Answers of 2026-11-01" did.
+
+- 1, T427. A field default that names an `extern fn` of the module or a function of the body of its class is refused with `a function is not a constant expression`, the message T426 gives a function of another module. The library file gets no new form, and the DESIGN of `put_defaults` in `src/antic/antl_write.c` stays. The tests of T427 expect the refusal.
+- 2, T422. A library file keeps the `///` text of a private field, since the C header of `--lib` and the one `anti bind --header` writes both print it. "Library file" in `docs/tooling.md` says so, and the entry of the T422 choice under "Compiler behaviour" loses its `[provisional]` tag.
+- 3. `abstract fn construct(self);` and `abstract fn destruct(self);` in a class are refused. The class runs its own `construct` after a literal and its own `destruct` at its end, so neither is an open function.
+- 4. A refused type argument is one mistake. antic gives one message, at the first use of the copy, and later uses of the same copy give none. Where `P` lacks `lt`, `Keyed<P>` gets the message and a later `first(k)` of that `k` gets none. The rule holds for every constraint.
 
 ## Open
 
