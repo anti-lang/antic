@@ -19,7 +19,5 @@
 # The test known_failures checks the list against the table of the findings.
 plugin_trace T136 A frame of a plugin has no build id, since a Windows plugin exports no `anti_licenses`. host=windows
 no_llvm_cov_packed T138 The test matches the refusal of check-llvm on its text as CMake wraps it, which breaks at the length of the path of the VM. host=windows
-std_deserialize_match_group T430 A group of a Match without a pattern stops the program with SIGSEGV.
-std_deserialize_match_group_named T430 A group by name of a Match without a pattern stops the program with SIGSEGV.
 matrix_values_patch_into_an_empty_name_refused T431 A patch into an empty name of a pattern literal writes into its one group.
 std_regex_patch_into_an_empty_name T432 A patch into an empty name computed at run time writes into the one group.

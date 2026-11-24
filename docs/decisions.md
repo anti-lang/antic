@@ -2053,6 +2053,13 @@ antic had two native back ends, x86_64 and ARM64, until the step `switch` of `do
   keeps the program defined and the same in dev and in release, where PCRE2 read the
   missing handle before. Every function of `src/rt/patterns.c` that takes a pattern from
   Anti checks it first, the fix of T166 of `docs/audit/tests-findings.md`.
+- [provisional] A `Match` or a `ByteMatch` that holds no pattern stops the program at
+  `group` and `took_part`, by number and by name, with the message of a search of a
+  `Regex` that holds no pattern. `Object.deserialize` leaves such a match in a field
+  that the text gives as `null` when the class declares the field without a default.
+  Reason: a group runs the search of its match again, so it is a search without a
+  pattern, and PCRE2 read the missing handle before, T430 of
+  `docs/audit/tests-findings.md`.
 - [provisional] A module that writes a pattern literal or `Regex.compile` imports
   `anti.regex`. Without the import the literal is refused with `` a pattern literal is
   compiled by `anti.regex`, so the module imports `anti.regex` `` and the call with ``

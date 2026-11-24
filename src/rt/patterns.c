@@ -557,6 +557,10 @@ int64_t anti_rt_regex_group(const struct anti_match *m, int64_t n,
     pcre2_match_data *md;
     int64_t status;
 
+    /* A match that Object.deserialize left in a field holds no pattern,
+       and a group runs the search of its pattern again, by T430 of
+       docs/audit/tests-findings.md. */
+    held(m->pattern);
     if (!has_group(m->pattern, n)) {
         *out = slice(&m->subject, 0, 0);
         return NO_GROUP;
@@ -575,10 +579,15 @@ int64_t anti_rt_regex_group_named(const struct anti_match *m,
                                   const unsigned char *name, int64_t length,
                                   struct anti_text *out)
 {
-    pcre2_match_data *md = search_again(m);
-    const PCRE2_SIZE *ov = pcre2_get_ovector_pointer(md);
-    int64_t number = named_group(m->pattern, ov, name, length);
+    pcre2_match_data *md;
+    const PCRE2_SIZE *ov;
+    int64_t number;
     int64_t status = NO_GROUP;
+
+    held(m->pattern);
+    md = search_again(m);
+    ov = pcre2_get_ovector_pointer(md);
+    number = named_group(m->pattern, ov, name, length);
 
     *out = slice(&m->subject, 0, 0);
     if (number != NO_GROUP) {
