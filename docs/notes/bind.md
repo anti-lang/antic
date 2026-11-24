@@ -57,7 +57,10 @@ of the pack at each line and reads it at the line of the record.
 A record defined inside another is bound as a record of the module, as C
 declares it at file scope. An anonymous one takes the name of the record
 and its field, `LayoutHolder_as`. An anonymous member of C11 has no Anti
-form, so it becomes a field `anon0` with a warning.
+form, so it becomes a field `anon0` with a warning. An unnamed bitfield
+that is not zero-width becomes a field `pad0` of its type and width,
+since `_` is the zero-width bitfield of Anti alone, by T439 of
+`docs/audit/tests-findings.md`.
 
 ## Constants
 

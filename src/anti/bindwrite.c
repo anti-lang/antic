@@ -275,6 +275,7 @@ static void doc_of(const char *doc, const char *indent, struct text *out)
 static void write_record(const struct bind_record *r, struct text *out)
 {
     size_t i;
+    size_t pads = 0;
 
     doc_of(r->doc, "", out);
     text_append(out, "pub ");
@@ -293,8 +294,14 @@ static void write_record(const struct bind_record *r, struct text *out)
             text_append(out, "\t// volatile in C\n");
         }
         text_append(out, "\t");
-        if (f->name == NULL) {
+        /* `_` is the zero-width bitfield of Anti alone. Another unnamed
+           bitfield of C keeps its width under a name C does not have,
+           by the provisional entry of T439 under "The bind command" in
+           docs/decisions.md. */
+        if (f->name == NULL && f->bits == 0) {
             text_append(out, "_");
+        } else if (f->name == NULL) {
+            text_appendf(out, "pad%zu", pads++);
         } else {
             name_of(f->name, out);
         }
