@@ -52,6 +52,11 @@ static const char *under(const char *source, const char *root)
     while (n > 0 && separates(root[n - 1])) {
         n--;
     }
+    /* A root of separators alone is the root of the file system, which
+       holds every absolute path. */
+    if (n == 0 && root[0] != '\0') {
+        return separates(source[0]) ? source + 1 : NULL;
+    }
     if (n == 0 || strncmp(source, root, n) != 0 || !separates(source[n])) {
         return NULL;
     }
