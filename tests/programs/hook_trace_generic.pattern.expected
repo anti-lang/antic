@@ -1,0 +1,4 @@
+exit 0
+enter classes_trace_pattern_of_a_generic_class.Box<int>.get
+leave classes_trace_pattern_of_a_generic_class.Box<int>.get
+get 3

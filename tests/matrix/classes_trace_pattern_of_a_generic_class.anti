@@ -1,0 +1,59 @@
+//! A `--trace` pattern that names a generic class reaches every copy of it, as
+//! `trace class` before the generic marks every copy. Under `--trace Box` the
+//! call of `get` on a `Box<int>` reaches the handler. Without the option the
+//! program prints the value alone.
+
+import anti.lang;
+
+extern fn printf(format: ?*byte, ...) -> c_int;
+
+class Box<T>
+{
+	pub v: T,
+
+	pub fn get(self) -> T
+	{
+		return self.v;
+	}
+}
+
+class Watch inherits lang.TraceHandler
+{
+	concrete fn created(self, o: *Object) { }
+
+	concrete fn destroyed(self, o: *Object) { }
+
+	concrete fn copied(self, o: *Object, from: *Object) { }
+
+	concrete fn dispatched(self, o: *Object) { }
+
+	concrete fn joined(self, o: *Object) { }
+
+	concrete fn enter(self, o: *Object, name: str)
+	{
+		printf("enter %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn leave(self, o: *Object, name: str)
+	{
+		printf("leave %.*s\n".ptr, name.len as c_int, name.ptr);
+	}
+
+	concrete fn failed(self, o: *Object, name: str, e: *lang.Error) { }
+
+	concrete fn changed(self, o: *Object, field: *FieldDescriptor) { }
+}
+
+fn main() -> int
+{
+	let watch = alloc Watch { };
+	lang.Trace.install(watch);
+
+	let b = alloc Box<int> { v: 3 };
+	printf("get %d\n".ptr, b.get() as c_int);
+
+	lang.Trace.install(none);
+	delete(b);
+	delete(watch);
+	return 0;
+}

@@ -3665,6 +3665,15 @@ antic_program_test(matrix_classes_changed_hook_of_a_transient_field_trace_writes
     OPTIONS "--trace,--trace,writes"
     EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_changed_transient.writes.expected"
     WORK "${MATRIX_WORK}/trace-writes-transient")
+# A `--trace` pattern that names a generic class reaches the copy
+# `Box<int>`, as `trace class` before the generic marks every copy. The
+# matrix runs the program without the option, where it prints no line of
+# the hook. T433 of docs/audit/tests-findings.md.
+antic_program_test(matrix_classes_trace_pattern_of_a_generic_class_pattern
+    "${MATRIX}/classes_trace_pattern_of_a_generic_class.anti"
+    OPTIONS "--trace,Box"
+    EXPECTED "${CMAKE_CURRENT_SOURCE_DIR}/programs/hook_trace_generic.pattern.expected"
+    WORK "${MATRIX_WORK}/trace-pattern-generic")
 # `join` of a job without a result and `join_all` call the runtime without
 # the `joined` hook under --no-hooks.
 antic_program_test(matrix_threads_jobs_no_hooks
