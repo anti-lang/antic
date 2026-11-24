@@ -1996,6 +1996,32 @@ those of the coverage run after the batch.
 | `read_file` of `src/antic/driver.c`, line 119 | A source too large, read without its message. | `read_source` reads every source and names its failure, and the quiet read takes a library file, which has no limit. |
 | `back_end` of `src/antic/driver.c`, lines 1204 and 1206 | A library file, and a library of `--lib` in dev mode. | `write_library` writes a library file before the back end, and `--lib static` and `--lib shared` build in release mode alone, so `--dev` beside them is refused. |
 
+## The sides of batch 3az
+
+Batch 3az of the third phase read the places, the addresses and the
+constants of lowering in `src/antic/lower_place.c` and the run-time side
+of `anti.regex` in `src/rt/patterns.c`. It found T430 to T432 and fixed
+T430 and T431. The line numbers are those of the sources after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `bitfield_of` of `src/antic/lower_place.c`, lines 104 and 115 | An expression that is no field, a static field, and a field that no struct or class of the chain declares. | `place_address` asks for a field alone, after it took a static field, and the checker gave every field its declaration. |
+| `type_place` of `src/antic/lower_place.c`, line 220 | A static field. | Every static field is `atomic`, and its reads and writes are lowered as atomic operations, never through `lower_place`. |
+| `type_place` of `src/antic/lower_place.c`, lines 227, 231, 236 and 237 | A union, a field its type does not declare, a member past the aggregate, a bitfield and a member of another IR type. | `names_union` returned for a path through a union, the checker writes `super` before a field of a base, a bitfield returned at the first guard, and the checker narrows names alone, so a field reads the type it holds. |
+| `place_address` of `src/antic/lower_place.c`, lines 266 and 278 | A name whose variable is a scalar while its value is an aggregate, and a static field. | A narrowed name reads the value inside its variable, so a variable of a scalar holds a scalar value, and a static field is lowered as an atomic operation. |
+| `lower_place` of `src/antic/lower_place.c`, line 331 | A place that `place_address` does not find. | `place_address` gives every expression an address, a value that is no place a slot of its own. |
+| `const_tree` of `src/antic/lower_place.c`, line 382 | A field of a `?T` of three bytes that is no `has`. | A `?T` has the fields `value` and `has` alone. |
+| `lower_store_constant` of `src/antic/lower_place.c`, line 549 | A type written part by part that has no fields. | A type that holds a class or a repeated array is a class, a `?T`, an array or a type with fields. |
+| `lower_location_value` of `src/antic/lower_place.c`, lines 626, 629, 646 and 648 | No function, a function without its module, and a field of `SourceLocation` that is none of its five. | `here` is no constant expression, so lowering meets it inside a function, every function names its module, and `SourceLocation` of `anti.lang` has the five fields. |
+| `literal` of `src/rt/patterns.c`, line 58 | A pattern literal that does not compile at start. | antic compiled every literal already, so the compile fails only where PCRE2 finds no memory, which no seam of `src/rt/fault.h` reaches. |
+| `anti_rt_regex_message` of `src/rt/patterns.c`, line 110 | A code outside the error numbers of PCRE2. | `anti.regex` passes the code of a compile that failed. |
+| `failure` of `src/rt/patterns.c`, line 175 | A search that finds no memory. | PCRE2 takes the memory of a search through `malloc`, which no seam of `src/rt/fault.h` reaches. |
+| `slice` of `src/rt/patterns.c`, line 310 | An end before the start. | A match ends at or after its start, since PCRE2 refuses `\K` in a lookaround. |
+| `search_again` of `src/rt/patterns.c`, line 542 | A search that finds its match no longer. | It runs the search that found the match, from the same place, with the same options and over the same text. |
+| `expand` of `src/rt/patterns.c`, lines 652 and 662 | A piece of no kind, and a group the pattern lacks. | `anti_rt_regex_piece` gives the three kinds alone, and the checker or `anti_rt_regex_template_fits` refused a template that names a group the pattern lacks before the search. |
+| `fits_span` of `src/rt/patterns.c`, line 716 | A length below zero. | Each length is that of a slice. |
+| `anti_rt_regex_patch` of `src/rt/patterns.c`, line 769 | A walk that fails before its first search. | `walk_begin` with a limit of 0 and no check counts nothing and gives `DONE`. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
