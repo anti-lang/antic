@@ -1,7 +1,8 @@
 //! The `get` of a copy of a generic singleton of a library: the copy of `int`
 //! that the library file holds, which its function counts in as well, and the
 //! copy of `u8`, which the program and the library mid make each. Each copy has
-//! one instance. T440 of docs/audit/tests-findings.md.
+//! one instance, and a function of the class without `self` stands beside
+//! `get`. T440 of docs/audit/tests-findings.md.
 import com.example.registry;
 import com.example.mid;
 
@@ -20,5 +21,7 @@ fn main() -> int
 	mid.tick();
 	printf("tick %d %d\n".ptr, registry.Reg<int>.get().count.load() as c_int,
 		registry.Reg<u8>.get().count.load() as c_int);
+	printf("width %d %d\n".ptr, registry.Reg<int>.width() as c_int,
+		registry.Reg<u16>.width() as c_int);
 	return 0;
 }

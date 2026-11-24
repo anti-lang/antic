@@ -5,6 +5,12 @@
 pub singleton class Reg<T>
 {
 	pub atomic count: int = 0,
+
+	/// The size of the type argument, a function without `self` beside `get`.
+	pub fn width() -> int
+	{
+		return size_of(T) as int;
+	}
 }
 
 /// Add ten to the counter of `int`.
