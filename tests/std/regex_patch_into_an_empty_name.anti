@@ -1,0 +1,21 @@
+//! `patch` with a compiled pattern into a group that an empty name computed at
+//! run time names fails with `MissingGroup`, as a name the pattern lacks does,
+//! since no group of a pattern has an empty name. The data keeps its bytes.
+
+import anti.io;
+import anti.regex;
+import anti.text;
+
+fn main() -> int
+{
+	let data = "ab".to_bytes();
+	let r = ByteRegex.compile("(a)") catch fatal;
+	let b = text.Builder.new();
+	let n = data.patch(r, b"9", b.text()) catch e {
+		io.println(e.message);
+		yield -1;
+	};
+	io.println(f"{n} {data[0]}");
+	free(data.ptr);
+	return 0;
+}

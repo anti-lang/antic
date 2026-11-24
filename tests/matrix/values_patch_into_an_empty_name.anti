@@ -1,0 +1,14 @@
+//! `patch` into a group that an empty literal names is refused as a name the
+//! pattern lacks, as `m.group("")` is, since no group of a pattern has an empty
+//! name.
+
+import anti.lang;
+import anti.regex;
+
+fn main() -> int
+{
+	let room: [4]byte = [97, 98, 99, 100];
+	let data = room[0..4];
+	let n = data.patch(re"(a)", b"x", "");
+	return 0;
+}
