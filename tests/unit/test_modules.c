@@ -733,6 +733,9 @@ static void module_path_under_the_root(void)
     static const char *const empty[] = {""};
 
     path_of("/com/niese/geo.anti", roots, 1, "com.niese.geo");
+    /* A relative source whose directory cannot be resolved is compared
+       as written, and the root holds no relative path. */
+    path_of("com/niese/geo.anti", roots, 1, "geo");
     /* An empty root holds nothing. */
     path_of("/com/geo.anti", empty, 1, "geo");
 }
