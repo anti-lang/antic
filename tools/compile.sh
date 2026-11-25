@@ -24,6 +24,13 @@
 #   ./c coverage report      write the report again from the profiles on
 #                            disk, and run no test
 #
+# A run of the suite writes build/coverage/commit.txt beside the report:
+# the commit it measured, then clean, or modified when a file outside
+# docs/, CLAUDE.md, README.md and CHANGELOG.md differed from that commit
+# at either end of the run. A batch of coverage takes a clean run as its
+# own before run when none of those files changed since, by answer 3 of
+# "Answers of 2026-11-25" in docs/decisions.md.
+#
 # The coverage build instruments antic, anti, the unit tests and the
 # runtime its programs link. Its suite leaves raw profiles in
 # build/coverage/profiles, and the report is build/coverage/summary.txt,
@@ -76,7 +83,7 @@ for arg in "$@"; do
         fresh) fresh=1 ;;
         part) after=part ;;
         report) report=1 ;;
-        -h|--help) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,52p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "c: unknown argument $arg" >&2; exit 64 ;;
     esac
 done
@@ -207,14 +214,29 @@ fi
 if [ "$fresh" = 1 ] || [ ! -f "$tree/CMakeCache.txt" ]; then
     cmake --preset "$preset"
 fi
+# Print the commit of HEAD, then clean, or modified when a file outside
+# docs/, CLAUDE.md, README.md and CHANGELOG.md differs from it.
+measured_state() {
+    git rev-parse HEAD
+    if [ -n "$(git status --porcelain -- . ':!docs/' ':!CLAUDE.md' \
+                   ':!README.md' ':!CHANGELOG.md')" ]; then
+        echo modified
+    else
+        echo clean
+    fi
+}
+
 if [ "$preset" = coverage ]; then
     status=0
+    measured="$tree/commit.txt"
     if [ "$report" = 0 ]; then
         cmake --build --preset coverage -j "$jobs"
         # The profiles of an earlier run count for programs that have
         # changed since, so a run starts without them.
         if [ "$number" = 1 ]; then
             cmake --build --preset coverage --target coverage_clear
+            rm -f "$measured"
+            measured_state > "$measured.start"
         fi
         if [ "$parts" = 1 ]; then
             ctest --preset coverage -j "$jobs" || status=$?
@@ -228,6 +250,20 @@ if [ "$preset" = coverage ]; then
     fi
     if [ "$number" = "$parts" ]; then
         cmake --build --preset coverage --target coverage_report
+        # The run measured one commit when the tree stood at it at the
+        # start of the first part and at the end of the last.
+        if [ "$report" = 0 ]; then
+            measured_state > "$measured.end"
+            if [ -f "$measured.start" ] &&
+               cmp -s "$measured.start" "$measured.end"; then
+                mv "$measured.end" "$measured"
+            else
+                { git rev-parse HEAD; echo modified; } > "$measured"
+                rm -f "$measured.end"
+            fi
+            rm -f "$measured.start"
+            echo "c: $(tr '\n' ' ' < "$measured")in $measured"
+        fi
     fi
     echo "c: coverage build in $tree"
     exit "$status"

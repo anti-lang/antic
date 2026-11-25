@@ -291,6 +291,33 @@ the set, and each area has one rule:
   outside them. ctest adds the fixtures a selected test needs, such as
   `dev_object_<module>`, beyond the count.
 
+## Reusing a coverage run
+
+A batch of the coverage phase measures the suite before its first commit and after its
+last. Answer 3 of "Answers of 2026-11-25" in `docs/decisions.md` lets it take the
+"after" run of the batch before as its own "before" run. That holds when nothing that
+the suite measures changed since.
+
+- `./c coverage` writes `build/coverage/commit.txt` beside `summary.txt` when the last
+  part ends. Line 1 is the commit of `HEAD`, line 2 `clean` or `modified`. The first
+  part removes the file, so a run cut short leaves none.
+- A run is `clean` when no file outside `docs/`, `CLAUDE.md`, `README.md` and
+  `CHANGELOG.md` differed from `HEAD` at the start of the first part and at the end of
+  the last, and `HEAD` stayed the same.
+- A batch reuses the run when line 2 is `clean` and both commands print nothing:
+
+```bash
+git diff --name-only "$(head -1 build/coverage/commit.txt)" -- . ':!docs/' \
+    ':!CLAUDE.md' ':!README.md' ':!CHANGELOG.md'
+git status --porcelain -- . ':!docs/' ':!CLAUDE.md' ':!README.md' ':!CHANGELOG.md'
+```
+
+- Otherwise it runs `./c coverage` as before, and its parts with `./c coverage part
+  1/3` in a session whose command ends after ten minutes.
+- A batch runs its "after" run at its last commit that changes a file outside those
+  texts, so the next batch can take it. The report and the records of the times then
+  follow as commits of texts alone.
+
 ## For the next session
 
 - Auto mode refuses `git checkout -- .` and other resets of the working tree. To split

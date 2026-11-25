@@ -1356,6 +1356,11 @@ it are disabled in that tree alone.
   profiles of the run before, and the last writes the report from the
   profiles of every part.
 - `./c coverage report` writes the report again from the profiles on disk.
+- `./c coverage` writes `build/coverage/commit.txt` beside the summary: the
+  commit it measured and `clean` or `modified`. A batch takes a clean run of
+  the batch before as its "before" run, by answer 3 of "Answers of
+  2026-11-25". "Reusing a coverage run" in `docs/notes/hosts-and-harness.md`
+  holds the rule.
 - The measurement is no gate. A step runs it when its task says so.
 - `tools/coverage.cmake` holds the flags and the directory of the profiles,
   and `tools/coverage-report.cmake` writes the report.
