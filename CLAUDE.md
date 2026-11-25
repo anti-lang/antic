@@ -66,9 +66,12 @@ not re-open a settled decision without asking Eddie.
   or `CHANGELOG.md`, runs the docs-style checker over its `.md` files and
   nothing else. That covers reports and notes. Prose is prose wherever it
   sits. A push made only of such commits needs no suite.
-- A commit that changes anything else runs the full suite on the host first.
-  A push that includes such a commit runs both sanitizer suites first, once
-  per push and not once per commit. `cmake --preset asan` and `cmake --preset
+- A commit that changes anything else runs a fast set on the host first, by
+  answer 1 of "Answers of 2026-11-25": the C unit tests, the tests it adds
+  or changes and the tests of the areas it touches, which `./c test
+  changed` selects. A push that includes such a commit runs the full host
+  suite, in its three parts, and both sanitizer suites first, once per push
+  and not once per commit. `cmake --preset asan` and `cmake --preset
   ubsan`, each with the full suite. Build and test the asan tree with
   `cmake --build --preset asan` and `ctest --preset asan`, whose presets set
   `ASAN_OPTIONS=detect_leaks=1`. The presets of `ubsan` set the same and
@@ -1288,9 +1291,9 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
 - Do not narrate. No summaries of what you are about to do, no restating of the
   task, no lists of what you read. Say what changed and what failed, in one line
   each, and only when a step completes.
-- Run the full suite once per commit that needs it, not per edit. While working on
-  one test, run that test alone. Run the sanitizer suites once per push that needs
-  them.
+- Run `./c test changed` once per commit that needs it, not per edit. While working on
+  one test, run that test alone. Run the full host suite and the sanitizer suites once
+  per push that needs them.
 - Do not print test output into the context. Redirect it to a file and grep for
   failures. Show me at most the failing lines.
 - Do not show file contents you did not change. When you edit, show the diff, not
@@ -1309,7 +1312,15 @@ The target stands under "Binary distribution" in `docs/decisions.md`.
 ./c release    # Release build in build/release
 ./c test       # the Debug build, then its suite
 ./c coverage   # the coverage build, its suite and the coverage report
+./c test changed  # the Debug build, then the tests the changes select
 ```
+
+`./c test changed` reads the changes against `HEAD`, staged and not, and
+the untracked files outside `build/`, and `./c test changed origin/main`
+adds every commit since `origin/main`. It prints the areas of
+`tests/test-areas.txt` it picked and the number of tests, then runs them.
+"Choosing the tests of a change" in `docs/notes/hosts-and-harness.md`
+holds the rules, and the test `test_areas` refuses a test without an area.
 
 `./c` is a link to `tools/compile.sh`. It configures a tree on its first
 build and takes `asan`, `ubsan`, `coverage`, `test` and `fresh` as well. The long form is

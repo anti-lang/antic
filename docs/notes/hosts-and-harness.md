@@ -249,6 +249,48 @@ each of the five tests of `./r`, which then run the script again as each needs.
   does. Without it, CMake finds no Ninja and `deps_dir` fails. The full suite
   with `-j4` took 8 min 36 s on 2026-10-02.
 
+## Choosing the tests of a change
+
+Every test carries one area or more as a label of ctest, by answer 2 of "Answers of
+2026-11-25" in `docs/decisions.md`. The line `areas:` of `tests/test-areas.txt` names
+the set, and each area has one rule:
+
+| Area | A test carries it when it |
+|---|---|
+| `compiler` | runs antic, itself, through anti or through a runner, or reads `src/antic/` |
+| `runtime` | runs antic or anti, names the runtime archive, or reads `src/rt/` or `src/native/` |
+| `std` | runs antic or anti, names the runtime archive, whose `std/` holds the library, or reads `src/std/` |
+| `tool` | runs anti, or reads `src/anti/` |
+| `packaging` | checks the pins, the toolchain, a package, the installers, `./r` or `deps_dir` |
+| `repo` | is a guard that reads files of the whole tree |
+| `unit` | is a C unit test, `unit_<file>`, or a program of the runtime of `tests/unit/` |
+
+- `tests/test_areas.cmake` reads the map. In `tests/CMakeLists.txt` and
+  `src/native/CMakeLists.txt` a call `antic_test_area(<area>...)` opens a section, and
+  the next call gives every test registered in between the areas of the section. A
+  test of another area inside a section stands between two calls of its own.
+- `test_areas` refuses a test without an area and a label outside the set. It reads the
+  command of each test: one that names antic lacks no area of `compiler`, `runtime` and
+  `std`, and one that names anti lacks no area of those and `tool`. A program name
+  counts only before `,` or the end of its word, so `antic_unit_tests` is no antic.
+- The same test refuses a line of the map whose path names nothing. It also refuses a
+  script of `-DSCRIPTS` that does not spell the path of the map. `tools/compile.sh` is
+  that script.
+- `./c test changed` reads `git diff --name-only --no-renames HEAD` and the untracked
+  files outside `build/`. `./c test changed origin/main` reads every commit since
+  `origin/main` as well, which is what a push holds.
+- The first line of the map that names a path decides for it. `none` selects nothing,
+  `all` every test, and a path no line names selects every test. Every change that
+  selects a test adds `unit` and `repo`.
+- `named` selects the tests whose line in a `CTestTestfile.cmake` of the tree names the
+  file, a file of its stem beside it or a directory of `tests/` that holds it. A path
+  that no test names in any of the three ways selects every test. A program of
+  `tests/matrix/` is three tests, and every refusal of the matrix runs in that directory.
+- The word prints the number of changed paths, the areas and the number of tests. It
+  runs `ctest -j<cores> -L` on the areas, then `--tests-from-file` on the named tests
+  outside them. ctest adds the fixtures a selected test needs, such as
+  `dev_object_<module>`, beyond the count.
+
 ## For the next session
 
 - Auto mode refuses `git checkout -- .` and other resets of the working tree. To split

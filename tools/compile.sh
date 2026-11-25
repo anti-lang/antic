@@ -8,6 +8,13 @@
 #   ./c <config> test    build, then run the suite of that tree
 #   ./c <config> fresh   configure the tree again before the build
 #
+#   ./c test changed [<base>]
+#                        build in build/host and run the tests that the
+#                        changes since <base>, HEAD by default, select:
+#                        the tracked changes, staged and not, and the
+#                        untracked files outside build/. A base such as
+#                        origin/main takes in every commit since it
+#
 #   ./c coverage             build in build/coverage, run the suite and
 #                            write the coverage report
 #   ./c coverage part 1/3    the same with the suite in parts, one call per
@@ -31,6 +38,11 @@
 # installs the pinned clang, the LLVM tools, the sysroots and raylib under
 # build/deps. A later build configures again with fresh alone. The job
 # count is the number of processors.
+#
+# tests/test-areas.txt maps each path to the areas of the tests a change
+# of it selects. changed prints the areas and the number of tests it
+# picked and runs them, the unit tests and the guards of the repository
+# among them, by answer 2 of "Answers of 2026-11-25" in docs/decisions.md.
 set -eu
 
 root=$(cd "$(dirname "$0")" && pwd)
@@ -43,9 +55,16 @@ fresh=0
 part=
 report=0
 after=
+changed=0
+base=HEAD
 for arg in "$@"; do
     if [ "$after" = part ]; then
         part=$arg
+        after=
+        continue
+    fi
+    if [ "$after" = changed ]; then
+        base=$arg
         after=
         continue
     fi
@@ -53,13 +72,25 @@ for arg in "$@"; do
         debug|host) preset=host ;;
         release|asan|ubsan|coverage) preset=$arg ;;
         test) test=1 ;;
+        changed) changed=1; test=1; after=changed ;;
         fresh) fresh=1 ;;
         part) after=part ;;
         report) report=1 ;;
-        -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "c: unknown argument $arg" >&2; exit 64 ;;
     esac
 done
+if [ "$after" = changed ]; then
+    after=
+fi
+if [ "$changed" = 1 ] && [ "$preset" != host ]; then
+    echo "c: test changed runs the tests of build/host" >&2
+    exit 64
+fi
+if [ "$changed" = 1 ] && ! git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+    echo "c: test changed takes a commit, not $base" >&2
+    exit 64
+fi
 if [ "$preset" != coverage ] && { [ -n "$part$after" ] || [ "$report" = 1 ]; }; then
     echo "c: part and report belong to ./c coverage" >&2
     exit 64
@@ -81,6 +112,97 @@ fi
 
 jobs=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 tree="build/$preset"
+
+# The map of the areas, which tests/test_areas.cmake names as well and
+# the test test_areas holds to this spelling.
+map=tests/test-areas.txt
+
+# Print the number of / in $1.
+slashes() {
+    printf '%s' "$1" | tr -cd / | wc -c | tr -d ' '
+}
+
+# Print the words of the first line of the map that names the path $1,
+# and all when no line names it. A * of a file line stands for any
+# characters but /, so the line and the path hold as many / each.
+map_words() {
+    depth=$(slashes "$1")
+    while read -r pattern words; do
+        case "$pattern" in
+            ''|'#'*|areas:) continue ;;
+            */) case "$1" in "$pattern"*) echo "$words"; return ;; esac ;;
+            *)
+                if [ "$(slashes "$pattern")" = "$depth" ]; then
+                    case "$1" in $pattern) echo "$words"; return ;; esac
+                fi ;;
+        esac
+    done < "$map"
+    echo all
+}
+
+# Print the files of the tests of the tree, by the subdirs() line of each.
+test_files() {
+    dirs=$tree
+    while [ -n "$dirs" ]; do
+        next=
+        for dir in $dirs; do
+            echo "$dir/CTestTestfile.cmake"
+            for sub in $(sed -n 's/^subdirs("\(.*\)")$/\1/p' "$dir/CTestTestfile.cmake"); do
+                next="$next $dir/$sub"
+            done
+        done
+        dirs=$next
+    done
+}
+
+# Print the texts that name the path $1 of tests/ in a test file: the
+# file, a file of its stem beside it and each directory that holds it,
+# up to tests/, each before the characters that may end a word there.
+# The test files spell the source directory as the tree's cache names it.
+named_texts() {
+    dir=${1%/*}
+    file=${1##*/}
+    stem=${file%%.*}
+    for end in '"' ',' ';' ']'; do
+        echo "$source/$1$end"
+    done
+    if [ -n "$stem" ]; then
+        echo "$source/$dir/$stem."
+    fi
+    while :; do
+        for end in '"' ',' ';' ']' '/"'; do
+            echo "$source/$dir$end"
+        done
+        case "$dir" in */*) dir=${dir%/*} ;; *) break ;; esac
+    done
+}
+
+if [ "$changed" = 1 ]; then
+    mkdir -p "$tree"
+    paths="$tree/changed-paths.txt"
+    {
+        git -c core.quotepath=false diff --name-only --no-renames "$base"
+        git -c core.quotepath=false ls-files --others --exclude-standard
+    } | grep -v '^build/' | sort -u > "$paths"
+    areas=
+    named="$tree/changed-named.txt"
+    : > "$named"
+    everything=0
+    while IFS= read -r path; do
+        words=$(map_words "$path")
+        case "$words" in
+            all) everything=1 ;;
+            none) ;;
+            named) echo "$path" >> "$named" ;;
+            *) areas="$areas $words" ;;
+        esac
+    done < "$paths"
+    echo "c: $(wc -l < "$paths" | tr -d ' ') changed paths since $base"
+    if [ "$everything" = 0 ] && [ -z "$areas" ] && [ ! -s "$named" ]; then
+        echo "c: the changes select no test"
+        exit 0
+    fi
+fi
 
 if [ "$fresh" = 1 ] || [ ! -f "$tree/CMakeCache.txt" ]; then
     cmake --preset "$preset"
@@ -111,6 +233,64 @@ if [ "$preset" = coverage ]; then
     exit "$status"
 fi
 cmake --build --preset "$preset" -j "$jobs"
+if [ "$changed" = 1 ]; then
+    status=0
+    if [ "$everything" = 1 ]; then
+        total=$(ctest --preset host -N | sed -n 's/^Total Tests: //p')
+        echo "c: areas: all, $total tests"
+        ctest --preset host -j "$jobs" || status=$?
+        echo "c: $preset build in $tree"
+        exit "$status"
+    fi
+    # A change that selects a test selects the unit tests and the guards
+    # of the repository as well.
+    areas=$(echo unit repo $areas | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    areas=${areas% }
+    expression="^($(echo "$areas" | tr ' ' '|'))\$"
+    listed="$tree/changed-listed.txt"
+    ctest --preset host -N -L "$expression" |
+        sed -n 's/^ *Test *#[0-9]*: //p' > "$listed"
+    # The tests that name a changed file of tests/ and carry none of the
+    # areas, by the rule `named` of tests/test-areas.txt. A file that no
+    # test names selects every test.
+    extra="$tree/changed-tests.txt"
+    : > "$extra"
+    texts="$tree/changed-texts.txt"
+    files=$(test_files)
+    source=$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$tree/CMakeCache.txt")
+    while IFS= read -r path; do
+        named_texts "$path" > "$texts"
+        names=$(grep -h -F -f "$texts" $files |
+            sed -n -e 's/^add_test("\([^"]*\)".*/\1/p' \
+                   -e 's/^set_tests_properties("\([^"]*\)".*/\1/p' |
+            sort -u)
+        if [ -z "$names" ]; then
+            echo "c: no test names $path, so it selects every test"
+            everything=1
+            break
+        fi
+        echo "$names" >> "$extra"
+    done < "$named"
+    if [ "$everything" = 1 ]; then
+        total=$(ctest --preset host -N | sed -n 's/^Total Tests: //p')
+        echo "c: areas: all, $total tests"
+        ctest --preset host -j "$jobs" || status=$?
+        echo "c: $preset build in $tree"
+        exit "$status"
+    fi
+    sort -u "$extra" | grep -v -x -F -f "$listed" > "$extra.new" || true
+    mv "$extra.new" "$extra"
+    count=$(wc -l < "$listed" | tr -d ' ')
+    more=$(wc -l < "$extra" | tr -d ' ')
+    echo "c: areas: $areas, $count tests"
+    echo "c: tests that name a changed file of tests/: $more more"
+    ctest --preset host -j "$jobs" -L "$expression" || status=$?
+    if [ "$more" != 0 ]; then
+        ctest --preset host -j "$jobs" --tests-from-file "$extra" || status=$?
+    fi
+    echo "c: $preset build in $tree"
+    exit "$status"
+fi
 if [ "$test" = 1 ]; then
     ctest --preset "$preset" -j "$jobs"
 fi

@@ -119,6 +119,13 @@ foreach(target IN LISTS ANTIC_TARGETS)
     endif()
 endforeach()
 
+# The areas of the tests of this directory, by answer 2 of "Answers of
+# 2026-11-25" in docs/decisions.md. A test here builds a native library,
+# links a program of antic against it or reads a pin.
+include("${PROJECT_SOURCE_DIR}/tests/test_areas.cmake")
+antic_test_areas_read()
+antic_test_area(runtime compiler std packaging)
+
 include(pcre2.cmake)
 include(sqlite.cmake)
 include(mbedtls.cmake)
@@ -250,3 +257,6 @@ foreach(target IN LISTS ANTIC_NATIVE_TARGETS)
         set_tests_properties(${name} PROPERTIES TIMEOUT 180)
     endforeach()
 endforeach()
+
+# The last call gives the tests above it their areas.
+antic_test_area()

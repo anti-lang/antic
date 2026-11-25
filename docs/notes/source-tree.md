@@ -469,6 +469,8 @@ The files directly under `tests/`.
 | `tests/pinned_clang.cmake` | Puts the pinned clang of the build first on `PATH` for a runner whose cases run `anti bind --clang`. |
 | `tests/program_output.cmake` | The functions a runner includes to run antic, `anti` and a program with the output in files, to compare the status and the bytes, and to fake a release. |
 | `tests/release_copy.cmake` | The clone of the tree with a bare origin and a bumped version that the tests `release_*` run `./r` on, and its first `./r --dry-run`. |
+| `tests/test-areas.txt` | The areas of the tests, which `./c test changed` selects by, and what a change of each path of the repository selects. |
+| `tests/test_areas.cmake` | Reads the areas and the lines of `tests/test-areas.txt`, and gives each test of a section its areas with `antic_test_area`. |
 
 ### The directories
 
@@ -849,6 +851,8 @@ Each runner runs as `cmake -P`, and its header names the values it takes.
 | `tests/runners/run_sysroot_links.cmake` | Checks that the sysroot script turns an absolute link relative. |
 | `tests/runners/run_target_lists.cmake` | Refuses the six targets spelled outside `tools/cpu-levels`. |
 | `tests/runners/run_target_triples.cmake` | Refuses a triple of the C of a target outside `antic_target_triple` of `tools/target-compile.cmake`. |
+| `tests/runners/run_test_areas.cmake` | Refuses a test without an area of `tests/test-areas.txt`, an area outside it, a test without the area of what its command names and a line of the map that names nothing. |
+| `tests/runners/run_test_areas_self.cmake` | Tests `run_test_areas.cmake` on made-up lists of tests and maps. |
 | `tests/runners/run_trace.cmake` | Runs a program and matches its output against pattern files. |
 | `tests/runners/run_trap.cmake` | Builds a program that must stop and compares its message. |
 | `tests/runners/run_trap_table.cmake` | Checks the trap of an unset table entry per build mode. |

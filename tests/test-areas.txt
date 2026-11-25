@@ -1,0 +1,66 @@
+# The areas of the tests and what a change of each path selects, by
+# answer 2 of "Answers of 2026-11-25" in docs/decisions.md. `./c test
+# changed` reads it, and so do tests/test_areas.cmake and the test
+# test_areas. "Choosing the tests of a change" in
+# docs/notes/hosts-and-harness.md gives the rule of each area.
+#
+# A line is a path and one word or more. A path that ends in / names a
+# directory and every file below it. Any other path names one file, and a
+# * in it stands for any characters but /. The first line that
+# names a changed path decides for it. Its words are areas, whose tests
+# the change selects, or one of three words: all selects every test, none
+# selects no test, and named selects the tests whose command names the
+# file, a file of its stem beside it or a directory of tests/ that holds
+# it. A path that no line names, or that no test names under named,
+# selects every test. A change that selects a test selects the areas unit
+# and repo as well.
+
+areas: compiler runtime std tool packaging repo unit
+
+docs/ none
+CLAUDE.md none
+README.md none
+CHANGELOG.md none
+
+CMakeLists.txt all
+CMakePresets.json all
+src/native/CMakeLists.txt all
+tests/CMakeLists.txt all
+tests/runners/ all
+tests/anti_messages.cmake named
+tests/antic_messages.cmake named
+tests/*.cmake all
+tests/known-failures.txt all
+tests/binary_stdio.h all
+tools/fuzz/ compiler
+tools/*.cmake all
+tools/*-pin all
+tools/sysroot-pins all
+tools/cpu-levels all
+tools/version all
+tools/llvm-version all
+tools/release-base all
+tools/site-base all
+
+src/antic/ compiler
+src/anti/ tool
+src/rt/ runtime compiler tool
+src/native/ runtime packaging
+src/std/ std
+
+tests/unit/ unit
+tests/test-areas.txt repo
+tests/diagnostics-open.txt repo
+tests/options-open.txt repo
+tests/ named
+
+tools/docs-style/ repo
+tools/hooks/ repo
+tools/ packaging
+LICENSES/ packaging runtime tool
+LICENSE packaging runtime tool
+.editorconfig repo
+.gitattributes repo
+.gitignore repo
+c packaging
+r packaging

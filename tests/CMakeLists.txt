@@ -9,6 +9,12 @@
 # the first test reads either. llvm-mc assembles the output of `antic -S`
 # for the tests of the assembly, and no package carries it.
 
+# The areas of the tests, by answer 2 of "Answers of 2026-11-25" in
+# docs/decisions.md. Each section below names the areas of its tests with
+# antic_test_area, and test_areas refuses a test without one.
+include("${CMAKE_CURRENT_SOURCE_DIR}/test_areas.cmake")
+antic_test_areas_read()
+
 # The first two values of a runner that runs antic: antic, and the runtime
 # archive it builds against.
 set(ANTIC_AND_RUNTIME "-DANTIC=$<TARGET_FILE:antic>"
@@ -416,6 +422,7 @@ set(MATRIX "${CMAKE_CURRENT_SOURCE_DIR}/matrix")
 
 # The unit tests of tests/unit/: antic_unit_tests, one test per file,
 # and the programs of the runtime that a file of its own builds.
+antic_test_area(unit)
 
 # The unit tests link anti_core, every file of anti but its main, and the
 # files of the runtime they test.
@@ -726,6 +733,7 @@ antic_coverage(rt_signal_tests rt_conf_tests rt_plugin_tests rt_object_tests
 # dev objects of the standard library, the checks of a dev build, the
 # traps, the runtime configuration, injection, plugins, traces, libraries
 # for C, the benchmarks and the matrix.
+antic_test_area(compiler runtime std)
 
 # DESIGN: the dev objects of the standard library are compiled once per
 # suite, each by the test dev_object_<name> into anti_<name>_dev of this
@@ -1744,6 +1752,7 @@ if(ANTIC_HOST_TARGET STREQUAL "windows-arm64")
         DISABLED TRUE)
 endif()
 
+antic_test_area(compiler runtime std tool)
 # The `tests` block of a module of the standard library. The module
 # imports other modules, so the dev run links an object of each.
 add_test(NAME std_tests_trace
@@ -1754,6 +1763,7 @@ add_test(NAME std_tests_trace
         "-DSOURCE=${ANTIC_STD_SOURCE_DIR}/trace.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/std-tests-trace"
         -P "${ANTIC_RUNNERS}/run_std_tests.cmake")
+antic_test_area(compiler runtime std)
 
 add_test(NAME check_cpu
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
@@ -2731,6 +2741,7 @@ add_test(NAME conf_include_relative
 set_tests_properties(conf_include_relative PROPERTIES
     WORKING_DIRECTORY "${CONF}")
 
+antic_test_area(compiler runtime std tool)
 # The runtime and `anti symbols` stop a chain of includes at one depth,
 # with one message.
 add_test(NAME conf_include_depth
@@ -2742,6 +2753,7 @@ add_test(NAME conf_include_depth
         "-DHOST=${ANTIC_HOST_TARGET}"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/conf-include-depth"
         -P "${ANTIC_RUNNERS}/run_conf_include_depth.cmake")
+antic_test_area(compiler runtime std)
 
 # The seed of the hashing collections without a fixed one: two runs of one
 # program choose two seeds.
@@ -2835,6 +2847,7 @@ add_test(NAME inject_closed
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/inject-closed"
         -P "${ANTIC_RUNNERS}/run_trace.cmake")
 
+antic_test_area(compiler runtime std tool)
 # The `[inject]` and `[inject.test]` tables of a manifest. `anti test`
 # runs in the project root, reads both and lays the test table over the
 # plain one, per interface. The one test of the module adds the label of
@@ -2891,6 +2904,7 @@ foreach(mode dev release)
                 -I src --runtime "${ANTIC_RUNTIME_DIR}"
  src/com/example/tree.anti src/com/example/window.anti)
 endforeach()
+antic_test_area(compiler runtime std)
 
 # Every `anti` block of docs/notes/graphics.md stands word for word in a
 # program the suite builds: the first in graphics_hello, the sketch of the
@@ -5679,6 +5693,7 @@ add_test(NAME runtime_from_data_dir
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/datadir"
         -P "${ANTIC_RUNNERS}/run_runtime_from_data_dir.cmake")
 
+antic_test_area(compiler runtime std tool)
 # Paths outside ASCII on the command line, in the place of antic, in the
 # data directory of the user and in a project of anti. Windows reads each
 # through UTF-16.
@@ -5690,6 +5705,7 @@ add_test(NAME unicode_paths
         "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/programs/return42.anti"
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/unicode-paths"
         -P "${ANTIC_RUNNERS}/run_unicode_paths.cmake")
+antic_test_area(compiler runtime std)
 
 # The platform linker links only for the operating system it runs on.
 if(ANTIC_HOST_OS STREQUAL "linux")
@@ -7121,6 +7137,8 @@ endforeach()
 
 # The commands of anti.
 
+antic_test_area(tool compiler runtime std)
+
 add_expect_test(anti_version STATUS 0
     EXPECTED "${CMAKE_CURRENT_BINARY_DIR}/expect/anti_version"
     COMMAND "$<TARGET_FILE:anti>" --version)
@@ -8386,6 +8404,8 @@ add_expect_test(anti_lto_library STATUS 2
 
 # The runtime archive, the pins, the packages and the release.
 
+antic_test_area(runtime std)
+
 # The runtime archive holds the licence text of every component.
 add_expect_test(runtime_licenses STATUS 0
     PATTERN "^BSD Zero Clause License"
@@ -8438,6 +8458,8 @@ add_test(NAME native_frames
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/native-frames.txt"
         -P "${ANTIC_RUNNERS}/run_native_frames.cmake")
 set_tests_properties(native_frames PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP: ")
+
+antic_test_area(packaging compiler runtime std tool)
 
 # bin/ of the runtime archive is built by the root CMakeLists.txt from
 # the directory of the pinned LLVM tools, and by no file of tests/.
@@ -8577,6 +8599,7 @@ if(ANTIC_FAULTS)
         "ANTI_FAULT=open:1:EIO,open:2:EIO,open:3:EIO,open:4:EIO,open:5:EIO,open:6:EIO,open:7:EIO,open:8:EIO,open:9:EIO")
 endif()
 
+antic_test_area(packaging runtime std)
 add_test(NAME release_pins
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_release_pins.cmake")
@@ -8658,6 +8681,8 @@ if(ANTIC_HOST_OS STREQUAL "macos")
                 "-DWORK=${coverage_work}"
                 -P "${ANTIC_RUNNERS}/run_coverage_report.cmake")
 endif()
+
+antic_test_area(packaging compiler runtime std tool)
 
 # A Linux program of a release names no glibc symbol above the pinned
 # 2.35, which tools/pack-anti.cmake reads before it writes a package
@@ -8830,6 +8855,8 @@ add_test(NAME own_tools
             "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/own_tools"
             -P "${ANTIC_RUNNERS}/run_own_tools.cmake")
 
+antic_test_area(packaging)
+
 # The binaries of a release are assets of its GitHub release, and the
 # installers take them from there and from nowhere else.
 add_test(NAME installer_github
@@ -8907,6 +8934,8 @@ set_tests_properties(release_dry_run_runner PROPERTIES
     SKIP_REGULAR_EXPRESSION "SKIP: ")
 
 # Checks that read the sources, the documents and the runners.
+
+antic_test_area(repo compiler runtime std tool)
 
 # Every host branch of antic, anti and the runtime stands in their
 # platform layers, src/antic/platform.c and src/anti/platform.c with their
@@ -9168,6 +9197,7 @@ add_test(NAME presets
     COMMAND "${CMAKE_COMMAND}" "-DPRESETS=${CMAKE_SOURCE_DIR}/CMakePresets.json"
             -P "${ANTIC_RUNNERS}/run_presets.cmake")
 
+antic_test_area(packaging)
 # A configure with -DANTI_DEPS_DIR reads the pinned downloads of another
 # directory, and a copy of the sources builds against this tree's.
 add_test(NAME deps_dir
@@ -9178,6 +9208,7 @@ add_test(NAME deps_dir
             "-DSYSROOT=${ANTIC_SYSROOT_DIR}" "-DRAYLIB=${ANTIC_RAYLIB_DIR}"
             -P "${ANTIC_RUNNERS}/run_deps_dir.cmake")
 
+antic_test_area(repo compiler runtime std tool)
 add_test(NAME line_endings
     COMMAND "${CMAKE_COMMAND}" "-DROOT=${CMAKE_SOURCE_DIR}"
             -P "${ANTIC_RUNNERS}/run_line_endings.cmake")
@@ -9208,6 +9239,7 @@ add_test(NAME overview_examples
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/overview"
         -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
 
+antic_test_area(compiler runtime std)
 # Every page of the developer's guide, through the same runner and its
 # marks: every `anti` block compiles, a program prints its `text output`
 # block, a `refused` block fails with the error it names, and an `llvm`
@@ -9221,6 +9253,7 @@ add_test(NAME guide_examples
         "-DLLVM_MC=${ANTIC_LLVM_MC}"
         "-DLLVM_OBJDUMP=${ANTIC_RUNTIME_OBJDUMP}"
         -P "${ANTIC_RUNNERS}/run_document_examples.cmake")
+antic_test_area(repo compiler runtime std tool)
 
 # The site page of the build tool names the commands of anti and the
 # options of anti and antic as their usage gives them (M363).
@@ -9287,6 +9320,34 @@ add_test(NAME skips_registered_runner
         "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/skips-registered"
         -P "${ANTIC_RUNNERS}/run_skips_registered_self.cmake")
 
+# Every test carries an area of tests/test-areas.txt, which `./c test
+# changed` selects by, and every line of the map names a path of the
+# repository, by answer 2 of "Answers of 2026-11-25" in docs/decisions.md.
+# test_areas reads every test of the tree.
+set(test_areas_compilers "$<TARGET_FILE:antic>")
+set(test_areas_tools "$<TARGET_FILE:anti>")
+set(test_areas_archives "${ANTIC_RUNTIME_DIR}")
+if(ANTIC_FAULTS)
+    list(APPEND test_areas_compilers "$<TARGET_FILE:antic_faults>")
+    list(APPEND test_areas_tools "$<TARGET_FILE:anti_faults>")
+    list(APPEND test_areas_archives "${ANTIC_FAULTS_RUNTIME_DIR}")
+endif()
+list(JOIN test_areas_compilers "," test_areas_compilers)
+list(JOIN test_areas_tools "," test_areas_tools)
+list(JOIN test_areas_archives "," test_areas_archives)
+add_test(NAME test_areas
+    COMMAND "${CMAKE_COMMAND}"
+        "-DCTEST=${CMAKE_CTEST_COMMAND}" "-DTREE=${CMAKE_BINARY_DIR}"
+        "-DMAP=${ANTIC_TEST_AREAS_MAP}" "-DROOT=${PROJECT_SOURCE_DIR}"
+        "-DCOMPILERS=${test_areas_compilers}" "-DTOOLS=${test_areas_tools}"
+        "-DRUNTIME=${test_areas_archives}" "-DSCRIPTS=tools/compile.sh"
+        -P "${ANTIC_RUNNERS}/run_test_areas.cmake")
+add_test(NAME test_areas_runner
+    COMMAND "${CMAKE_COMMAND}"
+        "-DRUNNER=${ANTIC_RUNNERS}/run_test_areas.cmake"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/test-areas"
+        -P "${ANTIC_RUNNERS}/run_test_areas_self.cmake")
+
 # antic allocates through src/antic/alloc.c alone, and the front end
 # includes no header of the IR for its memory. The programs of tests/ that
 # link antic_core, itself or through anti_core, take their memory from
@@ -9345,6 +9406,8 @@ add_test(NAME known_failures_runner
         "-DRUNNER=${ANTIC_RUNNERS}/run_known_failures.cmake"
         "-DWORK=${KNOWN_FAILURES_WORK}/runner"
         -P "${ANTIC_RUNNERS}/run_known_failures_self.cmake")
+# The last call gives the tests above it their areas.
+antic_test_area()
 known_failures_read("${KNOWN_FAILURES}" known_names known_ids known_hosts
                     known_wrong)
 get_property(known_tests DIRECTORY PROPERTY TESTS)
