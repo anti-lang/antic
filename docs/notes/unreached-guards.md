@@ -2106,6 +2106,21 @@ line numbers are those of the sources after the batch.
 | `lower_guard_missing` of `src/antic/lower_error.c`, line 310 | A handler of a guard that reaches its end. | The checker refuses it with `` the handler of a value can reach its end without `yield` ``. |
 | `lower_fail` of `src/antic/lower_error.c`, line 392 | A `fail` without the class of the error or without `capture`. | `sema_resolve_origin` refuses a `fail` where `anti.lang` lacks either, and a refused program is not lowered. |
 
+## The sides of batch 3bd
+
+Batch 3bd of the third phase read the parser of a spelling of a C type
+in `src/anti/bindtype.c` and the module path of a source in
+`src/antic/modpath.c`. It found T442 to T444 and fixed all three. The
+line numbers are those of the sources after the batch.
+
+| Function | What it guards against | Why no input reaches it |
+|---|---|---|
+| `bind_known_name` of `src/anti/bindtype.c`, line 50 | The name `_Bool` as a typedef name. | `specifiers` takes `_Bool` as a word of a builtin type, so it never asks `bind_known_name` for that name. |
+| `specifiers` of `src/anti/bindtype.c`, line 318 | A typedef name after a tag. | A tag sets `named` and `any` together, so `named` is empty while `any` is clear. |
+| `specifiers` of `src/anti/bindtype.c`, line 343 | A typedef name beside other words of the specifiers. | The loop takes a typedef name before every other word alone and stops after it. While `any` holds, `named` is a tag: a record, an enum or an opaque record. |
+| `separates` of `src/antic/modpath.c`, line 31 | A separator other than `/`. | `platform_separator` gives `/` on macOS, which the first test takes. |
+| `normal_file` of `src/antic/modpath.c`, line 87 | An empty absolute path. | `platform_absolute_path` gives a path that starts with `/`, or fails, and a failure skips the test. |
+
 ## Not in this note
 
 - The paths that run on another host: `find_crt_dir`, the ELF and PE
